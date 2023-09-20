@@ -675,18 +675,24 @@ object TransformFunctions {
       .filter(col("cluster_id").isNotNull)
       .distinct()
 
-    val latestSnapW = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
-    // capture long-running clusters not otherwise captured from audit
-    val currentlyRunningClusters = clusterSnapshotTable
-      .withColumn("snapRnk", rank.over(latestSnapW))
-      .filter(col("snapRnk") === 1)
-      .filter(col("state") === "RUNNING")
-      .select(col("cluster_id"))
-      .distinct
+    if(clusterSnapshotTable.isEmpty){
+       newClustersIDs
+    }else{
+      val latestSnapW = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
+      // capture long-running clusters not otherwise captured from audit
+      val currentlyRunningClusters = clusterSnapshotTable
+        .withColumn("snapRnk", rank.over(latestSnapW))
+        .filter(col("snapRnk") === 1)
+        .filter(col("state") === "RUNNING")
+        .select(col("cluster_id"))
+        .distinct
 
-    newClustersIDs
-      .unionByName(currentlyRunningClusters)
-      .distinct
+      newClustersIDs
+        .unionByName(currentlyRunningClusters)
+        .distinct
+    }
+
+
 
   }
 

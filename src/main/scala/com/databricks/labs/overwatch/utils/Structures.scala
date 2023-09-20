@@ -320,7 +320,13 @@ case class MultiWSDeploymentReport(
 
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 
-case class CloneDetail(source: String, target: String, asOfTS: Option[String] = None, cloneLevel: String = "DEEP")
+
+case class CloneDetail(source: String,
+                       target: String,
+                       asOfTS: Option[String] = None,
+                       cloneLevel: String = "DEEP",
+                       immutableColumns:Array[String] = Array(),
+                       mode: WriteMode.WriteMode = WriteMode.append)
 
 case class CloneReport(cloneSpec: CloneDetail, cloneStatement: String, status: String)
 
@@ -330,7 +336,7 @@ case class OrgWorkspace(organization_id: String, workspace: Workspace)
 
 case class NamedColumn(fieldName: String, column: Column)
 
-case class ModuleRollbackTS(organization_id: String, moduleId: Int, rollbackTS: Long)
+case class ModuleRollbackTS(organization_id: String, moduleId: Int, rollbackTS: Long, isAzure: Boolean)
 
 case class TargetRollbackTS(organization_id: String, target: PipelineTable, rollbackTS: Long)
 
@@ -354,7 +360,7 @@ case class SanitizeFieldException(field: StructField, rules: List[SanitizeRule],
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, dbsql, pools = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, dbsql, pools, notebookCommands = Value
   // Todo Issue_77
 }
 

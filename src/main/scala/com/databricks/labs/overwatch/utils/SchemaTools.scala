@@ -241,7 +241,7 @@ object SchemaTools extends SparkSessionWrapper {
               s"null_${randomString(22L, 6)}"
             } else kRaw
             mapCols.add(lit(k).cast("string"))
-            mapCols.add(col(s"${colToConvert}.${field.name}").cast("string"))
+            mapCols.add(col(s"${colToConvert}.`${field.name}`").cast("string"))
           })
           val newRawMap = map(mapCols.toSeq: _*)
           if (dropEmptyKeys) {

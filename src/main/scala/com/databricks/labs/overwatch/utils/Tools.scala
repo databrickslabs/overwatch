@@ -20,6 +20,8 @@ import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryListener}
+import org.apache.spark.sql.streaming.StreamingQueryListener.{QueryProgressEvent, QueryStartedEvent, QueryTerminatedEvent}
 
 import java.net.URI
 import java.time.LocalDate
@@ -194,7 +196,7 @@ object Helpers extends SparkSessionWrapper {
     if (globPath.isEmpty)
       false
     else
-       true
+      true
   }
 
 
@@ -584,8 +586,8 @@ object Helpers extends SparkSessionWrapper {
                             ): Workspace = {
     // verify database exists
     val initialCatalog = getCurrentCatalogName(spark)
-      val etlDBWithOutCatalog = if(etlDB.contains(".")){
-        setCurrentCatalog(spark, etlDB.split("\\.").head)
+    val etlDBWithOutCatalog = if(etlDB.contains(".")){
+      setCurrentCatalog(spark, etlDB.split("\\.").head)
       etlDB.split("\\.").last
     } else etlDB
 
@@ -653,7 +655,7 @@ object Helpers extends SparkSessionWrapper {
 
     //val workspaceID = Initializer.getOrgId
 
-  val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
+    val statusFilter = if (successfulOnly) 'status === "SUCCESS" else lit(true)
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
     val testConfig = spark.read.format("delta").load(pipelineReportPath)
       .filter(statusFilter)
@@ -776,43 +778,89 @@ object Helpers extends SparkSessionWrapper {
     registrationReport
   }
 
+  /**
+   * derive the incremental delete logic for the targetToRollback and execute the rollback delete
+   * @param rollbackTarget target to be rolled back with required metadata for the rollback
+   * @param dryRun whether the rollback is dryRun or not
+   */
+  private def executeRollbackDelete(rollbackTarget: TargetRollbackTS, dryRun: Boolean): Unit = {
+    val deleteLogger = Logger.getLogger("ROLLBACK Logger")
+    val target = rollbackTarget.target
+    val rollbackToTime = Pipeline.createTimeDetail(rollbackTarget.rollbackTS)
+    val targetSchema = target.asDF.schema
+    val incrementalFields = targetSchema.filter(f => target.incrementalColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
+    val incrementalFilters = incrementalFields.map(f => {
+      f.dataType.typeName match {
+        case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
+        case "double" => s"""cast(${f.name} as long) >= ${rollbackToTime.asUnixTimeMilli}"""
+        case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
+        case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
+      }
+    })
+    val orgIdFilter = s" and organization_id = '${rollbackTarget.organization_id}'"
+    val deleteClause = incrementalFilters.reduce((x, y) => s"$x and $y ") + orgIdFilter
+    val deleteStatement =
+      s"""
+         |delete from ${target.tableFullName}
+         |where $deleteClause
+         |""".stripMargin
+    deleteLogger.info(s"DELETE STATEMENT: $deleteStatement")
+    try {
+      if (!dryRun) spark.sql(deleteStatement)
+    } catch {
+      case e: Throwable =>
+        val failMsg = s"FAILED DELETE FROM TARGET: ${target.tableFullName}\n\nDELETE STATEMENT: ${deleteStatement}"
+        println(PipelineFunctions.appendStackStrace(e, failMsg))
+        deleteLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+    }
+  }
+
+  /**
+   * When supporting rollback functionality for certain tables, additional deletes may be necessary. Handle
+   * secondary deletes in this function
+   * @param rollbackTarget primary target with rollback metadata to be rolled back
+   * @param dryRun whether or not it's a dry run or not
+   * @param bronzePipeline the bronze pipeline
+   */
+  private def dropSecondaryData(
+                                 rollbackTarget: TargetRollbackTS,
+                                 dryRun: Boolean,
+                                 bronzePipeline: Bronze
+                               ): Unit = {
+    rollbackTarget.target.name match {
+      case "spark_events_bronze" =>
+        val secondaryRollbackTarget = TargetRollbackTS(
+          rollbackTarget.organization_id,
+          PipelineFunctions.getPipelineTarget(bronzePipeline, "spark_events_processedFiles"),
+          rollbackTarget.rollbackTS
+        )
+        executeRollbackDelete(secondaryRollbackTarget, dryRun)
+    }
+
+  }
+
   private def rollbackTargetToTimestamp(
                                          targetsToRollbackByTS: Array[TargetRollbackTS],
-                                         dryRun: Boolean
+                                         dryRun: Boolean,
+                                         bronzePipeline: Bronze
                                        ): Unit = {
-    val deleteLogger = Logger.getLogger("ROLLBACK Logger")
     val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism - 1))
     val targetsToRollback = targetsToRollbackByTS.par
     targetsToRollback.tasksupport = taskSupport
 
     targetsToRollback.foreach(rollbackTarget => {
-      val target = rollbackTarget.target
-      val rollbackToTime = Pipeline.createTimeDetail(rollbackTarget.rollbackTS)
-      val targetSchema = target.asDF.schema
-      val incrementalFields = targetSchema.filter(f => target.incrementalColumns.map(_.toLowerCase).contains(f.name.toLowerCase))
-      val incrementalFilters = incrementalFields.map(f => {
-        f.dataType.typeName match {
-          case "long" => s"${f.name} >= ${rollbackToTime.asUnixTimeMilli}"
-          case "double" => s"""cast(${f.name} as long) >= ${rollbackToTime.asUnixTimeMilli}"""
-          case "date" => s"${f.name} >= '${rollbackToTime.asDTString}'"
-          case "timestamp" => s"${f.name} >= '${rollbackToTime.asTSString}'"
+
+      // audit_log_bronze on azure is not supported by this function because of the incremental logic for
+      // audit_log_raw_events. When audit_log_raw_events incremental is enhanced, support may be able to be added.
+      if (!(rollbackTarget.target.name == "audit_log_bronze" && rollbackTarget.target.config.cloudProvider == "azure")) {
+        // execute the target delete for the primary rollback target
+        executeRollbackDelete(rollbackTarget, dryRun)
+
+        // currently only one bronze target, spark_events_bronze, requires secondary data rollback but if more
+        // present later, they can be added to this if statement and handled in the dropSecondaryData function
+        if (rollbackTarget.target.name == "spark_events_bronze") {
+          dropSecondaryData(rollbackTarget, dryRun, bronzePipeline)
         }
-      })
-      val orgIdFilter = s" and organization_id = '${rollbackTarget.organization_id}'"
-      val deleteClause = incrementalFilters.reduce((x, y) => s"$x and $y ") + orgIdFilter
-      val deleteStatement =
-        s"""
-           |delete from ${target.tableFullName}
-           |where $deleteClause
-           |""".stripMargin
-      deleteLogger.info(s"DELETE STATEMENT: $deleteStatement")
-      try {
-        if (!dryRun) spark.sql(deleteStatement)
-      } catch {
-        case e: Throwable =>
-          val failMsg = s"FAILED DELETE FROM TARGET: ${target.tableFullName}\n\nDELETE STATEMENT: ${deleteStatement}"
-          println(PipelineFunctions.appendStackStrace(e, failMsg))
-          deleteLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
       }
     })
 
@@ -827,28 +875,46 @@ object Helpers extends SparkSessionWrapper {
     val rollbackLogger = Logger.getLogger("Overwatch_State: ROLLBACK Logger")
 
     rollbackTSByModule.foreach(rollbackDetail => {
-      val updateClause =
-        s"""
-           |update ${config.databaseName}.pipeline_report
-           |set status = concat('$customRollbackStatus', ' - ', status)
-           |where organization_id = '${rollbackDetail.organization_id}'
-           |and fromTS >= ${rollbackDetail.rollbackTS}
-           |and moduleId = ${rollbackDetail.moduleId}
-           |""".stripMargin
-      rollbackLogger.info(updateClause)
-      try {
-        if (!dryRun) spark.sql(updateClause)
-      } catch {
-        case e: Throwable =>
-          val failMsg = s"FAILED TARGET STATE UPDATE:\n MODULE ID: " +
-            s"${rollbackDetail.moduleId}\nRollbackTS: ${rollbackDetail.rollbackTS}\nORGID: " +
-            s"${rollbackDetail.organization_id}"
-          println(PipelineFunctions.appendStackStrace(e, failMsg))
-          rollbackLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+      // audit_log_bronze on azure is not supported by this function because of the incremental logic for
+      // audit_log_raw_events. When audit_log_raw_events incremental is enhanced, support may be able to be added.
+      if (rollbackDetail.moduleId == 1004 && rollbackDetail.isAzure) {
+        println(s"ALERT!! - rolling back audit_log_bronze on Azure using this function is not supported. If you truly " +
+          s"want to rollback audit_log_bronze on Azure, please do it manually.")
+      } else {
+        val updateClause =
+          s"""
+             |update ${config.databaseName}.pipeline_report
+             |set status = concat('$customRollbackStatus', ' - ', status)
+             |where organization_id = '${rollbackDetail.organization_id}'
+             |and fromTS >= ${rollbackDetail.rollbackTS}
+             |and moduleId = ${rollbackDetail.moduleId}
+             |""".stripMargin
+        rollbackLogger.info(updateClause)
+        try {
+          if (!dryRun) spark.sql(updateClause)
+        } catch {
+          case e: Throwable =>
+            val failMsg = s"FAILED TARGET STATE UPDATE:\n MODULE ID: " +
+              s"${rollbackDetail.moduleId}\nRollbackTS: ${rollbackDetail.rollbackTS}\nORGID: " +
+              s"${rollbackDetail.organization_id}"
+            println(PipelineFunctions.appendStackStrace(e, failMsg))
+            rollbackLogger.error(PipelineFunctions.appendStackStrace(e, failMsg))
+        }
       }
     })
   }
 
+  /**
+   * rollback modules for specific workspaces to some historical state referenced by a point in time.
+   * Note: rolling back audit_log_bronze on azure workspaces is not currently supported
+   * @param workspace A workspace sharing an ETL Prefix with the workspaceIDs to be rolled back
+   * @param rollbackToTimeEpochMS timestamp in millis to when to rollback
+   * @param moduleIds array of module IDs to rollback
+   * @param workspaceIds workspace ids in which the moduleIDs will be rolled back
+   * @param dryRun whether or not this is a dry run. When dryrun is true, no deletes / updates will be executed
+   * @param customRollbackStatus custom rollback string -- this string will prefix the current status field in
+   *                             pipeline_report table
+   */
   def rollbackPipelineForModule(
                                  workspace: Workspace,
                                  rollbackToTimeEpochMS: Long,
@@ -872,10 +938,14 @@ object Helpers extends SparkSessionWrapper {
       .filter(orgFilter)
       .filter('moduleId.isin(moduleIds: _*))
       .filter('untilTS >= rollbackToTimeEpochMS)
+      .withColumn("isAzure",
+        when($"inputConfig.auditLogConfig.rawAuditPath".isNull, lit(true))
+          .otherwise(lit(false))
+      )
       .withColumn("rnk", rank().over(latestRunW))
       .withColumn("rn", row_number().over(latestRunW))
       .filter('rnk === 1 && 'rn === 1)
-      .select('organization_id, 'moduleId, 'fromTS.alias("rollbackTS"))
+      .select('organization_id, 'moduleId, 'fromTS.alias("rollbackTS"), 'isAzure)
       .as[ModuleRollbackTS]
       .collect()
 
@@ -884,15 +954,19 @@ object Helpers extends SparkSessionWrapper {
       s"${rollbackTSByModule.map(_.organization_id).distinct.mkString(", ")}")
     rollbackPipelineStateToTimestamp(rollbackTSByModule, customRollbackStatus, config, dryRun)
 
-    val allTargets = (Bronze(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
+    val bronzePipeline = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
+    val allTargets = (bronzePipeline.getAllTargets ++
       Silver(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets ++
       Gold(workspace, suppressReport = true, suppressStaticDatasets = true).getAllTargets)
-        .filter(_.exists(pathValidation = false, catalogValidation = true))
+      .filter(_.exists(pathValidation = false, catalogValidation = true))
 
     val targetsToRollback = rollbackTSByModule.map(rollback => {
       val targetTableName = PipelineFunctions.getTargetTableNameByModule(rollback.moduleId)
       val targetToRollback = allTargets.find(_.name.toLowerCase == targetTableName.toLowerCase)
-      assert(targetToRollback.nonEmpty, s"Target with name: $targetTableName not found")
+      if (targetToRollback.isEmpty) { // table doesn't exist
+        println(s"WARNING: Target with name: $targetTableName not found. If it doesn't exist, you may ignore this " +
+          s"warning.")
+      }
       TargetRollbackTS(
         rollback.organization_id,
         targetToRollback.get,
@@ -904,7 +978,7 @@ object Helpers extends SparkSessionWrapper {
       s"${targetsToRollback.map(_.target.tableFullName).distinct.mkString(", ")} for WORKSPACE IDs " +
       s"${targetsToRollback.map(_.organization_id).distinct.mkString(", ")}"
     )
-    rollbackTargetToTimestamp(targetsToRollback, dryRun)
+    rollbackTargetToTimestamp(targetsToRollback, dryRun, bronzePipeline)
 
   }
 
@@ -1029,4 +1103,47 @@ object Helpers extends SparkSessionWrapper {
     when(url.endsWith("/"), url.substr(lit(0), length(url) - 1)).otherwise(url)
   }
 
+  /**
+   * Registers the missing tables for Bronze,Silver and Gold into the metastore.
+   * @param workspace
+   */
+  def registerMissingTargets(workspace: Workspace): Unit = {
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(12))
+    val bronze = Bronze(workspace)
+    val silver = Silver(workspace)
+    val gold = Gold(workspace)
+    val db = bronze.database
+    val targets = (bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget).filter(_.exists(dataValidation = true, catalogValidation = false)).par
+    targets.tasksupport = taskSupport
+    targets.foreach(t => {
+      try {
+        db.registerTarget(t)
+      } catch {
+        case e: Throwable => println(s"FAILED: ${t.tableFullName}", e)
+      }
+    })
+  }
+  
+  def getQueryListener(query: StreamingQuery, config: Config, minEventsPerTrigger: Long): StreamingQueryListener = {
+    val streamManager = new StreamingQueryListener() {
+      override def onQueryStarted(queryStarted: QueryStartedEvent): Unit = {
+        logger.log(Level.INFO,s"Query started: ${queryStarted.id}")
+      }
+
+      override def onQueryTerminated(queryTerminated: QueryTerminatedEvent): Unit = {
+        logger.log(Level.INFO,s"Query terminated: ${queryTerminated.id}")
+      }
+
+      override def onQueryProgress(queryProgress: QueryProgressEvent): Unit = {
+        logger.log(Level.INFO,s"Query made progress: ${queryProgress.progress}")
+        if (config.debugFlag) {
+          println(query.status.prettyJson)
+        }
+        if (queryProgress.progress.numInputRows <= minEventsPerTrigger) {
+          query.stop()
+        }
+      }
+    }
+    streamManager
+  }
 }
