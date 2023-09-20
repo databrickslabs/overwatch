@@ -19,8 +19,8 @@ object Optimizer extends SparkSessionWrapper{
    * @param overwatchETLDB name of the Overwtch ETL database
    * @return
    */
-  private[overwatch] def getLatestSuccessState(overwatchETLDB: String): DataFrame = {
-    val orgId = Initializer.getOrgId
+  private[overwatch] def getLatestSuccessState(overwatchETLDB: String,orgId: String): DataFrame = {
+//    val orgId = Initializer.getOrgId
     val lastSuccessByModuleW = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
     spark.table(s"${overwatchETLDB}.pipeline_report")
       .filter('organization_id === orgId)
@@ -36,7 +36,7 @@ object Optimizer extends SparkSessionWrapper{
    * @param overwatchETLDB name of the Overwtch ETL database
    * @return workspace object
    */
-  private def getLatestWorkspace(overwatchETLDB: String): Workspace = {
+  private def getLatestWorkspace(overwatchETLDB: String,orgId: String): Workspace = {
     val params = getLatestSuccessState(overwatchETLDB)
       .selectExpr("inputConfig.*")
       .as[OverwatchParams]
@@ -61,16 +61,20 @@ object Optimizer extends SparkSessionWrapper{
         s"arguments. Please review the docs to compose the input arguments appropriately.")
     }
 
-    val workspace = getLatestWorkspace(overwatchETLDB)
-    val config = workspace.getConfig
-    if (config.debugFlag) println(JsonUtils.objToJson(config.inputConfig).compactString)
-    val bronze = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
-    val silver = Silver(workspace, suppressReport = true, suppressStaticDatasets = true)
-    val gold = Gold(workspace, suppressReport = true, suppressStaticDatasets = true)
+    val orgIdList = spark.table(s"${overwatchETLDB}.pipeline_report").select("organization_id").distinct().collect().map(x =>x(0).toString)
 
-    val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget
-    val postProcessor = new PostProcessor(config)
-    postProcessor.optimizeOverwatch(spark, optimizationCandidates)
+    orgIdList.foreach { orgId =>
+      val workspace = getLatestWorkspace(overwatchETLDB,orgId)
+      val config = workspace.getConfig
+      if (config.debugFlag) println(JsonUtils.objToJson(config.inputConfig).compactString)
+      val bronze = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
+      val silver = Silver(workspace, suppressReport = true, suppressStaticDatasets = true)
+      val gold = Gold(workspace, suppressReport = true, suppressStaticDatasets = true)
+
+      val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget
+      val postProcessor = new PostProcessor(config)
+      postProcessor.optimizeOverwatch(spark, optimizationCandidates)
+    }
 
   }
 
