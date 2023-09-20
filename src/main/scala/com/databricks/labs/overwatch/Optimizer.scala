@@ -54,17 +54,16 @@ object Optimizer extends SparkSessionWrapper{
    */
   def main(args: Array[String]): Unit = {
 
-    val overwatchETLDB = if (args.length == 1) {
-      args(0)
-    } else {
-      throw new BadConfigException(s"Main class requires at least 1 but less than 5 arguments. Received ${args.length} " +
-        s"arguments. Please review the docs to compose the input arguments appropriately.")
-    }
-    val orgId = if (args.length > 1) {
-      args(1).toString
-    } else {
-      " "
-    }
+//    val overwatchETLDB = if (args.length == 2) {
+//      args(0)
+//    } else {
+//      throw new BadConfigException(s"Main class requires at least 1 but less than 5 arguments. Received ${args.length} " +
+//        s"arguments. Please review the docs to compose the input arguments appropriately.")
+//    }
+
+    val overwatchETLDB = args(0)
+    val orgId = args.lift(1).getOrElse(" ")
+
 
     val orgIdList = spark.table(s"${overwatchETLDB}.pipeline_report").select("organization_id").distinct().collect().map(x =>x(0).toString)
 
