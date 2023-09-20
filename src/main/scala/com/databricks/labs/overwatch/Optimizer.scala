@@ -37,7 +37,7 @@ object Optimizer extends SparkSessionWrapper{
    * @return workspace object
    */
   private def getLatestWorkspace(overwatchETLDB: String,orgId: String): Workspace = {
-    val params = getLatestSuccessState(overwatchETLDB)
+    val params = getLatestSuccessState(overwatchETLDB,orgId)
       .selectExpr("inputConfig.*")
       .as[OverwatchParams]
       .first
