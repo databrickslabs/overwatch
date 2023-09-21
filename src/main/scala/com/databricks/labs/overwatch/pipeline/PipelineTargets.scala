@@ -21,11 +21,11 @@ abstract class PipelineTargets(config: Config) {
 
   val apiEventsTarget: PipelineTable = PipelineTable(
     name = "apiEventDetails",
-    _keys = Array("organization_id", "Overwatch_RunID","end_point"),
+    _keys = Array("organization_id", "Overwatch_RunID","endPoint"),
     config = config,
     incrementalColumns = Array("Pipeline_SnapTS"),
-    partitionBy = Array("organization_id","end_point"),
-    statsColumns = ("organization_id,end_point").split(", ")
+    partitionBy = Array("organization_id","endPoint"),
+    statsColumns = ("organization_id,endPoint").split(", ")
   )
 
   lazy private[overwatch] val pipelineStateViewTarget: PipelineView = PipelineView(

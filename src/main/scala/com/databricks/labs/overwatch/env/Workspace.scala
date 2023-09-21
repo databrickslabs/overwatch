@@ -260,8 +260,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .execute()
       .asRawDF()
       .withColumn("organization_id", lit(config.organizationId))
-
-    println("token df size"+df.count())
     df
   }
 

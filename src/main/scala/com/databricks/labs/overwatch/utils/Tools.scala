@@ -1135,18 +1135,18 @@ object Helpers extends SparkSessionWrapper {
     rawDF.select(explode(col(apiMetaFactory.dataframeColumn)).alias(apiMetaFactory.dataframeColumn)).select(col(apiMetaFactory.dataframeColumn + ".*"))
   }
 
-  def getTraceDFByModule(apiEventPath: String, moduleId: Long): DataFrame = {
-    val rawDF = spark.read.load(apiEventPath).filter('moduleId === moduleId)
-    val endPoint = rawDF.head().getAs("end_point")
+  def getTraceDFByModule(apiEventTable: String, moduleId: Long): DataFrame = {
+    val rawDF = spark.read.table(apiEventTable).filter('moduleId === moduleId)
+    val endPoint = rawDF.head().getAs("endPoint")
     deriveTraceDFByApiName(rawDF, endPoint)
   }
 
   def getTraceDFByTable(apiEventTable: String, endPoint: String): DataFrame = {
-    deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('end_point === endPoint), endPoint)
+    deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('endPoint === endPoint), endPoint)
   }
 
   def getTraceDFByPath(apiEventPath: String, endPoint: String): DataFrame = {
-    deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('end_point === endPoint), endPoint)
+    deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('endPoint === endPoint), endPoint)
   }
 
 

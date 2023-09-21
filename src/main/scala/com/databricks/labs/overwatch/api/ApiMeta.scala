@@ -172,8 +172,7 @@ trait ApiMeta {
    *
    * @param response
    */
-    //TOMES -- change name to enrichAPIResponse (or something)
-    //TOMES -- workspaceName and runID and snapTS will get added when we database.write api_events_bronze
+
   private[overwatch] def enrichAPIResponse(response: HttpResponse[String],jsonQuery: String,queryMap: Map[String, String], apiSuccessCount: Int): String = {
 
         val filter: String = if(apiCallType.equals("POST")) jsonQuery else {
@@ -183,8 +182,9 @@ trait ApiMeta {
         }
       val jsonObject = new JSONObject();
       val apiTraceabilityMeta = new JSONObject();
-      apiTraceabilityMeta.put("end_point",apiName)
+      apiTraceabilityMeta.put("endPoint",apiName)
       apiTraceabilityMeta.put("type",apiCallType)
+      apiTraceabilityMeta.put("apiVersion",apiV)
       apiTraceabilityMeta.put("responseCode",response.code)
       apiTraceabilityMeta.put("batchKeyFilter",filter)
       jsonObject.put("rawResponse", response.body.trim)
@@ -192,21 +192,6 @@ trait ApiMeta {
       jsonObject.toString
 
     }
-
-    /*The output json will look like below
-          { rawResponse: {.......},
-            apiTraceabilityMeta : {
-                                    batch_key_filter:{
-                                                      "cluster_id":"0317-072829-j1kqdql3",
-                                                      "Limit":"500"
-                                                      }
-                                                  ,
-                                    api_name:"clusters/events",
-                                    response_code:200,
-                                    response_count: 1
-            }
-          }
-         */
 
 }
 

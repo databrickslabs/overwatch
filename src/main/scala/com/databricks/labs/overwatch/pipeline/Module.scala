@@ -425,7 +425,6 @@ class Module(
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
-      println("traceapi: "+spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
       if(spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
         {
           persistApiEvents
@@ -436,11 +435,9 @@ class Module(
   }
 
   private def persistApiEvents(): Unit = {
-    //call getTempApiData and get the data then persist it
     try {
       val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
       if (pathExists(successPath)) {
-        println("successPath" + successPath)
         val rawTraceDF = spark.read.json(successPath)
         rawTraceDF.columns.foreach(println)
 
@@ -455,22 +452,15 @@ class Module(
         val finalDF = rawStructDF
           .withColumn("batchKeyFilter", batchKeyFilterOverride)
           .withColumn("data", col("rawResponse").cast("binary"))
-          .select("end_point","type", "batchKeyFilter", "responseCode", "data")
+          .select("endPoint", "type","apiVersion", "batchKeyFilter", "responseCode", "data")
           .withColumn("moduleId", lit(moduleId))
           .withColumn("moduleName", lit(moduleName))
           .withColumn("organization_id", lit(config.organizationId))
           .withColumn("Pipeline_SnapTS", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
           .withColumn("Overwatch_RunID", lit(config.runID))
 
-        val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF,  pipeline.apiEventsTarget)
+        val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF, pipeline.apiEventsTarget)
         pipeline.database.writeWithRetry(optimizeDF, pipeline.apiEventsTarget, pipeline.pipelineSnapTime.asColumnTS)
-
-        println("trace writing completed for " + moduleName)
-      /*  if (target.apiEndpointTempDir.get.toLowerCase().equals("cluster_events")) { // for cluster/events api we store the failed events in another directory
-          val tmpClusterEventsErrorPath = deriveApiTempErrDir(config.tempWorkingDir, BronzeTargets.tokensSnapshotTarget.apiEndpointTempDir.get, pipelineSnapTime)
-          println("in tmpClusterEventsErrorPath method" + tmpClusterEventsErrorPath)
-        }
-*/
 
       }
     } catch {
