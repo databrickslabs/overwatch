@@ -135,7 +135,7 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * Start the optimize process. This should only be called from the Optimizer Main Class.
    * @param targetsToOptimize Array of PipelineTables considered as optimize candidates.
    */
-  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable],orgId:String): Unit = {
+  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable],orgId: String): Unit = {
     emitStartLog
     targetsToOptimize.foreach(t => tablesToOptimize.append(t))
     executeOptimize

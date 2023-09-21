@@ -57,24 +57,19 @@ object Optimizer extends SparkSessionWrapper{
   def main(args: Array[String]): Unit = {
 
 
-    val (overwatchETLDB, orgId)= if (args.length == 1){
-      (args(0), " ")
-    }else if (args.length == 2){
-      (args(0), args(1))
-    }else throw new BadConfigException(s"Main class requires at least 1 but less than 3 arguments. Received ${args.length} " +
-            s"arguments. Please review the docs to compose the input arguments appropriately.")
-
-
-    val orgIdList = spark.table(s"${overwatchETLDB}.pipeline_report").select("organization_id").distinct().collect().map(x =>x(0).toString)
-
-    val orgIDs = if (orgId != " ") {
-      if (orgIdList.contains(orgId)) {
-        Array(orgId)
+    val (overwatchETLDB, orgIDs) = if (args.length == 1) {
+      val orgIdList = spark.table(s"${args(0)}.pipeline_report").select("organization_id").distinct().collect().map(x => x(0).toString)
+      (args(0), orgIdList)
+    } else if (args.length == 2) {
+      val cntOrgID = spark.table(s"${args(0)}.pipeline_report").select("organization_id").filter('organization_id === args(1)).distinct.count()
+      if (cntOrgID > 0) {
+        (args(0), Array(args(1)))
       } else {
         throw new BadConfigException("Input Organization_ID is not part of the Overwatch Deployment for which you want to run the optimizer")
       }
     } else {
-      orgIdList
+      throw new BadConfigException(s"Main class requires at least 1 but less than 3 arguments. Received ${args.length} " +
+        s"arguments. Please review the docs to compose the input arguments appropriately.")
     }
 
     orgIDs.foreach { orgId =>
