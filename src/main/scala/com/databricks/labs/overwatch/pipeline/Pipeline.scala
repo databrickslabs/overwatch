@@ -387,8 +387,8 @@ class Pipeline(
     // cleanse the temp dir
     // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
-    //Helpers.fastrm(Array(config.tempWorkingDir))
-    //dbutils.fs.rm(config.tempWorkingDir)
+    Helpers.fastrm(Array(config.tempWorkingDir))
+    dbutils.fs.rm(config.tempWorkingDir)
 
     postProcessor.refreshPipReportView(pipelineStateViewTarget)
     //TODO clearcache will clear global cache multithread performance issue
