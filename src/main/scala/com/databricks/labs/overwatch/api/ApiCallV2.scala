@@ -751,6 +751,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     val tmpErrorPath = if(jsonInput.contains("tmp_error_path")) jsonInput.get("tmp_error_path").get
     else s"${config.tempWorkingDir}/errors/${tempEndpointLocation}/${System.currentTimeMillis()}"
 
+    println("tmpSuccessPath:"+tmpSuccessPath)
+    println("tmpErrorPath:"+tmpErrorPath)
+
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
     val apiResponseCounter = Collections.synchronizedList(new util.ArrayList[Int]())

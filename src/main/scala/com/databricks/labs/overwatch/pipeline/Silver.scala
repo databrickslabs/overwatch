@@ -1,6 +1,7 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.env.{Database, Workspace}
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiTempErrDir}
 import com.databricks.labs.overwatch.utils.{Config, OverwatchScope}
 import org.apache.log4j.Logger
 
@@ -369,7 +370,12 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendSqlQueryHistoryProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getSqlQueryHistoryParallelDF(sqlQueryHistoryModule.fromTime, sqlQueryHistoryModule.untilTime,sqlQueryHistoryModule.pipeline.pipelineSnapTime),
+        workspace.getSqlQueryHistoryParallelDF(
+          sqlQueryHistoryModule.fromTime,
+          sqlQueryHistoryModule.untilTime,
+          sqlQueryHistoryModule.pipeline.pipelineSnapTime,
+          deriveApiTempDir(config.tempWorkingDir,sqlQueryHistoryModule.moduleName,pipelineSnapTime),
+          deriveApiTempErrDir(config.tempWorkingDir,sqlQueryHistoryModule.moduleName,pipelineSnapTime)),
         Seq(enhanceSqlQueryHistory),
         append(SilverTargets.sqlQueryHistoryTarget)
       )

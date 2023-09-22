@@ -434,34 +434,43 @@ class Module(
 
   }
 
+  private def transformAndPersistApiEvents(rawTraceDF: DataFrame)={
+    val rawStructDF = rawTraceDF
+      .select("apiTraceabilityMeta.*", "rawResponse")
+    val batchKeyFilterOverride = if (rawStructDF.columns.contains("batchKeyFilter")) {
+      col("batchKeyFilter")
+    } else {
+      lit("")
+    }
+
+    val finalDF = rawStructDF
+      .withColumn("batchKeyFilter", batchKeyFilterOverride)
+      .withColumn("data", col("rawResponse").cast("binary"))
+      .select("endPoint", "type", "apiVersion", "batchKeyFilter", "responseCode", "data")
+      .withColumn("moduleId", lit(moduleId))
+      .withColumn("moduleName", lit(moduleName))
+      .withColumn("organization_id", lit(config.organizationId))
+      .withColumn("Pipeline_SnapTS", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
+      .withColumn("Overwatch_RunID", lit(config.runID))
+
+    val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF, pipeline.apiEventsTarget)
+    pipeline.database.writeWithRetry(optimizeDF, pipeline.apiEventsTarget, pipeline.pipelineSnapTime.asColumnTS)
+
+  }
+
   private def persistApiEvents(): Unit = {
     try {
       val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
+      val errPath = deriveApiTempErrDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
+      println("persistApiEvents successpath"+successPath)
+      println("persistApiEvents errPath"+errPath)
       if (pathExists(successPath)) {
         val rawTraceDF = spark.read.json(successPath)
-        rawTraceDF.columns.foreach(println)
-
-        val rawStructDF = rawTraceDF
-          .select("apiTraceabilityMeta.*", "rawResponse")
-        val batchKeyFilterOverride = if (rawStructDF.columns.contains("batchKeyFilter")) {
-          col("batchKeyFilter")
-        } else {
-          lit("")
-        }
-
-        val finalDF = rawStructDF
-          .withColumn("batchKeyFilter", batchKeyFilterOverride)
-          .withColumn("data", col("rawResponse").cast("binary"))
-          .select("endPoint", "type","apiVersion", "batchKeyFilter", "responseCode", "data")
-          .withColumn("moduleId", lit(moduleId))
-          .withColumn("moduleName", lit(moduleName))
-          .withColumn("organization_id", lit(config.organizationId))
-          .withColumn("Pipeline_SnapTS", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
-          .withColumn("Overwatch_RunID", lit(config.runID))
-
-        val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF, pipeline.apiEventsTarget)
-        pipeline.database.writeWithRetry(optimizeDF, pipeline.apiEventsTarget, pipeline.pipelineSnapTime.asColumnTS)
-
+        transformAndPersistApiEvents(rawTraceDF)
+      }
+      if(pathExists(errPath)){
+        val rawTraceDF = spark.read.json(errPath)
+        transformAndPersistApiEvents(rawTraceDF)
       }
     } catch {
       case e: Throwable =>

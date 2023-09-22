@@ -164,11 +164,18 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes, pipelineSnapTime: TimeTypes): DataFrame = {
+  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes,
+                                   untilTime: TimeTypes,
+                                   pipelineSnapTime: TimeTypes ,
+                                   tmpClusterEventsSuccessPath: String,
+                                   tmpClusterEventsErrorPath: String): DataFrame = {
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val untilTimeMs = untilTime.asUnixTimeMilli
     val fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
     val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)).toLong// Total no. of API Calls
+   /* val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTime.asUnixTimeMilli
+    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTime.asUnixTimeMilli
+   */
 
     // creating Json input for parallel API calls
     val jsonInput = Map(
@@ -176,19 +183,27 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "end_value" -> s"${untilTimeMs}",
       "increment_counter" -> "3600000",
       "final_response_count" -> s"${finalResponseCount}",
-      "result_key" -> "res"
+      "result_key" -> "res",
+      "tmp_success_path" -> tmpClusterEventsSuccessPath,
+      "tmp_error_path" -> tmpClusterEventsErrorPath
     )
 
     // calling function to make parallel API calls
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)
     val tmpSqlQueryHistorySuccessPath= apiCallV2Obj.makeParallelApiCalls(sqlQueryHistoryEndpoint, jsonInput, pipelineSnapTime.asUnixTimeMilli,config)
     logger.log(Level.INFO, " sql query history landing completed")
-
+    println("tmpSqlQueryHistorySuccessPath:"+tmpSqlQueryHistorySuccessPath)
     if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
       try {
-        deriveRawApiResponseDF(spark.read.json(tmpSqlQueryHistorySuccessPath))
-          .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
-          .withColumn("organization_id", lit(config.organizationId))
+        val rawDF = deriveRawApiResponseDF(spark.read.json(tmpSqlQueryHistorySuccessPath))
+        if (rawDF.columns.contains("res")) {
+          rawDF.select(explode(col("res")).alias("res")).select(col("res" + ".*"))
+            .withColumn("organization_id", lit(config.organizationId))
+        } else {
+          println(s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs},res column not found in dataset""")
+          logger.log(Level.INFO, s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}, res column not found in dataset""")
+          spark.emptyDataFrame
+        }
       } catch {
         case e: Throwable =>
           throw new Exception(e)
