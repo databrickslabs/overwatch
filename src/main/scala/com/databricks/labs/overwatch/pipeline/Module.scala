@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiT
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.{col, lit, unix_timestamp}
 
 import java.time.Duration
 import scala.util.parsing.json.JSON.number
@@ -450,7 +450,8 @@ class Module(
       .withColumn("moduleId", lit(moduleId))
       .withColumn("moduleName", lit(moduleName))
       .withColumn("organization_id", lit(config.organizationId))
-      .withColumn("Pipeline_SnapTS", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
+      .withColumn("snapTS", lit(pipeline.pipelineSnapTime.asTSString))
+      .withColumn("timestamp", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
       .withColumn("Overwatch_RunID", lit(config.runID))
 
     val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF, pipeline.apiEventsTarget)
