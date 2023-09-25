@@ -463,8 +463,6 @@ class Module(
     try {
       val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
       val errPath = deriveApiTempErrDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
-      println("persistApiEvents successpath"+successPath)
-      println("persistApiEvents errPath"+errPath)
       if (pathExists(successPath)) {
         val rawTraceDF = spark.read.json(successPath)
         transformAndPersistApiEvents(rawTraceDF)
