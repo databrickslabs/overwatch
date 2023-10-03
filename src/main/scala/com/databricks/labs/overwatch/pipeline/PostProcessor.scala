@@ -85,8 +85,38 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
     logger.log(Level.INFO, invalidTargetsMsg)
     logger.log(Level.INFO, msg)
     // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
-    Helpers.parOptimize(validatedTargets.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128)
-    Helpers.parOptimize(validatedTargets.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32)
+    Helpers.parOptimize(validatedTargets.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128,includeVacuum = true)
+    Helpers.parOptimize(validatedTargets.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32,includeVacuum = true)
+  }
+
+
+  /**
+   * launch the optimize jobs in parallel
+   */
+  private def executeExternalOptimize(orgID: String): Unit = {
+    appendIntermediateTargets
+    val validatedTargets = validateExists
+    val invalidTargets = tablesToOptimize.map(_.tableLocation).diff(validatedTargets.map(_.tableLocation))
+    val invalidTargetsMsg = s"OPTIMIZE: Missing Targets: \n${invalidTargets.mkString("\n")}"
+    val msg = s"OPTIMIZE: Targets To Optimize: \n${validatedTargets.map(_.tableLocation).mkString("\n")}"
+
+    if (config.debugFlag) {
+      println(invalidTargetsMsg)
+      println(msg)
+    }
+    logger.log(Level.INFO, invalidTargetsMsg)
+    logger.log(Level.INFO, msg)
+    // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
+    if (orgID == ""){
+      println(s"Running Optimization for ${config.databaseName}")
+      Helpers.parOptimize(validatedTargets.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128,true,orgID)
+      Helpers.parOptimize(validatedTargets.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32,true,orgID)
+    }else{
+      println(s"Running Optimization for ${orgID}")
+      Helpers.parOptimize(validatedTargets.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128,true,orgID)
+      Helpers.parOptimize(validatedTargets.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32,true,orgID)
+
+    }
   }
 
   /**
@@ -135,11 +165,18 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
    * Start the optimize process. This should only be called from the Optimizer Main Class.
    * @param targetsToOptimize Array of PipelineTables considered as optimize candidates.
    */
-  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable],orgId: String): Unit = {
+  private[overwatch] def optimizeOverwatch(spark: SparkSession, targetsToOptimize: Array[PipelineTable],orgId: String,orgIdList: Array[String]): Unit = {
     emitStartLog
     targetsToOptimize.foreach(t => tablesToOptimize.append(t))
-    executeOptimize
-    updateLastOptimizedDate(spark,orgId)
+    executeExternalOptimize(orgId)
+    if (orgId == ""){
+      orgIdList.foreach{org_id =>
+        updateLastOptimizedDate(spark,org_id)
+      }
+    }else{
+      updateLastOptimizedDate(spark,orgId)
+    }
+
     emitCompletionLog
   }
 
