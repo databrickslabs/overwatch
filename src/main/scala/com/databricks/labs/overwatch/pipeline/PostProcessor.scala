@@ -107,16 +107,8 @@ class PostProcessor(config: Config) extends PipelineTargets(config) {
     logger.log(Level.INFO, invalidTargetsMsg)
     logger.log(Level.INFO, msg)
     // TODO -- spark_events_bronze -- put in proper rules -- hot fix due to optimization issues
-    if (orgID == ""){
-      println(s"Running Optimization for ${config.databaseName}")
       Helpers.parOptimize(validatedTargets.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128,true,orgID)
       Helpers.parOptimize(validatedTargets.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32,true,orgID)
-    }else{
-      println(s"Running Optimization for ${orgID}")
-      Helpers.parOptimize(validatedTargets.filterNot(_.name == "spark_events_bronze"), maxFileSizeMB = 128,true,orgID)
-      Helpers.parOptimize(validatedTargets.filter(_.name == "spark_events_bronze"), maxFileSizeMB = 32,true,orgID)
-
-    }
   }
 
   /**
