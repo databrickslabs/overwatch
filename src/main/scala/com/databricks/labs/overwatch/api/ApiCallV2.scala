@@ -342,7 +342,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       hibernate(response)
       execute()
     } else {
-      if(writeTraceApiFlag){
+      if(writeTraceApiFlag()){
         PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
       }
       throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
@@ -568,9 +568,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       logger.error(errMsg)
       spark.emptyDataFrame
     } else {
-     //val rawDf = spark.read.json(apiResultDF.rdd.map(row => row.getAs[String]("rawResponse")))
-     val rawDf = deriveRawApiResponseDF(apiResultDF)
-     // rawDf.as[TraceApi]
+      val rawDf = deriveRawApiResponseDF(apiResultDF)
       extrapolateSupportedStructure(rawDf)
     }
   }
@@ -626,9 +624,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
-      // TOMES -- does jsonQuery hold all the meta we want? Don't forget ow run id Sriram: Run it we will add it in pipeline.append() function
       _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))//for GET request we have to convert queryMap to Json
-    //  _apiResponseArray.add(response.body)
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
@@ -719,7 +715,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         throw e
       }
     }finally {
-      if (writeTraceApiFlag) {
+      if (writeTraceApiFlag()) {
           PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
       }
     }
@@ -750,9 +746,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
     val tmpErrorPath = if(jsonInput.contains("tmp_error_path")) jsonInput.get("tmp_error_path").get
     else s"${config.tempWorkingDir}/errors/${tempEndpointLocation}/${System.currentTimeMillis()}"
-
-    println("tmpSuccessPath:"+tmpSuccessPath)
-    println("tmpErrorPath:"+tmpErrorPath)
 
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
     var apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())

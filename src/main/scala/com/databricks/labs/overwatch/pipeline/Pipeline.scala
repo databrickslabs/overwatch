@@ -428,11 +428,6 @@ class Pipeline(
     Helpers.getDatesGlob(startDate.toLocalDate, untilTime.asLocalDateTime.plusDays(1).toLocalDate)
   }
 
-
-
-
-
-
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 
     val finalDF = PipelineFunctions.optimizeDFForWrite(df, target)

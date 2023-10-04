@@ -65,7 +65,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "expand_tasks" -> "true",
       "offset" -> "0"
     )
-    ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)//Option if non we should not break it if temp dir is not present then we will not record it
+    ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)
       .setSuccessTempPath(apiTempPath)
       .execute()
       .asRawDF()
@@ -173,9 +173,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val untilTimeMs = untilTime.asUnixTimeMilli
     val fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
     val finalResponseCount = scala.math.ceil((untilTimeMs - fromTimeMs).toDouble/(1000*60*60)).toLong// Total no. of API Calls
-   /* val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTime.asUnixTimeMilli
-    val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTime.asUnixTimeMilli
-   */
 
     // creating Json input for parallel API calls
     val jsonInput = Map(
@@ -192,8 +189,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)
     val tmpSqlQueryHistorySuccessPath= apiCallV2Obj.makeParallelApiCalls(sqlQueryHistoryEndpoint, jsonInput, pipelineSnapTime.asUnixTimeMilli,config)
     logger.log(Level.INFO, " sql query history landing completed")
-    println("tmpSqlQueryHistorySuccessPath:"+tmpSqlQueryHistorySuccessPath)
-    if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
+
+    if (Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
       try {
         val rawDF = deriveRawApiResponseDF(spark.read.json(tmpSqlQueryHistorySuccessPath))
         if (rawDF.columns.contains("res")) {
