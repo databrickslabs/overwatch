@@ -387,7 +387,6 @@ class Pipeline(
     // cleanse the temp dir
     // if failure doesn't allow pipeline to get here, temp dir will be cleansed on workspace init
     if (!config.externalizeOptimize) postProcessor.optimize(this, Pipeline.OPTIMIZESCALINGCOEF)
-    println(config.tempWorkingDir+" config.tempWorkingDir")
     Helpers.fastrm(Array(config.tempWorkingDir))
     dbutils.fs.rm(config.tempWorkingDir)
 
@@ -428,18 +427,6 @@ class Pipeline(
     val startDate = fromTime.asLocalDateTime.minusDays(maxMergeScanDays)
     Helpers.getDatesGlob(startDate.toLocalDate, untilTime.asLocalDateTime.plusDays(1).toLocalDate)
   }
-
-  //Get the dataframe from either tempDirectory or from the ResponseArray
-  private def getTempApiData(apiTempPath: String): DataFrame ={
-     //Get the data from either tempDirectory or from the ResponseArray
-     val apiTempDir =  s"${config.tempWorkingDir}/${apiTempPath}/success_" + pipelineSnapTime.asUnixTimeMilli
-    ???
-  }
-
-
-
-
-
 
   private[overwatch] def append(target: PipelineTable)(df: DataFrame, module: Module): ModuleStatusReport = {
 
