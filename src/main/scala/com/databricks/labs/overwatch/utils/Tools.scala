@@ -1105,6 +1105,12 @@ object Helpers extends SparkSessionWrapper {
   }
 
 
+  /**
+   * Function separates the raw api response from the enriched api response which contains the meta info of the api call and
+   * returns a dataframe which contains only raw api response.
+   * @param dataFrame
+   * @return
+   */
   def deriveRawApiResponseDF(dataFrame: DataFrame): DataFrame = {
     val filteredDf = dataFrame.select('rawResponse)
       .filter('rawResponse =!= "{}")
@@ -1117,34 +1123,77 @@ object Helpers extends SparkSessionWrapper {
     }
   }
 
-  def deriveApiTempDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
-    s"${tempWOrkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
+  /**
+   * Function returns a temp path which can be used to store successful api responses.
+   * @param tempWOrkingDir
+   * @param endpointDir
+   * @param pipelineSnapTs
+   * @return
+   */
+  private[overwatch] def deriveApiTempDir(tempWorkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+    s"${tempWorkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
   }
 
-  def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+  /**
+   * Function return a temp path which can be used to store the api responses which was not successful.
+   * @param tempWOrkingDir
+   * @param endpointDir
+   * @param pipelineSnapTs
+   * @return
+   */
+  private[overwatch] def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
     s"${tempWOrkingDir}/${endpointDir}/error_" + pipelineSnapTs.asUnixTimeMilli
   }
 
+  /**
+   * Function converts the data column which is binary in traceApi dataframe to string.
+   * @param df
+   * @return
+   */
   def transformBinaryDf(df: DataFrame): DataFrame = {
     df.withColumnRenamed("data", "rawResponse").withColumn("rawResponse", col("rawResponse").cast("String"))
   }
 
+  /**
+   * Function returns the api response for provided apiName from api trace data.
+   * @param df dataframe which contains the traceApi data.
+   * @param apiName name of the api.
+   * @return
+   */
   def deriveTraceDFByApiName(df: DataFrame, apiName: String): DataFrame = {
     val rawDF = deriveRawApiResponseDF(transformBinaryDf(df))
     val apiMetaFactory = new ApiMetaFactory().getApiClass(apiName)
     rawDF.select(explode(col(apiMetaFactory.dataframeColumn)).alias(apiMetaFactory.dataframeColumn)).select(col(apiMetaFactory.dataframeColumn + ".*"))
   }
 
+  /**
+   * Function returns the api response for provided moduleID from api trace data.
+   * @param apiEventTable apiEventTable name.
+   * @param moduleId
+   * @return
+   */
   def getTraceDFByModule(apiEventTable: String, moduleId: Long): DataFrame = {
     val rawDF = spark.read.table(apiEventTable).filter('moduleId === moduleId)
     val endPoint = rawDF.head().getAs[String]("endPoint")
     deriveTraceDFByApiName(rawDF, endPoint)
   }
 
+  /**
+   * Function returns the api response for provided apiName from api trace data.
+   * @param apiEventTable apiEventTable name.
+   * @param endPoint
+   * @return
+   */
   def getTraceDFByApi(apiEventTable: String, endPoint: String): DataFrame = {
       deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('endPoint === endPoint), endPoint)
   }
 
+  /**
+   * Function returns the api response for provided apiName from api trace data.
+   * @param apiEventPath path of the apiEvent data.
+   * @param endPoint
+   * @return
+   */
   def getTraceDFByPath(apiEventPath: String, endPoint: String): DataFrame = {
     deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('endPoint === endPoint), endPoint)
   }

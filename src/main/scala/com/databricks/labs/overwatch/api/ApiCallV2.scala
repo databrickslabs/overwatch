@@ -343,7 +343,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       execute()
     } else {
       if(writeTraceApiFlag()){
-        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))
       }
       throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
     }
@@ -512,8 +512,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Converting the API response to Dataframe.
+   * This dataframe includes both raw api response and the metadata of the api.
    *
-   * @return Dataframe which is created from the API response.
+   * @return Dataframe which is created from the API response with the api call metadata.
    */
   def asDF(): DataFrame = {
     var apiResultDF: DataFrame = null;
@@ -543,6 +544,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Converting the API response to Dataframe.
+   *
+   * @return Dataframe which is created from the API response.
+   */
   def asRawDF() : DataFrame = {
     val apiResultDF: DataFrame =
     if (_apiResponseArray.size == 0 && !apiMeta.batchPersist) { //If response contains no Data.
@@ -624,7 +630,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))//for GET request we have to convert queryMap to Json
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))//for GET request we have to convert queryMap to Json
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
@@ -676,7 +682,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap,apiSuccessCount))
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
@@ -721,6 +727,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     }
   }
 
+  /**
+   * Function to check id traceability is enabled or not for API calls..
+   * @return
+   */
   private def writeTraceApiFlag(): Boolean ={
     spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean && !apiMeta.batchPersist && successTempPath.nonEmpty
   }
