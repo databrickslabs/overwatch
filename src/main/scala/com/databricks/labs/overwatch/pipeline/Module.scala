@@ -427,13 +427,17 @@ class Module(
     } finally {
       if(spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean)
         {
-          persistApiEvents
+          persistApiEvents()
         }
       spark.catalog.clearCache()
     }
 
   }
 
+  /**
+   * Function add necessary fields to the apiEventDetails and persist it.
+   * @param rawTraceDF
+   */
   private def transformAndPersistApiEvents(rawTraceDF: DataFrame)={
     val rawStructDF = rawTraceDF
       .select("apiTraceabilityMeta.*", "rawResponse")
@@ -459,6 +463,9 @@ class Module(
 
   }
 
+  /**
+   * Function persists the apiEvent details.
+   */
   private def persistApiEvents(): Unit = {
     try {
       val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
