@@ -320,6 +320,7 @@ class JobListApi extends ApiMeta {
   setDataframeColumn("jobs")
   setApiCallType("GET")
   setPaginationKey("has_more")
+  setPaginationToken("next_page_token")
   setIsDerivePaginationLogic(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
@@ -327,17 +328,9 @@ class JobListApi extends ApiMeta {
   }
 
   private[overwatch] override def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
-    val limit = Integer.parseInt(requestMap.get("limit").get)
-    var offset = Integer.parseInt(requestMap.get("offset").get)
-    val expand_tasks = requestMap.get("expand_tasks").get
-    offset = offset + limit
-    Map(
-      "limit" -> s"${limit}",
-      "expand_tasks" -> s"${expand_tasks}",
-      "offset" -> s"${offset}"
-    )
+    val _jsonValue = jsonObject.get(paginationToken).asText()
+    requestMap ++ Map(s"page_token" -> s"${_jsonValue}")
   }
-
 }
 
 class ClusterEventsApi extends ApiMeta {
@@ -374,6 +367,7 @@ class JobRunsApi extends ApiMeta {
   setDataframeColumn("runs")
   setApiCallType("GET")
   setPaginationKey("has_more")
+  setPaginationToken("next_page_token")
   setIsDerivePaginationLogic(true)
   setBatchPersist(true)
 
@@ -382,15 +376,8 @@ class JobRunsApi extends ApiMeta {
   }
 
   private[overwatch] override def getPaginationLogic(jsonObject: JsonNode, requestMap: Map[String, String]): Map[String, String] = {
-    val limit = Integer.parseInt(requestMap.get("limit").get)
-    var offset = Integer.parseInt(requestMap.get("offset").get)
-    val expand_tasks = requestMap.get("expand_tasks").get
-    offset = offset + limit
-    Map(
-      "limit" -> s"${limit}",
-      "expand_tasks" -> s"${expand_tasks}",
-      "offset" -> s"${offset}"
-    )
+    val _jsonValue = jsonObject.get(paginationToken).asText()
+    requestMap ++ Map(s"page_token" -> s"${_jsonValue}")
   }
 }
 

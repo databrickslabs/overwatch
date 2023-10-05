@@ -395,6 +395,45 @@ object Helpers extends SparkSessionWrapper {
     spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
   }
 
+  /**
+   * Same purpose as parOptimize above but instead of optimizing an entire database, only specific tables are
+   * optimized for specific organizationID
+   *
+   * @param tables        Array of Overwatch PipelineTable
+   * @param maxFileSizeMB Optimizer's max file size in MB. Default is 1000 but that's too large so it's commonly
+   *                      reduced to improve parallelism
+   * @param orgID         Organization ID for which optimization need to be performed
+   */
+  def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int, includeVacuum: Boolean,orgID: String): Unit = {
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+    spark.conf.set("spark.databricks.delta.optimize.maxFileSize", 1024 * 1024 * maxFileSizeMB)
+
+    val tablesPar = tables.par
+    val taskSupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism - 1))
+    tablesPar.tasksupport = taskSupport
+
+    tablesPar.foreach(tbl => {
+      try {
+        val zorderColumns = if (tbl.zOrderBy.nonEmpty) s"ZORDER BY (${tbl.zOrderBy.mkString(", ")})" else ""
+        val sql = if (orgID == ""){
+          s"""optimize delta.`${tbl.tableLocation}` $zorderColumns"""
+        }else{
+          s"""optimize delta.`${tbl.tableLocation}` where organization_id = '${orgID}' $zorderColumns"""
+        }
+        println(s"optimizing: ${tbl.tableLocation} --> $sql")
+        spark.sql(sql)
+        if (tbl.vacuum_H > 0 && includeVacuum) {
+          println(s"vacuuming: ${tbl.tableLocation}, Retention == ${tbl.vacuum_H}")
+          spark.sql(s"VACUUM delta.`${tbl.tableLocation}` RETAIN ${tbl.vacuum_H} HOURS")
+        }
+        println(s"Complete: ${tbl.tableLocation}")
+      } catch {
+        case e: Throwable => println(e.printStackTrace())
+      }
+    })
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+  }
+
   def parOptimize(tables: Array[PipelineTable], maxFileSizeMB: Int): Unit = {
     parOptimize(tables, maxFileSizeMB, includeVacuum = true)
   }

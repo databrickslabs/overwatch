@@ -59,8 +59,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val jobsEndpoint = "jobs/list"
     val query = Map(
       "limit" -> "25",
-      "expand_tasks" -> "true",
-      "offset" -> "0"
+      "expand_tasks" -> "true"
     )
     ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)
       .setSuccessTempPath(apiTempPath)
@@ -287,7 +286,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val jsonQuery = Map(
       "limit" -> "25",
       "expand_tasks" -> "true",
-      "offset" -> "0",
       "start_time_from" -> s"${fromTime.asUnixTimeMilli}",
       "start_time_to" -> s"${untilTime.asUnixTimeMilli}"
     )
