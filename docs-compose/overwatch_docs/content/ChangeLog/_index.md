@@ -18,7 +18,7 @@ If you're in a previous version, contact your Databricks representative.
 be optimized
 * Updated GCP instance details to the correct API Names
 
-Released Oct 5th, 2023 - Full Change Inventory
+Released Oct 5th, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/29?closed=1)
 
 ------------------------------------------------------------------------------------------------
 
