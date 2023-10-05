@@ -16,6 +16,7 @@ If you're in a previous version, contact your Databricks representative.
 * Updated Jobs API queries to use token based pagination
 * Fixed an issue in the Optimizer code that would show up if the driver workspace was not in the list of workspaces to
 be optimized
+* Updated GCP instance details to the correct API Names
 
 Released Oct 5th, 2023 - Full Change Inventory
 
