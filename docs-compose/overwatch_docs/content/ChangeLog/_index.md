@@ -4,6 +4,23 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.2.2
+
+This release contains a change to how we query the Databricks Jobs API, to prevent failures, given that the API is 
+changing from offset based pagination, to token based. 
+
+**To Upgrade**, if you're currently running Overwatch v0.7.2.0.1 onwards, simply swap the JAR.
+If you're in a previous version, contact your Databricks representative.
+
+### Bug Fixes
+* Updated Jobs API queries to use token based pagination
+* Fixed an issue in the Optimizer code that would show up if the driver workspace was not in the list of workspaces to
+be optimized
+
+Released Oct 5th, 2023 - Full Change Inventory
+
+------------------------------------------------------------------------------------------------
+
 ## 0.7.2.1
 ### Upgrading
 Although there are no breaking schema changes with this release, we recommend you run the upgrade script to:
