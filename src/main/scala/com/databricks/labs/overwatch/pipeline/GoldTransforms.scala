@@ -553,7 +553,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .drop("cluster_name", "custom_tags", "node_type_id")
 
 
-      val joinedDF = clsfDF.join(auditDF, Seq("clusterId", "organization_id"), "left")
+      val joinedDF = clsfDF.join(auditDF, Seq("clusterId", "organization_id"), "inner")
 
       // Cluster_state started before cmd start time and ended before command end time
       val state_before_before = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end < 'unixTimeMSEnd
