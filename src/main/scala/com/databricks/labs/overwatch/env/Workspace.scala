@@ -194,7 +194,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
   def resizeCluster(apiEnv: ApiEnv, numWorkers: Int): Unit = {
     val endpoint = "clusters/resize"
-    val jsonQuery = s"""{"cluster_id":"${overwatchRunClusterId}","num_workers":${numWorkers}}"""
+    val jsonQuery = Map(
+      "cluster_id" -> s"${overwatchRunClusterId}",
+      "num_workers" -> s"${numWorkers}"
+    )
     try {
       ApiCallV2(apiEnv, endpoint, jsonQuery).execute()
     } catch {
