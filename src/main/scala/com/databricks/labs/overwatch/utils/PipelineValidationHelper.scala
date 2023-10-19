@@ -150,7 +150,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
       } else {
         val (healthCheckMsg: String, healthCheckType: String) =
           if (validationType.toLowerCase() == "validate_greater_than_zero") {
-            (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are not greater than zero", "Failure")
+            (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are not greater than zero or is NULL", "Failure")
           } else if (validationType.toLowerCase() == "validate_not_null") {
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are null", "Failure")
           } else if (validationType.toLowerCase() == "validate_leq_one") {
