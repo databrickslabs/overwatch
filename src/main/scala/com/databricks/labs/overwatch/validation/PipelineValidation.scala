@@ -46,9 +46,9 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
     val processingStartTime = System.currentTimeMillis()
 
     if (tableArray.length == 0){
-      println(s"By Default Validation has been configured for ${clsfTable},${jrcpTable},${clusterTable},${sparkJobTable},${sqlQueryHistTable},${jobRunTable},${jobTable}")
+      println(s"By Default Single Table Validation has been configured for ${clsfTable},${jrcpTable},${clusterTable},${sparkJobTable},${sqlQueryHistTable},${jobRunTable},${jobTable}")
     }else{
-      println(s"Validation has been configured for ${tableArray.mkString(",")}")
+      println(s"Single Table Validation has been configured for ${tableArray.mkString(",")}")
     }
 
     if (crossTableValidation) {
