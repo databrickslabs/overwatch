@@ -553,7 +553,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .drop("cluster_name", "custom_tags", "node_type_id")
 
 
-      val joinedDF = clsfDF.join(auditDF, Seq("clusterId", "organization_id"), "left")
+      val joinedDF = clsfDF.join(auditDF, Seq("clusterId", "organization_id"), "inner")
 
       // Cluster_state started before cmd start time and ended before command end time
       val state_before_before = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end < 'unixTimeMSEnd
@@ -617,6 +617,11 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H") / lit(3600))
         .withColumn("estimated_dbu_cost", col("executionTime") * col("dbu_cost_ps"))
         .drop("cluster_id")
+      println(s"Rows in NotebookCommands with Null notebook_id are :")
+      println(s"${notebookCodeAndMetaDF.filter('notebookId.isNull).select("organization_id","cluster_id","notebook_id").show()}")
+      println(s"Count of Rows in NotebookCommands with Null notebook_id are :")
+      println(s"${notebookCodeAndMetaDF.filter('notebookId.isNull).count()}")
+      println(s"${notebookCodeAndMetaDF.printSchema()}")
       notebookCodeAndMetaDF.select(colNames: _*)
     }else{
       println("Verbose Audit Log not enabled in workspace")
