@@ -617,11 +617,6 @@ trait GoldTransforms extends SparkSessionWrapper {
         .withColumn("dbu_cost_ps", col("total_DBU_cost") / col("uptime_in_state_H") / lit(3600))
         .withColumn("estimated_dbu_cost", col("executionTime") * col("dbu_cost_ps"))
         .drop("cluster_id")
-      println(s"Rows in NotebookCommands with Null notebook_id are :")
-      println(s"${notebookCodeAndMetaDF.filter('notebookId.isNull).select("organization_id","cluster_id","notebook_id").show()}")
-      println(s"Count of Rows in NotebookCommands with Null notebook_id are :")
-      println(s"${notebookCodeAndMetaDF.filter('notebookId.isNull).count()}")
-      println(s"${notebookCodeAndMetaDF.printSchema()}")
       notebookCodeAndMetaDF.select(colNames: _*)
     }else{
       println("Verbose Audit Log not enabled in workspace")
