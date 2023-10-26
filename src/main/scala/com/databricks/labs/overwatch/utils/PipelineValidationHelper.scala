@@ -82,15 +82,16 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
   val sqlQueryHistTable: String = goldTargets.sqlQueryHistoryTarget.name
   val jobTable: String = goldTargets.jobTarget.name
 
-  val jrcpDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jrcpTable")) spark.read.table(s"$etlDB.$jrcpTable") else spark.emptyDataFrame
-  val clsfDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clsfTable")) spark.read.table(s"$etlDB.$clsfTable") else spark.emptyDataFrame
-  val jobRunDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jobRunTable")) spark.read.table(s"$etlDB.$jobRunTable") else spark.emptyDataFrame
-  val nbDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$nbTable")) spark.read.table(s"$etlDB.$nbTable") else spark.emptyDataFrame
-  val nbcmdDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$nbcmdTable")) spark.read.table(s"$etlDB.$nbcmdTable") else spark.emptyDataFrame
-  val clusterDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clusterTable")) spark.read.table(s"$etlDB.$clusterTable") else spark.emptyDataFrame
-  val sparkJobDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$sparkJobTable")) spark.read.table(s"$etlDB.$sparkJobTable") else spark.emptyDataFrame
-  val sqlQueryHistDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$sqlQueryHistTable")) spark.read.table(s"$etlDB.$sqlQueryHistTable") else spark.emptyDataFrame
-  val jobDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jobTable")) spark.read.table(s"$etlDB.$jobTable") else spark.emptyDataFrame
+  val filterCondition = 'Overwatch_RunID === Overwatch_RunID
+  val jrcpDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jrcpTable")) spark.read.table(s"$etlDB.$jrcpTable").filter(filterCondition) else spark.emptyDataFrame
+  val clsfDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clsfTable")) spark.read.table(s"$etlDB.$clsfTable").filter(filterCondition) else spark.emptyDataFrame
+  val jobRunDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jobRunTable")) spark.read.table(s"$etlDB.$jobRunTable").filter(filterCondition) else spark.emptyDataFrame
+  val nbDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$nbTable")) spark.read.table(s"$etlDB.$nbTable").filter(filterCondition) else spark.emptyDataFrame
+  val nbcmdDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$nbcmdTable")) spark.read.table(s"$etlDB.$nbcmdTable").filter(filterCondition) else spark.emptyDataFrame
+  val clusterDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clusterTable")) spark.read.table(s"$etlDB.$clusterTable").filter(filterCondition) else spark.emptyDataFrame
+  val sparkJobDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$sparkJobTable")) spark.read.table(s"$etlDB.$sparkJobTable").filter(filterCondition) else spark.emptyDataFrame
+  val sqlQueryHistDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$sqlQueryHistTable")) spark.read.table(s"$etlDB.$sqlQueryHistTable").filter(filterCondition) else spark.emptyDataFrame
+  val jobDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jobTable")) spark.read.table(s"$etlDB.$jobTable").filter(filterCondition) else spark.emptyDataFrame
 
   private[overwatch] def pipelineSnapTime: TimeTypes = {
     Pipeline.createTimeDetail(_pipelineSnapTime)
