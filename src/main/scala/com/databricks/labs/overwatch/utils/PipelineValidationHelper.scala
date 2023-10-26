@@ -32,9 +32,9 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
   private var _validations: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
   private var _quarantine: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
 
-   def validations: ArrayBuffer[HealthCheckReport] = _validations
+  def validations: ArrayBuffer[HealthCheckReport] = _validations
 
-   def quarantine: ArrayBuffer[QuarantineReport] = _quarantine
+  def quarantine: ArrayBuffer[QuarantineReport] = _quarantine
 
   val _isOverwatchDB: Boolean = spark.sessionState.catalog.getDatabaseMetadata(etlDB).properties.getOrElse("OVERWATCHDB", "FALSE").toBoolean
 
