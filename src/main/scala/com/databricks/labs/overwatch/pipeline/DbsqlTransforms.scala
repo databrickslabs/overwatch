@@ -30,37 +30,6 @@ object DbsqlTransforms extends SparkSessionWrapper {
     val warehouse_name_gen_w = Window.partitionBy('organization_id, 'warehouse_id)
       .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, 1000)
 
-//    val warehouseRaw = auditRawDF
-//      .select(
-//        'timestamp,
-//        'date,
-//        'organization_id,
-//        'serviceName,
-//        'actionName,
-//        'userEmail,
-//        'requestId,
-//        'response,
-//        'warehouse_id,
-//        PipelineFunctions.fillForward("warehouse_name",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("cluster_size",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("min_num_clusters",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("max_num_clusters",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("auto_stop_mins",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("spot_instance_policy",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("enable_photon",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("channel",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("tags",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("enable_serverless_compute",warehouse_name_gen_w),
-//        PipelineFunctions.fillForward("warehouse_type",warehouse_name_gen_w)
-////        PipelineFunctions.fillForward("warehouse_state",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("size",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("auto_resume",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("creator_id",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("num_clusters",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("num_active_sessions",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("jdbc_url",warehouse_name_gen_w),
-////        PipelineFunctions.fillForward("odbc_params",warehouse_name_gen_w)
-//      )
     val warehouseRaw = auditRawDF
       .withColumn("warehouse_name",PipelineFunctions.fillForward("warehouse_name",warehouse_name_gen_w))
       .withColumn("cluster_size",PipelineFunctions.fillForward("cluster_size",warehouse_name_gen_w))
