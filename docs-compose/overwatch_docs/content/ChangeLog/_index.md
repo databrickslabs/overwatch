@@ -17,7 +17,9 @@ Upgrade script: **[HTML](/assets/ChangeLog/07221_upgrade.html) | [DBC](/assets/C
 * Improve performance of WarehouseSpec table and resolve schema discrepancies in Warehouse Gold which would lead to 
   failures
 * Improves the coverage of job_run_cluster_util by ensuring we can also compute it for jobs submitted using SparkSubmit  
-
+* (Dashboard bug) Fix to metric "DBU Spend by the top 3 expensive Interactive clusters" in Clusters dashboard
+  - Find the updated version [here]({{%relref "dashboards/_index.md"%}}/#dashboard-files)
+  
 Released Oct 31st, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/30?closed=1)
 
 ------------------------------------------------------------------------------------------------
