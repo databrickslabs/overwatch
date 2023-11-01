@@ -339,6 +339,25 @@ trait BronzeTransforms extends SparkSessionWrapper {
       val azureAuditSourceFilters = 'Overwatch_RunID === lit(overwatchRunID) && 'organization_id === organizationId
       val rawBodyLookup = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
+
+      val requiredColumns : Array[Column] = Array(
+        col("category"),
+        col("version"),
+        col("timestamp"),
+        col("date"),
+        col("identity").alias("userIdentity"),
+        col("organization_id"),
+        col("properties.actionName"),
+        col("properties.logId"),
+        col("properties.requestId"),
+        col("properties.requestParams"),
+        col("properties.response"),
+        col("properties.serviceName"),
+        col("properties.sessionId"),
+        col("properties.sourceIPAddress"),
+        col("properties.userAgent"),
+      )
+
       val schemaBuilders = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
         .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
@@ -348,9 +367,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
-        .selectExpr("*", "properties.*").drop("properties")
-
+        .select(requiredColumns: _*)
 
       val baselineAuditLogs = auditRawLand.asDF
         .filter(azureAuditSourceFilters)
@@ -361,16 +378,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
         .withColumn("time", 'time.cast("timestamp"))
         .withColumn("timestamp", unix_timestamp('time) * 1000)
         .withColumn("date", 'time.cast("date"))
-        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
+        .select(requiredColumns: _*)
         .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
-        .selectExpr("*", "properties.*").drop("properties")
         .withColumn("requestParams", structFromJson(spark, schemaBuilders, "requestParams"))
 
-      PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
+      val auditDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
         .withColumn("response", structFromJson(spark, schemaBuilders, "response"))
         .withColumn("requestParamsJson", to_json('requestParams))
         .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
         .drop("logId", "requestParamsJson")
+
+      auditDF
 
     } else {
 
