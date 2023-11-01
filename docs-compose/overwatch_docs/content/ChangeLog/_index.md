@@ -4,6 +4,24 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.7.2.2.1 (Patch)
+
+This patch addresses some critical fixes. If you ran versions 0721 or 0722, you need to run the upgrade script in 
+order to repair the data.
+
+Upgrade script: **[HTML](/assets/ChangeLog/07221_upgrade.html) | [DBC](/assets/ChangeLog/07221_upgrade.dbc)**
+
+### Bug Fixes
+* Fixed lookup to ensure NotebookCommands there are no NULL notebook_ids in NotebookCommands
+* There are some new services available in EventHub that if activated, would send duplicated audit log columns.
+* Improve performance of WarehouseSpec table and resolve schema discrepancies in Warehouse Gold which would lead to 
+  failures
+* Improves the coverage of job_run_cluster_util by ensuring we can also compute it for jobs submitted using SparkSubmit  
+
+Released Oct 31st, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/30?closed=1)
+
+------------------------------------------------------------------------------------------------
+
 ## 0.7.2.2
 
 This release contains a change to how we query the Databricks Jobs API, to prevent failures, given that the API is 
