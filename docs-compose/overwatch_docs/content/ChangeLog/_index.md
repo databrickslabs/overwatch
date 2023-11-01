@@ -6,7 +6,7 @@ weight: 4
 
 ## 0.7.2.2.1 (Patch)
 
-These patch addresses some critical fixes. If you ran versions 0721 or 0722, you need to run the upgrade script in 
+This patch addresses some critical fixes. If you ran versions 0721 or 0722, you need to run the upgrade script in 
 order to repair the data.
 
 Upgrade script: **[HTML](/assets/ChangeLog/07221_upgrade.html) | [DBC](/assets/ChangeLog/07221_upgrade.dbc)**
@@ -18,7 +18,8 @@ Upgrade script: **[HTML](/assets/ChangeLog/07221_upgrade.html) | [DBC](/assets/C
   failures
 * Improves the coverage of job_run_cluster_util by ensuring we can also compute it for jobs submitted using SparkSubmit  
 
-Released Oct 5th, 2023 - [Full Change Inventory]()
+Released Oct 31st, 2023 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/30?closed=1)
+
 ------------------------------------------------------------------------------------------------
 
 ## 0.7.2.2
