@@ -80,3 +80,5 @@ Please download the dbc file and import it into your workspace, read through the
 able to get them running right away. 
 
 - **Version 1** - [DBC](/assets/Dashboards/Dashboards_v1.0.dbc) Released September 11, 2023
+- **Version 1.1** - [DBC](/assets/Dashboards/Dashboards_v1.1.dbc) Released October 31, 2023
+    - Fix to "DBU Spend by the top 3 expensive Interactive clusters" metric in Clusters dashboard.
