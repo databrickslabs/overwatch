@@ -114,6 +114,7 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
           BronzeTargets.dbuCostDetail,
           BronzeTargets.clustersSnapshotTarget,
           SilverTargets.clustersSpecTarget,
+          SilverTargets.dbJobRunsTarget.asIncrementalDF(clusterStateFactModule, SilverTargets.dbJobRunsTarget.incrementalColumns, 30),
           pipelineSnapTime
         )),
         append(GoldTargets.clusterStateFactTarget)

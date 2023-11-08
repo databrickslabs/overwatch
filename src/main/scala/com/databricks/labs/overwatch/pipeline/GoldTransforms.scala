@@ -246,6 +246,7 @@ trait GoldTransforms extends SparkSessionWrapper {
                                        dbuCostDetailsTarget: PipelineTable,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
+                                       jrsilverDF: DataFrame,
                                        pipelineSnapTime: TimeTypes
                                      )(clusterStateDetail: DataFrame): DataFrame = {
     val instanceDetailsDF = instanceDetailsTarget.asDF
@@ -402,8 +403,21 @@ trait GoldTransforms extends SparkSessionWrapper {
       (driverComputeCost + driverDBUCost + workerComputeCost + workerDBUCost).alias("total_cost")
     )
 
-    clusterPotential
+    val clsfDF = clusterPotential
       .select(clusterStateFactCols: _*)
+
+    val clsfDF1 =clsfDF.filter('state === "TERMINATING").filter('isAutomated === true).filter('days_in_state > 2)
+    val clsfDF2 = clsfDF.except(clsfDF1)
+
+    val joinedDF = clsfDF2.join(jrsilverDF,clsfDF2("cluster_id")===jrsilverDF("clusterID"),"left")
+    joinedDF.withColumn("timestamp_state_end", coalesce('end_run_time, 'timestamp_state_end))
+      .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
+      .withColumn("days_in_state", size('state_dates))
+      .drop("end_run_time")
+      .drop("clusterID")
+
+    clsfDF2.union(joinedDF)
+
   }
 
   protected def buildJobRunCostPotentialFact(
