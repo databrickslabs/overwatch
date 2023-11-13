@@ -70,12 +70,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    *                 if false it will register the exception in the validation report.
    */
   private def storagePrefixAccessValidation(config: MultiWorkspaceConfig, fastFail: Boolean = false): DeploymentValidationReport  = {
-    val testDetails = s"""StorageAccessTest storage : ${config.storage_prefix}"""
+    val testDetails = s"""StorageAccessTest storage : ${config.storage_prefix}/${config.workspace_id}/"""
     try {
-      dbutils.fs.mkdirs(s"""${config.storage_prefix}/test_access""")
-      dbutils.fs.put(s"""${config.storage_prefix}/test_access/testwrite""", "This is a file in cloud storage.")
-      dbutils.fs.head(s"""${config.storage_prefix}/test_access/testwrite""")
-      dbutils.fs.rm(s"""${config.storage_prefix}/test_access""", true)
+      dbutils.fs.mkdirs(s"""${config.storage_prefix}/${config.workspace_id}/test_access""")
+      dbutils.fs.put(s"""${config.storage_prefix}/${config.workspace_id}/test_access/testwrite""", "This is a file in cloud storage.")
+      dbutils.fs.head(s"""${config.storage_prefix}/${config.workspace_id}/test_access/testwrite""")
+      dbutils.fs.rm(s"""${config.storage_prefix}/${config.workspace_id}/test_access""", true)
       DeploymentValidationReport(true,
         getSimpleMsg("Storage_Access"),
         testDetails,
