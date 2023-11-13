@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Pipeline, PipelineF
 import com.databricks.labs.overwatch.utils.Helpers.spark
 import com.databricks.labs.overwatch.utils.{DeploymentValidationReport, Helpers, SparkSessionWrapper}
 import org.apache.log4j.Logger
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Row}
 
 import java.time.LocalDateTime
@@ -25,7 +25,7 @@ object DataReconciliation extends SparkSessionWrapper {
     performBasicValidation(sourceOrgIDArr,targetOrgIDArr)
     val sourceWorkspace = getConfig(sourceEtl,targetOrgIDArr(0))
     val targetWorkspace = getConfig(targetEtl,targetOrgIDArr(0))
-    val targets = getAllTargets(targetWorkspace)
+    val targets = getAllTargets(sourceWorkspace)
     val report = runRecon(targets,sourceEtl,sourceOrgIDArr,targetEtl)
     val reconRunId: String = java.util.UUID.randomUUID.toString
     saveReconReport(report,targetWorkspace.getConfig.etlDataPathPrefix,"ReconReport",reconRunId)
@@ -34,8 +34,10 @@ object DataReconciliation extends SparkSessionWrapper {
   private def countValidation(target: PipelineTable,orgId: String, sourceEtl:String,targetEtl:String ):ReconReport ={
     val simpleMsg = "Count validation"
     try {
-      val sourceTable = getTableDF(s"""${target.tableFullName}""", orgId)
-      val targetTable = getTableDF(s"""${target.tableFullName}""", orgId)
+      val sourceTable = getTableDF(s"""${target.tableFullName}""", orgId, target.keys)
+      println("SourceTable")
+      val targetTable = getTableDF(s"""${target.tableFullName.replaceAll(sourceEtl,targetEtl)}""", orgId,target.keys)
+      println("TargetTable")
       val sourceCount = sourceTable.count()
       val targetCount = targetTable.count()
       val missingSourceCount = targetTable.exceptAll(sourceTable).count()
@@ -49,7 +51,13 @@ object DataReconciliation extends SparkSessionWrapper {
         }
 
       }
-      val deviation = sourceCount / deviationFactor
+      val deviation:Double = {
+        if(deviationFactor == 1){
+          0
+        }else{
+          (deviationFactor/sourceCount)*100
+        }
+      }
       val validated: Boolean = {
         if ((sourceCount == targetCount) && (missingSourceCount == 0 && missingTargetCount == 0)) {
           true
@@ -141,20 +149,35 @@ object DataReconciliation extends SparkSessionWrapper {
                           missingInSource: Option[Long] = None,
                           missingInTarget: Option[Long] = None,
                           commonDataCount: Option[Long] = None,
-                          deviationPercentage: Option[Long] = None
+                          deviationPercentage: Option[Double] = None
                         )
 
 
-  private def getTableDF(tableName: String,orgId: String):DataFrame = {
-    println("table name is"+tableName)
-    spark.sql(s"""select * from $tableName""").filter('organization_id === orgId).drop("Pipeline_SnapTS", "Overwatch_RunID")
+  private def getTableDF(tableName: String,orgId: String, keys:Array[String]):DataFrame = {
+
+    try{
+      val query = s"""select * from $tableName"""
+      println("table name is"+tableName)
+      println(query)
+      val df = spark.sql(query)
+      val filterDF = df
+        .filter('organization_id === orgId)
+        .select(keys map col: _*)
+        .drop("Overwatch_RunID")
+    filterDF
+    }catch {
+      case exception: Exception =>
+        println(s"""Exception: Unable to read data from $tableName"""+exception.getMessage)
+        spark.emptyDataFrame
+    }
+
   }
 
   private[overwatch] def getAllTargets(workspace: Workspace): ParArray[PipelineTable] = {
     val b = Bronze(workspace)
     val s = Silver(workspace)
     val g = Gold(workspace)
-    (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets :+ b.pipelineStateTarget).filter(_.exists(dataValidation = true, catalogValidation = false)).par
+    (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets).filter(_.exists(dataValidation = true, catalogValidation = false)).par
   }
 
   private[overwatch] def performBasicValidation(sourceOrgIDArr:Array[String],targetOrgIDArr:Array[String]):Unit = {
