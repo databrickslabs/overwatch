@@ -144,6 +144,24 @@ case class RulesValidationResult(ruleName: String, passed: String, permitted: St
 
 case class RulesValidationReport(deployment_id: String, workspace_id: String, result: RulesValidationResult)
 
+case class ReconReport(
+                        validated: Boolean = false,
+                        workspaceId: String,
+                        simpleMsg: String,
+                        sourceDB: String,
+                        targetDB: String,
+                        tableName: String,
+                        sourceCount: Option[Long] = None,
+                        targetCount: Option[Long] = None,
+                        missingInSource: Option[Long] = None,
+                        missingInTarget: Option[Long] = None,
+                        commonDataCount: Option[Long] = None,
+                        deviationPercentage: Option[Double] = None,
+                        sourceQuery: Option[String] = None,
+                        targetQuery: Option[String] = None,
+                        errorMsg: Option[String] = None
+                      )
+
 object MultiWorkspaceConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
   storage_prefix, etl_database_name, consumer_database_name, secret_scope,

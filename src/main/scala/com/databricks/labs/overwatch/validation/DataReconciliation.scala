@@ -3,7 +3,7 @@ package com.databricks.labs.overwatch.validation
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline.{Bronze, Gold, Pipeline, PipelineFunctions, PipelineTable, Silver}
 import com.databricks.labs.overwatch.utils.Helpers.spark
-import com.databricks.labs.overwatch.utils.{DeploymentValidationReport, Helpers, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{DeploymentValidationReport, Helpers, ReconReport, SparkSessionWrapper}
 import org.apache.log4j.Logger
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Row}
@@ -12,6 +12,12 @@ import java.time.LocalDateTime
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.mutable.ParArray
 
+/**
+ * Data Reconciliation is a new feature of OW which will ensure whether the data is consistent across the current release and previous release.
+ * In order to perform the data reconciliation, we need two overwatch deployments with current and previous versions.
+ * After running the reconciliation it will generate a report which will contain all comparison results for each table.
+ * This reconciliation module is independent of pipeline run and will be used as an helper function.
+ */
 object DataReconciliation extends SparkSessionWrapper {
 
   import spark.implicits._
@@ -19,7 +25,12 @@ object DataReconciliation extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def performRecon(sourceEtl:String,targetEtl:String): Unit ={
+  /**
+   * Function is the starting point of the reconciliation.
+   * @param sourceEtl :  ETL name of Previous version of OW
+   * @param targetEtl : ETL name of the current version of OW
+   */
+  private[overwatch] def performRecon(sourceEtl:String,targetEtl:String): Unit ={
     val sourceOrgIDArr = getAllOrgID(sourceEtl)
     val targetOrgIDArr = getAllOrgID(targetEtl)
     performBasicValidation(sourceOrgIDArr,targetOrgIDArr)
@@ -31,15 +42,27 @@ object DataReconciliation extends SparkSessionWrapper {
     saveReconReport(report,targetWorkspace.getConfig.etlDataPathPrefix,"ReconReport",reconRunId)
   }
 
+  /**
+   * Performs the below comparison between two tables called source table and target table.
+   * Count validation in Source
+   * Count validation in Target
+   * Common data between source and target
+   * Missing data in source
+   * Missing data in target
+   * Deviation percentage: it is calculated with the formula  ((missingSourceCount + missingTargetCount)/SourceCount)*100
+   * @param target
+   * @param orgId
+   * @param sourceEtl
+   * @param targetEtl
+   * @return
+   */
   private def countValidation(target: PipelineTable,orgId: String, sourceEtl:String,targetEtl:String ):ReconReport ={
     val simpleMsg = "Count validation"
     try {
       val sourceQuery = getQuery(s"""${target.tableFullName}""", orgId, target)
       val sourceTable = getTableDF(sourceQuery)
-      println("SourceTable")
       val targetQuery = getQuery(s"""${target.tableFullName.replaceAll(sourceEtl,targetEtl)}""", orgId,target)
       val targetTable = getTableDF(targetQuery)
-      println("TargetTable")
       val sourceCount = sourceTable.count()
       val targetCount = targetTable.count()
       val missingSourceCount = targetTable.exceptAll(sourceTable).count()
@@ -53,7 +76,6 @@ object DataReconciliation extends SparkSessionWrapper {
         }
 
       }
-      println("deviationFactor"+deviationFactor)
       val deviation:Double = {
         if(deviationFactor == 1){
           0
@@ -62,7 +84,6 @@ object DataReconciliation extends SparkSessionWrapper {
           (deviationFactor.toDouble/sourceCount)*100
         }
       }
-      println("deviation"+deviation)
 
       val validated: Boolean = {
         if ((sourceCount == targetCount) && (missingSourceCount == 0 && missingTargetCount == 0)) {
@@ -91,7 +112,6 @@ object DataReconciliation extends SparkSessionWrapper {
     } catch {
       case e: Exception =>
         e.printStackTrace()
-        println("got Exception:" + e.getMessage)
         val fullMsg = PipelineFunctions.appendStackStrace(e, "Got Exception while running recon,")
         ReconReport(
           workspaceId = orgId,
@@ -123,6 +143,13 @@ object DataReconciliation extends SparkSessionWrapper {
     reconStatus.toArray
   }
 
+  /**
+   * Function saves the recon report.
+   * @param reconStatusArray
+   * @param path
+   * @param reportName
+   * @param reconRunId
+   */
   private def saveReconReport(reconStatusArray: Array[ReconReport], path: String, reportName: String, reconRunId: String): Unit = {
     val validationPath = {
       if (!path.startsWith("dbfs:") && !path.startsWith("s3") && !path.startsWith("abfss") && !path.startsWith("gs")) {
@@ -131,7 +158,6 @@ object DataReconciliation extends SparkSessionWrapper {
         path
       }
     }
-    println("Validation report trying saved to " + s"""${validationPath}/report/${reportName}""")
 
     val pipelineSnapTime =  Pipeline.createTimeDetail(LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli)
     reconStatusArray.toSeq.toDS().toDF()
@@ -145,23 +171,7 @@ object DataReconciliation extends SparkSessionWrapper {
     println("Validation report has been saved to " + s"""${validationPath}/report/${reportName}""")
   }
 
-  case class ReconReport(
-                          validated: Boolean = false,
-                          workspaceId: String,
-                          simpleMsg: String,
-                          sourceDB: String,
-                          targetDB: String,
-                          tableName: String,
-                          sourceCount: Option[Long] = None,
-                          targetCount: Option[Long] = None,
-                          missingInSource: Option[Long] = None,
-                          missingInTarget: Option[Long] = None,
-                          commonDataCount: Option[Long] = None,
-                          deviationPercentage: Option[Double] = None,
-                          sourceQuery: Option[String] = None,
-                          targetQuery: Option[String] = None,
-                          errorMsg: Option[String] = None
-                        )
+
 
 private def getQuery(tableName: String,orgId: String,target:PipelineTable): String = {
   val _keys = target.keys.filterNot(_ == "Overwatch_RunID")
@@ -198,7 +208,6 @@ private def getQuery(tableName: String,orgId: String,target:PipelineTable): Stri
   private[overwatch] def performBasicValidation(sourceOrgIDArr:Array[String],targetOrgIDArr:Array[String]):Unit = {
     println("Number of workspace in Source:" + sourceOrgIDArr.size)
     println("Number of workspace in Target:" + targetOrgIDArr.size)
-    println("Number of common workspace:" + sourceOrgIDArr.intersect(targetOrgIDArr))
     if(sourceOrgIDArr.size<1 || targetOrgIDArr.size<1){
       val msg ="Number of workspace in source/target etl is 0 , Exiting"
       println(msg)
