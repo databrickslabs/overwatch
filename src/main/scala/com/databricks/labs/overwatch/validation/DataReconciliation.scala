@@ -19,7 +19,7 @@ object DataReconciliation extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  def performRecon(sourceEtl:String,targetEtl:String,fromTS:Long,untilTS:Long): Unit ={
+  def performRecon(sourceEtl:String,targetEtl:String): Unit ={
     val sourceOrgIDArr = getAllOrgID(sourceEtl)
     val targetOrgIDArr = getAllOrgID(targetEtl)
     performBasicValidation(sourceOrgIDArr,targetOrgIDArr)
@@ -34,9 +34,11 @@ object DataReconciliation extends SparkSessionWrapper {
   private def countValidation(target: PipelineTable,orgId: String, sourceEtl:String,targetEtl:String ):ReconReport ={
     val simpleMsg = "Count validation"
     try {
-      val sourceTable = getTableDF(s"""${target.tableFullName}""", orgId, target.keys)
+      val sourceQuery = getQuery(s"""${target.tableFullName}""", orgId, target)
+      val sourceTable = getTableDF(sourceQuery)
       println("SourceTable")
-      val targetTable = getTableDF(s"""${target.tableFullName.replaceAll(sourceEtl,targetEtl)}""", orgId,target.keys)
+      val targetQuery = getQuery(s"""${target.tableFullName.replaceAll(sourceEtl,targetEtl)}""", orgId,target)
+      val targetTable = getTableDF(targetQuery)
       println("TargetTable")
       val sourceCount = sourceTable.count()
       val targetCount = targetTable.count()
@@ -44,20 +46,24 @@ object DataReconciliation extends SparkSessionWrapper {
       val missingTargetCount = sourceTable.exceptAll(targetTable).count()
       val commonDataCount = sourceTable.intersectAll(targetTable).count()
       val deviationFactor = {
-        if (missingSourceCount + missingTargetCount == 0l) {
+        if ((missingSourceCount + missingTargetCount) == 0) {
           1
         } else {
           missingSourceCount + missingTargetCount
         }
 
       }
+      println("deviationFactor"+deviationFactor)
       val deviation:Double = {
         if(deviationFactor == 1){
           0
         }else{
-          (deviationFactor/sourceCount)*100
+          println(deviationFactor.toDouble/sourceCount+"deviationFactor/sourceCount")
+          (deviationFactor.toDouble/sourceCount)*100
         }
       }
+      println("deviation"+deviation)
+
       val validated: Boolean = {
         if ((sourceCount == targetCount) && (missingSourceCount == 0 && missingTargetCount == 0)) {
           true
@@ -69,16 +75,18 @@ object DataReconciliation extends SparkSessionWrapper {
       ReconReport(validated = validated,
         workspaceId = orgId,
         simpleMsg = simpleMsg,
-        errorMsg = Some(""),
         sourceDB = sourceEtl,
         targetDB = targetEtl,
-        tableName = target.tableFullName,
+        tableName = target.name,
         sourceCount = Some(sourceCount),
         targetCount = Some(targetCount),
         missingInSource = Some(missingSourceCount),
         missingInTarget = Some(missingTargetCount),
         commonDataCount = Some(commonDataCount),
-        deviationPercentage = Some(deviation))
+        deviationPercentage = Some(deviation),
+        sourceQuery = Some(sourceQuery),
+        targetQuery = Some(targetQuery),
+        errorMsg = Some(""))
 
     } catch {
       case e: Exception =>
@@ -88,10 +96,11 @@ object DataReconciliation extends SparkSessionWrapper {
         ReconReport(
           workspaceId = orgId,
           simpleMsg = simpleMsg,
-          errorMsg = Some(fullMsg),
           sourceDB = sourceEtl,
           targetDB = targetEtl,
-          tableName = target.tableFullName)
+          tableName = target.tableFullName,
+          errorMsg = Some(fullMsg)
+        )
     }
 
 
@@ -122,7 +131,7 @@ object DataReconciliation extends SparkSessionWrapper {
         path
       }
     }
-
+    println("Validation report trying saved to " + s"""${validationPath}/report/${reportName}""")
 
     val pipelineSnapTime =  Pipeline.createTimeDetail(LocalDateTime.now(Pipeline.systemZoneId).toInstant(Pipeline.systemZoneOffset).toEpochMilli)
     reconStatusArray.toSeq.toDS().toDF()
@@ -140,7 +149,6 @@ object DataReconciliation extends SparkSessionWrapper {
                           validated: Boolean = false,
                           workspaceId: String,
                           simpleMsg: String,
-                          errorMsg: Option[String] = None,
                           sourceDB: String,
                           targetDB: String,
                           tableName: String,
@@ -149,25 +157,32 @@ object DataReconciliation extends SparkSessionWrapper {
                           missingInSource: Option[Long] = None,
                           missingInTarget: Option[Long] = None,
                           commonDataCount: Option[Long] = None,
-                          deviationPercentage: Option[Double] = None
+                          deviationPercentage: Option[Double] = None,
+                          sourceQuery: Option[String] = None,
+                          targetQuery: Option[String] = None,
+                          errorMsg: Option[String] = None
                         )
 
+private def getQuery(tableName: String,orgId: String,target:PipelineTable): String = {
+  val _keys = target.keys.filterNot(_ == "Overwatch_RunID")
+  val reconColymns = target.reconColumns
+  val finalColumns = if(!reconColymns.isEmpty) {
+    _keys++reconColymns
+  }else{
+    _keys
+  }
+  s"""select ${finalColumns.mkString(",")} from $tableName where organization_id = ${orgId} """
 
-  private def getTableDF(tableName: String,orgId: String, keys:Array[String]):DataFrame = {
+}
 
+  private def getTableDF(query: String):DataFrame = {
     try{
-      val query = s"""select * from $tableName"""
-      println("table name is"+tableName)
       println(query)
-      val df = spark.sql(query)
-      val filterDF = df
-        .filter('organization_id === orgId)
-        .select(keys map col: _*)
-        .drop("Overwatch_RunID")
-    filterDF
+      val filterDF = spark.sql(query)
+      filterDF
     }catch {
       case exception: Exception =>
-        println(s"""Exception: Unable to read data from $tableName"""+exception.getMessage)
+        println(s"""Exception: Unable to run the query ${query}"""+exception.getMessage)
         spark.emptyDataFrame
     }
 

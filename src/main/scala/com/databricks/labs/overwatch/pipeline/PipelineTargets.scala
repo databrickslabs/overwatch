@@ -492,7 +492,9 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
       maxMergeScanDates = 31, // 1 greater than clusterStateDetail
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
-      zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
+      zOrderBy = Array("cluster_id", "unixTimeMS_state_start"),
+      reconColumns = Array("current_num_workers","target_num_workers","databricks_billable","total_DBU_cost","total_driver_cost","total_worker_cost","total_cost")
+
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(
