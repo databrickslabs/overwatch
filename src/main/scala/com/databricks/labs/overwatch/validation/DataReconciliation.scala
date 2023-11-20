@@ -80,7 +80,6 @@ object DataReconciliation extends SparkSessionWrapper {
         if(deviationFactor == 1){
           0
         }else{
-          println(deviationFactor.toDouble/sourceCount+"deviationFactor/sourceCount")
           (deviationFactor.toDouble/sourceCount)*100
         }
       }
@@ -187,7 +186,6 @@ private def getQuery(tableName: String,orgId: String,target:PipelineTable): Stri
 
   private def getTableDF(query: String):DataFrame = {
     try{
-      println(query)
       val filterDF = spark.sql(query)
       filterDF
     }catch {
