@@ -32,7 +32,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       BronzeTargets.instanceProfilesSnapshotTarget,
       BronzeTargets.tokensSnapshotTarget,
       BronzeTargets.globalInitScSnapshotTarget,
-      BronzeTargets.jobRunsSnapshotTarget
+      BronzeTargets.jobRunsSnapshotTarget,
+      BronzeTargets.warehousesSnapshotTarget
     )
   }
 
@@ -44,10 +45,12 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
       case OverwatchScope.sparkEvents => Array(sparkEventLogsModule)
+      case OverwatchScope.dbsql => Array(warehousesSnapshotModule)
       case _ => Array[Module]()
     }
   }
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
   /**
    * Simplified method for the common task of deep cloning bronze targets.
    * This function will perform a deep clone on all existing bronze targets
@@ -59,6 +62,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
    *                     if choosing to overwrite, only one backup will be maintained
    * @param excludes     which bronze targets to exclude from the snapshot
    */
+ //TODO: Add link for new Snapshot Class functionality
+  @deprecated("This Method is deprecated, Use new Snapshot Class instead. Please check the link for more details")
   def snapshot(
                 targetPrefix: String,
                 overwrite: Boolean,
@@ -67,6 +72,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     val bronzeTargets = getAllTargets :+ pipelineStateTarget
     val currTime = Pipeline.createTimeDetail(System.currentTimeMillis())
     val timestampedTargetPrefix = s"$targetPrefix/${currTime.asDTString}/${currTime.asUnixTimeMilli.toString}"
+   import spark.implicits._
 
     // if user provides dot path to table -- remove dot path and lower case the name
     val cleanExcludes = excludes.map(_.toLowerCase).map(exclude => {
@@ -85,18 +91,19 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       targetPrefix
     } else timestampedTargetPrefix // !Overwrite - targetPrefix/currDateString/timestampMillisString
 
-    // build clone details
-    val cloneSpecs = targetsToSnap.map(t => {
-      val targetPath = s"${finalTargetPathPrefix}/${t.name.toLowerCase}"
-      CloneDetail(t.tableLocation, targetPath)
-    })
+   val cloneSpecs = new Snapshot(workspace.getConfig.databaseName, finalTargetPathPrefix, workspace, workspace.database, workspace.getConfig, "snapShot").buildCloneSpecs("Deep", targetsToSnap)
+
 
     // par clone
-    Helpers.parClone(cloneSpecs)
+   val cloneReport = Helpers.parClone(cloneSpecs)
+   val cloneReportPath = s"${finalTargetPathPrefix}/clone_report/"
+   val ProcessCompleteMsg = s"Cloning is one and clone report is being written to ${cloneReportPath}"
+   logger.log(Level.INFO, ProcessCompleteMsg)
+   cloneReport.toDS.write.format("delta").mode("append").save(cloneReportPath)
 
   }
 
-  private val logger: Logger = Logger.getLogger(this.getClass)
+
 
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess: () => ETLDefinition = {
@@ -192,7 +199,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
             sparkLogClusterScaleCoefficient,
             config.apiEnv,
             config.isMultiworkspaceDeployment,
-            config.organizationId
+            config.organizationId,
+            config.cloudProvider
           ),
           generateEventLogsDF(
             database,
@@ -264,6 +272,16 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   }
 
 
+  lazy private[overwatch] val warehousesSnapshotModule = Module(1013, "Bronze_Warehouses_Snapshot", this)
+  lazy private val appendWarehousesAPIProcess: () => ETLDefinition = {
+    () =>
+    ETLDefinition (
+    workspace.getWarehousesDF,
+    Seq(cleanseRawWarehouseSnapDF),
+    append(BronzeTargets.warehousesSnapshotTarget)
+    )
+  }
+
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
 
@@ -310,6 +328,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.accounts =>
         tokenSnapshotModule.execute(appendTokenProcess)
         globalInitScSnapshotModule.execute(appendGlobalInitScProcess)
+      case OverwatchScope.dbsql => warehousesSnapshotModule.execute(appendWarehousesAPIProcess)
       case _ =>
     }
   }

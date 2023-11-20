@@ -167,7 +167,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   protected def unsafeSSLErrorCount: Int = _unsafeSSLErrorCount
 
-  protected def apiMeta: ApiMeta = _apiMeta
+  private[overwatch] def apiMeta: ApiMeta = _apiMeta
 
   protected def queryMap: Map[String, String] = _queryMap
 
@@ -564,7 +564,10 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       true
     } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.paginationKey)) { //Check if only pagination key in present in the response
       true
-    } else {
+    } else if (apiResultDF.columns.size == 1 && apiResultDF.columns.contains(apiMeta.emptyResponseColumn)) { //Check if only pagination key in present in the response
+      true
+    }
+    else {
       false
     }
   }
@@ -592,7 +595,11 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         logger.log(Level.INFO, buildDetailMessage())
         setPrintFinalStatsFlag(false)
       }
-      if (paginate(response.body)) executeThreadedHelper() else _apiResponseArray
+      if (paginate(response.body)) {
+        executeThreadedHelper()
+      } else {
+        _apiResponseArray
+      }
     }
     try {
       executeThreadedHelper()

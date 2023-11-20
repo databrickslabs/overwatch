@@ -136,7 +136,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("API_Name"),
       config,
       incrementalColumns = Array("Pipeline_SnapTS"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.instanceDetailsMinimumSchema)
     )
 
     lazy private[overwatch] val cloudMachineDetailViewTarget: PipelineView = PipelineView(
@@ -150,7 +151,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("sku"),
       config,
       incrementalColumns = Array("activeFrom"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.dbuCostDetailsMinimumSchema)
     )
 
     lazy private[overwatch] val dbuCostDetailViewTarget: PipelineView = PipelineView(
@@ -206,6 +208,16 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Pipeline_SnapTS"),
       partitionBy = Seq("organization_id")
     )
+
+    lazy private[overwatch] val warehousesSnapshotTarget: PipelineTable = PipelineTable(
+      name = "warehouses_snapshot_bronze",
+      _keys = Array("warehouse_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.warehouseSnapMinimumSchema)
+    )
+
   }
 
   /**
@@ -334,9 +346,6 @@ abstract class PipelineTargets(config: Config) {
       name = "job_status_silver",
       _keys = Array("timestamp", "jobId", "actionName", "requestId"),
       config,
-      _permitDuplicateKeys = false,
-      _mode = WriteMode.merge,
-      mergeScope = MergeScope.insertOnly,
       incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
     )
@@ -356,6 +365,14 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       _permitDuplicateKeys = false,
       incrementalColumns = Array("query_start_time_ms"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val warehousesSpecTarget: PipelineTable = PipelineTable(
+      name = "warehouse_spec_silver",
+      _keys = Array("timestamp", "warehouse_id"),
+      config,
+      incrementalColumns = Array("timestamp"),
       partitionBy = Seq("organization_id")
     )
 
@@ -503,6 +520,22 @@ abstract class PipelineTargets(config: Config) {
       config
     )
 
+    lazy private[overwatch] val notebookCommandsTarget: PipelineTable = PipelineTable(
+      name = "notebookCommands_gold",
+      _keys = Array("notebook_id", "unixTimeMS"),
+      config,
+      _mode = WriteMode.merge,
+      mergeScope = MergeScope.insertOnly,
+      partitionBy = Seq("organization_id"),
+      incrementalColumns = Array("unixTimeMS"),
+    )
+
+    lazy private[overwatch] val notebookCommandsFactViewTarget: PipelineView = PipelineView(
+      name = "notebookCommands",
+      notebookCommandsTarget,
+      config
+    )
+
     lazy private[overwatch] val sparkJobTarget: PipelineTable = PipelineTable(
       name = "sparkJob_gold",
       _keys = Array("spark_context_id", "job_id", "unixTimeMS"),
@@ -621,6 +654,20 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val sqlQueryHistoryViewTarget: PipelineView = PipelineView(
       name = "sqlQueryHistory",
       sqlQueryHistoryTarget,
+      config
+    )
+
+    lazy private[overwatch] val warehouseTarget: PipelineTable = PipelineTable(
+      name = "warehouse_gold",
+      _keys = Array("warehouse_id", "unixTimeMS"),
+      config,
+      incrementalColumns = Array("unixTimeMS"),
+      partitionBy = Seq("organization_id")
+    )
+
+    lazy private[overwatch] val warehouseViewTarget: PipelineView = PipelineView(
+      name = "warehouse",
+      warehouseTarget,
       config
     )
 

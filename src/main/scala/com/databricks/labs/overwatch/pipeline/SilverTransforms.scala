@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
+import com.databricks.labs.overwatch.pipeline.DbsqlTransforms._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
@@ -624,11 +625,11 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("rnk", rank().over(exactlyOnceFilterW))
         .withColumn("rn", row_number().over(exactlyOnceFilterW))
         .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
-        .toTSDF("timestamp", "organization_id", "instance_pool_id")
-        .lookupWhen(
-          poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
-          maxLookAhead = Long.MaxValue
-        ).df
+          .toTSDF("timestamp", "organization_id", "instance_pool_id")
+          .lookupWhen(
+            poolSnapLookup.toTSDF("timestamp", "organization_id", "instance_pool_id"),
+            maxLookAhead = Long.MaxValue
+          ).df
     } else spark.emptyDataFrame
 
     //    val newPoolsHasRecords = !newPoolsRecords.isEmpty
@@ -721,7 +722,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val clusterBaseDF = clusterBase(df)
     val clusterBaseWMetaDF = clusterBaseDF
       // remove start, startResults, and permanentDelete as they do not contain sufficient metadata
-      .filter('actionName.isin("create", "edit"))
+      .filter('actionName.isin("create", "edit", "resize"))
 
     val lastClusterSnapW = Window.partitionBy('organization_id, 'cluster_id)
       .orderBy('Pipeline_SnapTS.desc)
@@ -1353,4 +1354,21 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  protected def buildWarehouseSpec(
+                                  bronze_warehouse_snap: PipelineTable,
+                                  isFirstRun: Boolean,
+                                  silver_warehouse_spec: PipelineTable
+                                )(df: DataFrame): DataFrame = {
+    val lastWarehouseSnapW = Window.partitionBy('organization_id, 'warehouse_id)
+      .orderBy('Pipeline_SnapTS.desc)
+
+    val bronzeWarehouseSnapLatest = bronze_warehouse_snap.asDF
+      .withColumn("rnk", rank().over(lastWarehouseSnapW))
+      .withColumn("rn", row_number().over(lastWarehouseSnapW))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
+    deriveInputForWarehouseBase(df,silver_warehouse_spec,auditBaseCols)
+    .transform(deriveWarehouseBase())
+      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest))
+  }
 }

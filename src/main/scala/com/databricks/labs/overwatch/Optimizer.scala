@@ -19,11 +19,11 @@ object Optimizer extends SparkSessionWrapper{
    * @param overwatchETLDB name of the Overwtch ETL database
    * @return
    */
-  private[overwatch] def getLatestSuccessState(overwatchETLDB: String): DataFrame = {
-    val orgId = Initializer.getOrgId
+  private[overwatch] def getLatestSuccessState(overwatchETLDB: String,orgId: String): DataFrame = {
     val lastSuccessByModuleW = Window.partitionBy('moduleID).orderBy('Pipeline_SnapTS.desc)
+    val orgIDFilter = if (orgId == "") lit(true) else 'organization_id === orgId
     spark.table(s"${overwatchETLDB}.pipeline_report")
-      .filter('organization_id === orgId)
+      .filter(orgIDFilter)
       .filter('status === "SUCCESS" || 'status.like("EMPTY:%"))
       .withColumn("rnk", rank.over(lastSuccessByModuleW))
       .withColumn("rn", row_number.over(lastSuccessByModuleW))
@@ -36,8 +36,8 @@ object Optimizer extends SparkSessionWrapper{
    * @param overwatchETLDB name of the Overwtch ETL database
    * @return workspace object
    */
-  private def getLatestWorkspace(overwatchETLDB: String): Workspace = {
-    val params = getLatestSuccessState(overwatchETLDB)
+  private def getLatestWorkspace(overwatchETLDB: String,orgId: String): Workspace = {
+    val params = getLatestSuccessState(overwatchETLDB,orgId)
       .selectExpr("inputConfig.*")
       .as[OverwatchParams]
       .first
@@ -50,18 +50,32 @@ object Optimizer extends SparkSessionWrapper{
 
   /**
    * pass in the overwatch ETL database name to optimize overwatch in parallel
-   * @param args ["overwatch_etl"]
+   * @param args(0)   Overwatch ETL Database.
+   * @param args(1)   Organization_ID for which optimization need to be performed.(Optional). By default optimizer will run for all
+   *                  the organization ID in pipeline_report. If args(1) is not provided then run optimization for whole database.
    */
+
   def main(args: Array[String]): Unit = {
 
-    val overwatchETLDB = if (args.length == 1) {
-      args(0)
+
+    val (overwatchETLDB, orgID) = if (args.length == 1) {
+      val dbName = args(0)
+      (dbName, "")
+    } else if (args.length == 2) {
+      val dbName = args(0)
+      val org_id = args(1)
+      val cntOrgID = spark.table(s"${dbName}.pipeline_report").select("organization_id").filter('organization_id === org_id).distinct.count()
+      if (cntOrgID > 0) {
+        (dbName, org_id)
+      } else {
+        throw new BadConfigException("Input Organization_ID is not part of the Overwatch Deployment for which you want to run the optimizer")
+      }
     } else {
-      throw new BadConfigException(s"Main class requires at least 1 but less than 5 arguments. Received ${args.length} " +
+      throw new BadConfigException(s"Main class requires at least 1 but less than 3 arguments. Received ${args.length} " +
         s"arguments. Please review the docs to compose the input arguments appropriately.")
     }
 
-    val workspace = getLatestWorkspace(overwatchETLDB)
+    val workspace = getLatestWorkspace(overwatchETLDB,orgID)
     val config = workspace.getConfig
     if (config.debugFlag) println(JsonUtils.objToJson(config.inputConfig).compactString)
     val bronze = Bronze(workspace, suppressReport = true, suppressStaticDatasets = true)
@@ -70,7 +84,8 @@ object Optimizer extends SparkSessionWrapper{
 
     val optimizationCandidates = bronze.getAllTargets ++ silver.getAllTargets ++ gold.getAllTargets :+ bronze.pipelineStateTarget
     val postProcessor = new PostProcessor(config)
-    postProcessor.optimizeOverwatch(spark, optimizationCandidates)
+    val orgIdList  = spark.table(s"${overwatchETLDB}.pipeline_report").select("organization_id").distinct().collect().map(x => x(0).toString)
+    postProcessor.optimizeOverwatch(spark, optimizationCandidates,orgID,orgIdList)
 
   }
 
