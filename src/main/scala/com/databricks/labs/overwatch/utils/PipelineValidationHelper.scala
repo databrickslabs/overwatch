@@ -151,13 +151,13 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
       } else {
         val (healthCheckMsg: String, healthCheckType: String) =
-          if (validationType.toLowerCase() == "validate_greater_than_zero") {
+          if (validationType.toLowerCase().contains("greater_than_zero")) {
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are not greater than zero or is NULL", "Failure")
-          } else if (validationType.toLowerCase() == "validate_not_null") {
+          } else if (validationType.toLowerCase().contains("not_null")) {
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are null", "Failure")
-          } else if (validationType.toLowerCase() == "validate_leq_one") {
+          } else if (validationType.toLowerCase().contains("leq_one")) {
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are greater than 1", "Failure")
-          } else if (validationType.toLowerCase() == "validate_values_in_between") {
+          } else if (validationType.toLowerCase().contains("values_in_between")) {
             (s"HealthCheck Warning: got $countOfNegativeValidation ${colName}s which are not in between expected values", "Warning")
           }
           else {
