@@ -54,7 +54,8 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     val errMsg = s"pipeline_report is not present in $etlDB. To proceed with pipeline_validation , pipeline_report table needs to be present in the database.Pipeline Validation aborted!!!"
     throw new BadConfigException(errMsg)
   }
-  val storagePrefix: String = pipelineDF.select("inputConfig.dataTarget.etlDataPathPrefix").collect()(0)(0).toString
+  val storagePrefix: String = workSpace.getConfig.etlDataPathPrefix
+
   private val Overwatch_RunID = pipelineDF.orderBy('Pipeline_SnapTS.desc).select("Overwatch_RunID").collect()(0)(0).toString
 
   private val gold = Gold(workSpace)
@@ -174,6 +175,18 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     (validationStatus, quarantineStatus)
   }
 
+  /**
+   * Function to Validate relation between 2 OW tables. Check whether we have proper data consistency between 2 tables.
+   * @param source : Source OW Table
+   * @param target : Target OW Table
+   * @param sourceDF : Dataframe created from Source OW Table
+   * @param targetDF : Dataframe created from Target OW Table
+   * @param column : Column on which Data consistency would be validated between 2 tables.
+   * @param key : Key Column in Source Tables. Would be used for Reporting Purpose.
+   * @param validationStatus : Validation Status Array for Validation Status Report
+   * @param quarantineStatus : Quarantine Status Array for Quarantine Report
+   * @return
+   */
   def validateColumnBetweenMultipleTable(
                                           source: PipelineTable,
                                           target: PipelineTable,
