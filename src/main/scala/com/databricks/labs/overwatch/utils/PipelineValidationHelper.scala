@@ -150,19 +150,18 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         val healthCheckMsg = "Success"
         vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
       } else {
-        val (healthCheckMsg: String, healthCheckType: String) =
-          if (validationType.toLowerCase().contains("greater_than_zero")) {
+        val (healthCheckMsg: String, healthCheckType: String) = validationType.toLowerCase() match {
+          case "validate_greater_than_zero" =>
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are not greater than zero or is NULL", "Failure")
-          } else if (validationType.toLowerCase().contains("not_null")) {
+          case "validate_not_null" =>
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are null", "Failure")
-          } else if (validationType.toLowerCase().contains("leq_one")) {
+          case "validate_leq_one" =>
             (s"HealthCheck Failed: got $countOfNegativeValidation ${colName}s which are greater than 1", "Failure")
-          } else if (validationType.toLowerCase().contains("values_in_between")) {
+          case "validate_values_in_between" =>
             (s"HealthCheck Warning: got $countOfNegativeValidation ${colName}s which are not in between expected values", "Warning")
-          }
-          else {
+          case _ =>
             (s"HealthCheck Warning : got $countOfNegativeValidation ${colName}s which are greater than 1", "Warning")
-          }
+        }
         vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation",Some(healthCheckMsg), Overwatch_RunID))
         dfWithNegativeValidation.toJSON.collect().foreach(jsonString => {
           qStatus.append(QuarantineReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation", healthCheckType, jsonString))
