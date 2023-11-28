@@ -196,7 +196,8 @@ case class AzureAuditLogEventhubConfig(
 case class AuditLogConfig(
                            rawAuditPath: Option[String] = None,
                            auditLogFormat: String = "json",
-                           azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
+                           azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None,
+                           systemTableName: Option[String] = None
                          )
 
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)

@@ -402,63 +402,13 @@ trait InitializerFunctions
   @throws(classOf[BadConfigException])
   def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
 
-    if (disableValidations) {
+    if (disableValidations) { //need to double check this
       quickBuildAuditLogConfig(auditLogConfig)
     } else {
-      if (config.cloudProvider != "azure") {
-
-        val auditLogPath = auditLogConfig.rawAuditPath
-        val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
-        if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
-          throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
-        }
-
-        if (auditLogPath.nonEmpty)
-          dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
-            if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
-              s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
-          })
-
-        val supportedAuditLogFormats = Array("json", "parquet", "delta")
-        if (!supportedAuditLogFormats.contains(auditLogFormat)) {
-          throw new BadConfigException(s"Audit Log Format: Supported formats are ${supportedAuditLogFormats.mkString(",")} " +
-            s"but $auditLogFormat was placed in teh configuration. Please select a supported audit log format.")
-        }
-
-        val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
-
-        // return validated audit log config for aws
-        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
-
+      if (auditLogConfig.rawAuditPath.contains("system.access.audit")) {
+        validateAuditLogConfigsFromSystemTable(auditLogConfig)
       } else {
-        val ehConfigOp = auditLogConfig.azureAuditLogEventhubConfig
-        require(ehConfigOp.nonEmpty, "When using Azure, an Eventhub must be configured for audit log retrieval")
-        val ehConfig = ehConfigOp.get
-        val ehPrefix = ehConfig.auditRawEventsPrefix
-
-        val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
-        val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
-        // TODO -- Audit log bronze is no longer streaming target -- remove this path
-        val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
-
-        if (config.debugFlag) {
-          println("DEBUG FROM Init")
-          println(s"cleanPrefix = ${cleanPrefix}")
-          println(s"rawEventsCheck = ${rawEventsCheckpoint}")
-          println(s"auditLogsBronzeChk = ${auditLogBronzeChk}")
-          println(s"ehPrefix = ${ehPrefix}")
-        }
-
-        val ehFinalConfig = ehConfig.copy(
-          auditRawEventsPrefix = cleanPrefix,
-          auditRawEventsChk = Some(rawEventsCheckpoint),
-          auditLogChk = Some(auditLogBronzeChk)
-        )
-
-        // parse the connection string to validate format
-        PipelineFunctions.parseAndValidateEHConnectionString(ehFinalConfig.connectionString, ehFinalConfig.azureClientId.isEmpty)
-        // return validated auditLogConfig for Azure
-        auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
+        validateAuditLogConfigsFromCloud(auditLogConfig)
       }
     }
   }
@@ -535,5 +485,69 @@ trait InitializerFunctions
    * @param dataTarget OW DataTarget
    */
   def validateAndSetDataTarget(dataTarget: DataTarget): Unit
+
+  def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig): AuditLogConfig = {
+    val auditLogFormat = "delta"
+    val systemTableName = "system.access.audit"
+    auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName))
+  }
+
+  def validateAuditLogConfigsFromCloud(auditLogConfig: AuditLogConfig): AuditLogConfig = {
+      if (config.cloudProvider != "azure") {
+
+        val auditLogPath = auditLogConfig.rawAuditPath
+        val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
+        if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
+          throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
+        }
+
+        if (auditLogPath.nonEmpty)
+          dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
+            if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
+              s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
+          })
+
+        val supportedAuditLogFormats = Array("json", "parquet", "delta")
+        if (!supportedAuditLogFormats.contains(auditLogFormat)) {
+          throw new BadConfigException(s"Audit Log Format: Supported formats are ${supportedAuditLogFormats.mkString(",")} " +
+            s"but $auditLogFormat was placed in teh configuration. Please select a supported audit log format.")
+        }
+
+        val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
+
+        // return validated audit log config for aws
+        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
+
+      } else {
+        val ehConfigOp = auditLogConfig.azureAuditLogEventhubConfig
+        require(ehConfigOp.nonEmpty, "When using Azure, an Eventhub must be configured for audit log retrieval")
+        val ehConfig = ehConfigOp.get
+        val ehPrefix = ehConfig.auditRawEventsPrefix
+
+        val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
+        val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
+        // TODO -- Audit log bronze is no longer streaming target -- remove this path
+        val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
+
+        if (config.debugFlag) {
+          println("DEBUG FROM Init")
+          println(s"cleanPrefix = ${cleanPrefix}")
+          println(s"rawEventsCheck = ${rawEventsCheckpoint}")
+          println(s"auditLogsBronzeChk = ${auditLogBronzeChk}")
+          println(s"ehPrefix = ${ehPrefix}")
+        }
+
+        val ehFinalConfig = ehConfig.copy(
+          auditRawEventsPrefix = cleanPrefix,
+          auditRawEventsChk = Some(rawEventsCheckpoint),
+          auditLogChk = Some(auditLogBronzeChk)
+        )
+
+        // parse the connection string to validate format
+        PipelineFunctions.parseAndValidateEHConnectionString(ehFinalConfig.connectionString, ehFinalConfig.azureClientId.isEmpty)
+        // return validated auditLogConfig for Azure
+        auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
+      }
+    }
 
 }
