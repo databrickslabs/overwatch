@@ -5,10 +5,9 @@ import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiT
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{col, lit, unix_timestamp}
+import org.apache.spark.sql.functions.{col, lit}
 
 import java.time.Duration
-import scala.util.parsing.json.JSON.number
 
 class Module(
               val moduleId: Int,

@@ -163,8 +163,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
   def getSqlQueryHistoryParallelDF(fromTime: TimeTypes,
                                    untilTime: TimeTypes,
                                    pipelineSnapTime: TimeTypes ,
-                                   tmpClusterEventsSuccessPath: String,
-                                   tmpClusterEventsErrorPath: String): DataFrame = {
+                                   tmpSqlHistorySuccessPath: String,
+                                   tmpSqlHistoryErrorPath: String): DataFrame = {
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val untilTimeMs = untilTime.asUnixTimeMilli
     val fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
@@ -177,8 +177,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "increment_counter" -> "3600000",
       "final_response_count" -> s"${finalResponseCount}",
       "result_key" -> "res",
-      "tmp_success_path" -> tmpClusterEventsSuccessPath,
-      "tmp_error_path" -> tmpClusterEventsErrorPath
+      "tmp_success_path" -> tmpSqlHistorySuccessPath,
+      "tmp_error_path" -> tmpSqlHistoryErrorPath
     )
 
     // calling function to make parallel API calls
@@ -193,7 +193,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
           rawDF.select(explode(col("res")).alias("res")).select(col("res" + ".*"))
             .withColumn("organization_id", lit(config.organizationId))
         } else {
-          println(s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs},res column not found in dataset""")
           logger.log(Level.INFO, s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}, res column not found in dataset""")
           spark.emptyDataFrame
         }

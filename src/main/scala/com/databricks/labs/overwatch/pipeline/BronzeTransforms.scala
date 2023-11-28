@@ -1,12 +1,10 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.{ deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
-import com.databricks.labs.overwatch.utils.Helpers.{getDatesGlob, removeTrailingSlashes}
+import com.databricks.labs.overwatch.utils.Helpers.{deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -17,7 +15,6 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
@@ -487,13 +484,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
   private def landClusterEvents(clusterIDs: Array[String],
                                 startTime: TimeTypes,
                                 endTime: TimeTypes,
-                                apiEnv: ApiEnv,
                                 pipelineSnapTime: Long,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String,
                                 config: Config) = {
     val finalResponseCount = clusterIDs.length
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(config.apiEnv.threadPoolSize))
     val clusterEventsEndpoint = "clusters/events"
 
     val lagTime = 600000 //10 minutes
@@ -522,7 +517,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
         val baseDF = spark.read.json(tmpClusterEventsSuccessPath)
         val rawDf = deriveRawApiResponseDF(baseDF)
-      println("count for rawDF"+rawDf.count())
       if (rawDf.columns.contains("events")) {
         try {
           val tdf = SchemaScrubber.scrubSchema(
@@ -600,7 +594,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
 
-    landClusterEvents(clusterIDs, startTime, endTime, apiEnv, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
+    landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
       tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
