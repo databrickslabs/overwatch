@@ -11,11 +11,8 @@ import org.apache.spark.sql.functions._
 
 import java.util
 import java.util.Collections
-import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
-import scala.util.{Failure, Success}
 
 
 /**

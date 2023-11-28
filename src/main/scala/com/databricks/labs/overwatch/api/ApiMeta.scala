@@ -2,7 +2,6 @@ package com.databricks.labs.overwatch.api
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.ApiEnv
-import com.databricks.labs.validation.LocalTest.sc
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}

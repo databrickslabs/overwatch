@@ -728,7 +728,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   }
 
   /**
-   * Function to check id traceability is enabled or not for API calls..
+   * Function to check if traceability is enabled or not for API calls..
    * @return
    */
   private def writeTraceApiFlag(): Boolean ={
