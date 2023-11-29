@@ -11,11 +11,8 @@ import org.apache.spark.sql.functions._
 
 import java.util
 import java.util.Collections
-import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
-import scala.util.{Failure, Success}
 
 
 /**
@@ -66,7 +63,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     )
     ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -83,7 +80,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, clustersEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -112,7 +109,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, poolsEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -126,7 +123,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, profilesEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF().withColumn("organization_id", lit(config.organizationId))
+      .asDF().withColumn("organization_id", lit(config.organizationId))
 
   }
 
@@ -137,7 +134,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWorkspaceUsersDF: DataFrame = {
     val workspaceEndpoint = "workspace/list"
-    ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asRawDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv, workspaceEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
   }
 
   def getSqlQueryHistoryDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
@@ -245,7 +242,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, libsEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -254,7 +251,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, policiesEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -263,7 +260,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, tokenEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -272,7 +269,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, globalInitScEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
@@ -338,7 +335,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     ApiCallV2(config.apiEnv, warehousesEndpoint)
       .setSuccessTempPath(tempApiDir)
       .execute()
-      .asRawDF()
+      .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 

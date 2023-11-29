@@ -512,11 +512,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
   /**
    * Converting the API response to Dataframe.
-   * This dataframe includes both raw api response and the metadata of the api.
    *
+   *
+   * @withMetaData if this flag is set to true the returned dataframe will include both raw api response and the metadata of the api.
+   *               if this flag is set to false the returned dataframe will only include raw api response.
    * @return Dataframe which is created from the API response with the api call metadata.
    */
-  def asDF(): DataFrame = {
+  def asDF(withMetaData: Boolean = false): DataFrame = {
     var apiResultDF: DataFrame = null;
     if (_apiResponseArray.size == 0 && !apiMeta.batchPersist) { //If response contains no Data.
       val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
@@ -540,44 +542,15 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       logger.error(errMsg)
       spark.emptyDataFrame
     }else {
-      extrapolateSupportedStructure(apiResultDF)
-    }
-  }
-
-  /**
-   * Converting the API response to Dataframe.
-   *
-   * @return Dataframe which is created from the API response.
-   */
-  def asRawDF() : DataFrame = {
-    val apiResultDF: DataFrame =
-      if (_apiResponseArray.size == 0 && !apiMeta.batchPersist) { //If response contains no Data.
-        val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
-          s"Details Below:\n$buildGenericErrorMessage"
-        throw new ApiCallEmptyResponse(errMsg, true)
-      } else if (_apiResponseArray.size != 0 ) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
-        spark.read.json(Seq(_apiResponseArray.toString).toDS())
-      } else if (apiMeta.batchPersist && successTempPath.nonEmpty) { //Read the response from the Temp location/Disk and convert it to Dataframe.
-        try {
-          spark.read.json(successTempPath.get)
-        } catch {
-          case e: AnalysisException if e.getMessage().contains("Path does not exist") => spark.emptyDataFrame
-        }
+      val rawDf = if(withMetaData){
+        apiResultDF
       }else{
-        spark.emptyDataFrame
+        deriveRawApiResponseDF(apiResultDF)
       }
-
-    if (emptyDFCheck(apiResultDF)) {
-      val errMsg =
-        s"""API CALL Resulting DF is empty BUT no errors detected, progressing module.
-           |Details Below:\n$buildGenericErrorMessage""".stripMargin
-      logger.error(errMsg)
-      spark.emptyDataFrame
-    } else {
-      val rawDf = deriveRawApiResponseDF(apiResultDF)
       extrapolateSupportedStructure(rawDf)
     }
   }
+
 
 
   private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
