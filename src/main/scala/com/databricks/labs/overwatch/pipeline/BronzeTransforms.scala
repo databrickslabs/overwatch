@@ -1073,6 +1073,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn("timestamp", unix_timestamp('time) * 1000)
       .verifyMinimumSchema(Schema.auditMasterSchema)
       .drop("requestParamsString")
+      .withColumn("response", $"response".withField("statusCode",
+        coalesce($"response.statusCode", $"response.status_code")))  //figure out a way to efficiently renaming this column
+      .withColumn("response", $"response".withField("errorMessage",
+        coalesce($"response.errorMessage", $"response.error_message")))  //figure out a way to efficiently renaming this column
 
     // add time col from timetamp and make timestamp milli sec , multiply by 1000
     auditLogFromSysTableToStruct
