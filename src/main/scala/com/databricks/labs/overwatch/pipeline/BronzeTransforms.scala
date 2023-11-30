@@ -1054,6 +1054,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     val fromTimeSysTableCompatible = fromTime.withHour(0).withMinute(0).withSecond(0).format(sysTableFormat)
     val untilTimeSysTableCompatible = untilTime.withHour(23).withMinute(59).withSecond(59).format(sysTableFormat)
+    println(s"fromTimeSysTableCompatible---- ${fromTimeSysTableCompatible}")
+    println(s"untilTimeSysTableCompatible---- ${untilTimeSysTableCompatible}")
 
     val rawSystemTableFiltered = spark.table("system.access.audit")
                                   .filter('workspace_id === organizationId)
