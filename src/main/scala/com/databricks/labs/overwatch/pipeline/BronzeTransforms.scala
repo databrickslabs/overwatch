@@ -1062,15 +1062,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val auditLogFromSysTable = SchemaTools.snakeToCamel(rawSystemTableFiltered)
       .withColumn("organization_id",col("workspaceID"))
       .withColumnRenamed("eventDate", "date")
-      .withColumnRenamed("eventTime", "timestamp")
+      .withColumn("timestamp",(col("eventTime").cast("double")* 1000).cast("long"))
       .withColumn("requestParamsString",to_json(col("requestParams")))
-      .drop("requestParams")
+      .drop("requestParams","eventTime")
 
     val auditLogFromSysTableToStruct = auditLogFromSysTable
       .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
       .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
-      .withColumn("time", 'timestamp.cast("timestamp"))
-      .withColumn("timestamp", unix_timestamp('time) * 1000)
+//      .withColumn("time", 'timestamp.cast("timestamp"))
+//      .withColumn("timestamp", unix_timestamp('time) * 1000)
       .verifyMinimumSchema(Schema.auditMasterSchema)
       .drop("requestParamsString")
       .withColumn("response", $"response".withField("statusCode",
