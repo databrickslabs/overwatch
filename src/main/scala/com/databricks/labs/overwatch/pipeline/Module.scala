@@ -1,9 +1,11 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveApiTempErrDir, pathExists}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.{col, lit}
 
 import java.time.Duration
 import scala.util.parsing.json.JSON.number
@@ -423,9 +425,64 @@ class Module(
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
+      if (spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean) {
+        persistApiEvents()
+      }
       spark.catalog.clearCache()
     }
 
+  }
+
+  /**
+   * Function add necessary fields to the apiEventDetails and persist it.
+   *
+   * @param rawTraceDF
+   */
+  private def transformAndPersistApiEvents(rawTraceDF: DataFrame) = {
+    val rawStructDF = rawTraceDF
+      .select("apiTraceabilityMeta.*", "rawResponse")
+    val batchKeyFilterOverride = if (rawStructDF.columns.contains("batchKeyFilter")) {
+      col("batchKeyFilter")
+    } else {
+      lit("")
+    }
+
+    val finalDF = rawStructDF
+      .withColumn("batchKeyFilter", batchKeyFilterOverride)
+      .withColumn("data", col("rawResponse").cast("binary"))
+      .select("endPoint", "type", "apiVersion", "batchKeyFilter", "responseCode", "data")
+      .withColumn("moduleId", lit(moduleId))
+      .withColumn("moduleName", lit(moduleName))
+      .withColumn("organization_id", lit(config.organizationId))
+      .withColumn("snapTS", lit(pipeline.pipelineSnapTime.asTSString))
+      .withColumn("timestamp", lit(pipeline.pipelineSnapTime.asUnixTimeMilli))
+      .withColumn("Overwatch_RunID", lit(config.runID))
+
+    val optimizeDF = PipelineFunctions.optimizeDFForWrite(finalDF, pipeline.apiEventsTarget)
+    pipeline.database.writeWithRetry(optimizeDF, pipeline.apiEventsTarget, pipeline.pipelineSnapTime.asColumnTS)
+
+  }
+
+  /**
+   * Function persists the apiEvent details.
+   */
+  private def persistApiEvents(): Unit = {
+    try {
+      val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
+      val errPath = deriveApiTempErrDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
+      if (pathExists(successPath)) {
+        val rawTraceDF = spark.read.json(successPath)
+        transformAndPersistApiEvents(rawTraceDF)
+      }
+      if (pathExists(errPath)) {
+        val rawTraceDF = spark.read.json(errPath)
+        transformAndPersistApiEvents(rawTraceDF)
+      }
+    } catch {
+      case e: Throwable =>
+        println("got exception while writing" + e.getMessage)
+        e.getMessage
+    }
   }
 
 

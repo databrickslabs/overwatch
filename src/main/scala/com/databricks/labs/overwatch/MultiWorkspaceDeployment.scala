@@ -492,7 +492,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       deploymentReport.appendAll(deploymentReports)
       saveDeploymentReport(deploymentReport.toArray, multiWorkspaceConfig.head.storage_prefix, "deploymentReport")
     } catch {
-      case e: Exception =>
+      case e: Throwable =>
         val failMsg = s"FAILED DEPLOYMENT WITH EXCEPTION"
         println(failMsg)
         logger.log(Level.ERROR, failMsg, e)
