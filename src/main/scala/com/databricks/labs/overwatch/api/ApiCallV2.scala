@@ -524,7 +524,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       val errMsg = s"API CALL Resulting DF is empty BUT no errors detected, progressing module. " +
         s"Details Below:\n$buildGenericErrorMessage"
       throw new ApiCallEmptyResponse(errMsg, true)
-    } else if (_apiResponseArray.size != 0 && successTempPath.isEmpty) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
+    } else if (_apiResponseArray.size != 0) { //If API response don't have pagination/volume of response is not huge then we directly convert the response which is in-memory to spark DF.
       apiResultDF = spark.read.json(Seq(_apiResponseArray.toString).toDS())
     } else if (apiMeta.batchPersist && successTempPath.nonEmpty) { //Read the response from the Temp location/Disk and convert it to Dataframe.
       apiResultDF = try {
