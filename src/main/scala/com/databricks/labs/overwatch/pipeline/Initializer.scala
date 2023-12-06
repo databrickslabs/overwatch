@@ -191,6 +191,18 @@ object Initializer extends SparkSessionWrapper {
     )
   }
 
+  def apply(overwatchArgs: String, disableValidations: Boolean,initializeDatabase: Boolean,organizationID : Option[String]): Workspace = {
+    apply(
+      overwatchArgs,
+      debugFlag = false,
+      isSnap = false,
+      disableValidations,
+      initializeDatabase,
+      apiURL = None,
+      organizationID
+    )
+  }
+
   /**
    *
    * @param overwatchArgs Json string of args -- When passing into args in Databricks job UI, the json string must
@@ -218,6 +230,8 @@ object Initializer extends SparkSessionWrapper {
 
 
     val config = initConfigState(debugFlag,organizationID,apiURL)
+
+    println(s"Organization_id is ${config.organizationId}")
 
     logger.log(Level.INFO, "Initializing Environment")
     val overwatchParams = deserializeArgs(overwatchArgs)
