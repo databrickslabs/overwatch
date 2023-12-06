@@ -8,6 +8,7 @@ import com.databricks.labs.overwatch.api.ApiMetaFactory
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.validation.DataReconciliation
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -1281,6 +1282,17 @@ object Helpers extends SparkSessionWrapper {
    */
   def getTraceDFByPath(apiEventPath: String, endPoint: String): DataFrame = {
     deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('endPoint === endPoint), endPoint)
+  }
+
+  /**
+   * This function will  perform the data reconciliation between two deployments, we need two overwatch deployments with current and previous versions.
+   * After running the reconciliation it will generate a report which will contain all comparison results for each table.
+   *
+   * @param sourceEtl : ETL database name of previous version of OW
+   * @param targetEtl : ETL database name of current version of OW
+   */
+  def performRecon(sourceEtl: String, targetEtl: String) = {
+    DataReconciliation.performRecon(sourceEtl, targetEtl)
   }
 
 }
