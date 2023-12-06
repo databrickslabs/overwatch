@@ -231,8 +231,6 @@ object Initializer extends SparkSessionWrapper {
 
     val config = initConfigState(debugFlag,organizationID,apiURL)
 
-    println(s"Organization_id is ${config.organizationId}")
-
     logger.log(Level.INFO, "Initializing Environment")
     val overwatchParams = deserializeArgs(overwatchArgs)
 

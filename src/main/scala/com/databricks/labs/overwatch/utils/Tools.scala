@@ -641,8 +641,6 @@ object Helpers extends SparkSessionWrapper {
       s" $etlDBWithOutCatalog, is not an Overwatch managed Database. Please provide an Overwatch managed database")
     val workspaceID = if (isRemoteWorkspace) organization_id.get else Initializer.getOrgId(apiUrl)
 
-    println(s"workspaceID in getWorkspaceByDatabase is $workspaceID")
-
     val statusFilter = if (successfullOnly) 'status === "SUCCESS" else lit(true)
 
     val latestConfigByOrg = Window.partitionBy('organization_id).orderBy('Pipeline_SnapTS.desc)
@@ -654,9 +652,6 @@ object Helpers extends SparkSessionWrapper {
       .filter('organization_id === workspaceID)
       .select(to_json('inputConfig).alias("compactString"))
       .as[String].first()
-
-
-    println(s"testConfig in getWorkspaceByDatabase is $testConfig")
 
     val workspace = if (isRemoteWorkspace) { // single workspace deployment
       Initializer(testConfig, disableValidations = true, initializeDatabase = false,Some(workspaceID))
