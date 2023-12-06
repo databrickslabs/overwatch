@@ -3,6 +3,7 @@ package com.databricks.labs.overwatch.env
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.ApiCallV2
 import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.utils.Helpers.deriveRawApiResponseDF
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
@@ -10,11 +11,8 @@ import org.apache.spark.sql.functions._
 
 import java.util
 import java.util.Collections
-import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.concurrent.forkjoin.ForkJoinPool
-import scala.util.{Failure, Success}
 
 
 /**
@@ -57,8 +55,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  def getJobsDF: DataFrame = {
-
+  def getJobsDF(apiTempPath: String): DataFrame = {
     val jobsEndpoint = "jobs/list"
     val query = Map(
       "limit" -> "25",
@@ -78,9 +75,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getConfig: Config = config
 
-  def getClustersDF: DataFrame = {
+  def getClustersDF(tempApiDir: String): DataFrame = {
     val clustersEndpoint = "clusters/list"
     ApiCallV2(config.apiEnv, clustersEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
@@ -106,9 +104,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  def getPoolsDF: DataFrame = {
+  def getPoolsDF(tempApiDir: String): DataFrame = {
     val poolsEndpoint = "instance-pools/list"
     ApiCallV2(config.apiEnv, poolsEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
@@ -119,9 +118,12 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    *
    * @return
    */
-  def getProfilesDF: DataFrame = {
+  def getProfilesDF(tempApiDir: String): DataFrame = {
     val profilesEndpoint = "instance-profiles/list"
-    ApiCallV2(config.apiEnv, profilesEndpoint).execute().asDF().withColumn("organization_id", lit(config.organizationId))
+    ApiCallV2(config.apiEnv, profilesEndpoint)
+      .setSuccessTempPath(tempApiDir)
+      .execute()
+      .asDF().withColumn("organization_id", lit(config.organizationId))
 
   }
 
@@ -156,7 +158,11 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+  def getSqlQueryHistoryParallelDF(fromTime: TimeTypes,
+                                   untilTime: TimeTypes,
+                                   pipelineSnapTime: TimeTypes,
+                                   tmpSqlHistorySuccessPath: String,
+                                   tmpSqlHistoryErrorPath: String): DataFrame = {
     val sqlQueryHistoryEndpoint = "sql/history/queries"
     val untilTimeMs = untilTime.asUnixTimeMilli
     val fromTimeMs = fromTime.asUnixTimeMilli - (1000*60*60*24*2)  //subtracting 2 days for running query merge
@@ -168,19 +174,26 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "end_value" -> s"${untilTimeMs}",
       "increment_counter" -> "3600000",
       "final_response_count" -> s"${finalResponseCount}",
-      "result_key" -> "res"
+      "result_key" -> "res",
+      "tmp_success_path" -> tmpSqlHistorySuccessPath,
+      "tmp_error_path" -> tmpSqlHistoryErrorPath
     )
 
     // calling function to make parallel API calls
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)
-    val tmpSqlQueryHistorySuccessPath= apiCallV2Obj.makeParallelApiCalls(sqlQueryHistoryEndpoint, jsonInput, config)
+    val tmpSqlQueryHistorySuccessPath= apiCallV2Obj.makeParallelApiCalls(sqlQueryHistoryEndpoint, jsonInput, pipelineSnapTime.asUnixTimeMilli,config)
     logger.log(Level.INFO, " sql query history landing completed")
 
     if(Helpers.pathExists(tmpSqlQueryHistorySuccessPath)) {
       try {
-        spark.read.json(tmpSqlQueryHistorySuccessPath)
-          .select(explode(col("res")).alias("res")).select(col("res" + ".*"))
-          .withColumn("organization_id", lit(config.organizationId))
+        val rawDF = deriveRawApiResponseDF(spark.read.json(tmpSqlQueryHistorySuccessPath))
+        if (rawDF.columns.contains("res")) {
+          rawDF.select(explode(col("res")).alias("res")).select(col("res" + ".*"))
+            .withColumn("organization_id", lit(config.organizationId))
+        } else {
+          logger.log(Level.INFO, s"""No Data is present for sql/query/history from - ${fromTimeMs} to - ${untilTimeMs}, res column not found in dataset""")
+          spark.emptyDataFrame
+        }
       } catch {
         case e: Throwable =>
           throw new Exception(e)
@@ -224,33 +237,37 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       })
   }
 
-  def getClusterLibraries: DataFrame = {
+  def getClusterLibraries(tempApiDir: String): DataFrame = {
     val libsEndpoint = "libraries/all-cluster-statuses"
     ApiCallV2(config.apiEnv, libsEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getClusterPolicies: DataFrame = {
+  def getClusterPolicies(tempApiDir: String): DataFrame = {
     val policiesEndpoint = "policies/clusters/list"
     ApiCallV2(config.apiEnv, policiesEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getTokens: DataFrame = {
+  def getTokens(tempApiDir: String): DataFrame = {
     val tokenEndpoint = "token/list"
     ApiCallV2(config.apiEnv, tokenEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def getGlobalInitScripts: DataFrame = {
+  def getGlobalInitScripts(tempApiDir: String): DataFrame = {
     val globalInitScEndpoint = "global-init-scripts"
     ApiCallV2(config.apiEnv, globalInitScEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
@@ -260,7 +277,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * Function to get the the list of Job Runs
    * @return
    */
-  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes): DataFrame = {
+  def getJobRunsDF(fromTime: TimeTypes, untilTime: TimeTypes,tempWorkingDir: String): DataFrame = {
     val jobsRunsEndpoint = "jobs/runs/list"
     val jsonQuery = Map(
       "limit" -> "25",
@@ -270,7 +287,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     )
     val acc = sc.longAccumulator("sqlQueryHistoryAccumulator")
     var apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
-    val tempWorkingDir = s"${config.tempWorkingDir}/jobrunslist_bronze/${System.currentTimeMillis()}"
 
     val apiObj = ApiCallV2(config.apiEnv,
       jobsRunsEndpoint,
@@ -314,9 +330,10 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    * a snapshot of actively defined warehouses is captured and used to fill in the blanks in the silver+ layers.
    * @return
    */
-  def getWarehousesDF: DataFrame = {
+  def getWarehousesDF(tempApiDir: String): DataFrame = {
     val warehousesEndpoint = "sql/warehouses"
     ApiCallV2(config.apiEnv, warehousesEndpoint)
+      .setSuccessTempPath(tempApiDir)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))

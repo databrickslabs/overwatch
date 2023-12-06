@@ -3,11 +3,11 @@ package com.databricks.labs.overwatch.utils
 import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.labs.overwatch.api.ApiMetaFactory
 
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
-import com.databricks.labs.overwatch.validation.DataReconciliation
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -1187,14 +1187,100 @@ object Helpers extends SparkSessionWrapper {
     streamManager
   }
 
+
   /**
-   * This function will  perform the data reconciliation between two deployments, we need two overwatch deployments with current and previous versions.
-   * After running the reconciliation it will generate a report which will contain all comparison results for each table.
+   * Function separates the raw api response from the enriched api response which contains the meta info of the api call and
+   * returns a dataframe which contains only raw api response.
    *
-   * @param sourceEtl : ETL database name of previous version of OW
-   * @param targetEtl : ETL database name of current version of OW
+   * @param dataFrame
+   * @return
    */
-  def performRecon(sourceEtl: String, targetEtl: String) = {
-    DataReconciliation.performRecon(sourceEtl, targetEtl)
+  def deriveRawApiResponseDF(dataFrame: DataFrame): DataFrame = {
+    val filteredDf = dataFrame.select('rawResponse)
+      .filter('rawResponse =!= "{}")
+    if (filteredDf.isEmpty) {
+      filteredDf
+    } else {
+      filteredDf
+        .withColumn("rawResponse", SchemaTools.structFromJson(spark, dataFrame, "rawResponse"))
+        .select("rawResponse.*")
+    }
   }
+
+  /**
+   * Function returns a temp path which can be used to store successful api responses.
+   * @param tempWOrkingDir
+   * @param endpointDir
+   * @param pipelineSnapTs
+   * @return
+   */
+  private[overwatch] def deriveApiTempDir(tempWorkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+    s"${tempWorkingDir}/${endpointDir}/success_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
+  /**
+   * Function return a temp path which can be used to store the api responses which was not successful.
+   * @param tempWOrkingDir
+   * @param endpointDir
+   * @param pipelineSnapTs
+   * @return
+   */
+  private[overwatch] def deriveApiTempErrDir(tempWOrkingDir: String, endpointDir: String, pipelineSnapTs: TimeTypes): String = {
+    s"${tempWOrkingDir}/${endpointDir}/error_" + pipelineSnapTs.asUnixTimeMilli
+  }
+
+
+  /**
+   * Function converts the data column which is binary in traceApi dataframe to string.
+   * @param df
+   * @return
+   */
+  def transformBinaryDf(df: DataFrame): DataFrame = {
+    df.withColumnRenamed("data", "rawResponse").withColumn("rawResponse", col("rawResponse").cast("String"))
+  }
+
+  /**
+   * Function returns the api response for provided apiName from api trace data.
+   * @param df dataframe which contains the traceApi data.
+   * @param apiName name of the api.
+   * @return
+   */
+  def deriveTraceDFByApiName(df: DataFrame, apiName: String): DataFrame = {
+    val rawDF = deriveRawApiResponseDF(transformBinaryDf(df))
+    val apiMetaFactory = new ApiMetaFactory().getApiClass(apiName)
+    rawDF.select(explode(col(apiMetaFactory.dataframeColumn)).alias(apiMetaFactory.dataframeColumn)).select(col(apiMetaFactory.dataframeColumn + ".*"))
+  }
+
+  /**
+   * Function returns the api response for provided moduleID from api trace data.
+   * @param apiEventTable apiEventTable name.
+   * @param moduleId
+   * @return
+   */
+  def getTraceDFByModule(apiEventTable: String, moduleId: Long): DataFrame = {
+    val rawDF = spark.read.table(apiEventTable).filter('moduleId === moduleId)
+    val endPoint = rawDF.head().getAs[String]("endPoint")
+    deriveTraceDFByApiName(rawDF, endPoint)
+  }
+
+  /**
+   * Function returns the api response for provided apiName from api trace data.
+   * @param apiEventTable apiEventTable name.
+   * @param endPoint
+   * @return
+   */
+  def getTraceDFByApi(apiEventTable: String, endPoint: String): DataFrame = {
+    deriveTraceDFByApiName(spark.read.table(apiEventTable).filter('endPoint === endPoint), endPoint)
+  }
+
+  /**
+   * Function returns the api response for provided apiName from api trace data.
+   * @param apiEventPath path of the apiEvent data.
+   * @param endPoint
+   * @return
+   */
+  def getTraceDFByPath(apiEventPath: String, endPoint: String): DataFrame = {
+    deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('endPoint === endPoint), endPoint)
+  }
+
 }
