@@ -147,7 +147,7 @@ case class RulesValidationReport(deployment_id: String, workspace_id: String, re
 case class ReconReport(
                         validated: Boolean = false,
                         workspaceId: String,
-                        simpleMsg: String,
+                        reconType: String,
                         sourceDB: String,
                         targetDB: String,
                         tableName: String,
@@ -161,6 +161,9 @@ case class ReconReport(
                         targetQuery: Option[String] = None,
                         errorMsg: Option[String] = None
                       )
+
+
+
 
 object MultiWorkspaceConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,

@@ -33,8 +33,8 @@ object DataReconciliation extends SparkSessionWrapper {
   private[overwatch] def performRecon(sourceEtl:String,targetEtl:String): Unit ={
     val sourceOrgIDArr = getAllOrgID(sourceEtl)
     val targetOrgIDArr = getAllOrgID(targetEtl)
-    performBasicValidation(sourceOrgIDArr,targetOrgIDArr)
-    val sourceWorkspace = getConfig(sourceEtl,targetOrgIDArr(0))
+    performBasicRecon(sourceOrgIDArr,targetOrgIDArr)
+    val sourceWorkspace = getConfig(sourceEtl,sourceOrgIDArr(0))
     val targetWorkspace = getConfig(targetEtl,targetOrgIDArr(0))
     val targets = getAllTargets(sourceWorkspace)
     val report = runRecon(targets,sourceEtl,sourceOrgIDArr,targetEtl)
@@ -57,7 +57,7 @@ object DataReconciliation extends SparkSessionWrapper {
    * @return
    */
   private def countValidation(target: PipelineTable,orgId: String, sourceEtl:String,targetEtl:String ):ReconReport ={
-    val simpleMsg = "Count validation"
+    val reconType = "Count validation"
     try {
       val sourceQuery = getQuery(s"""${target.tableFullName}""", orgId, target)
       val sourceTable = getTableDF(sourceQuery)
@@ -94,7 +94,7 @@ object DataReconciliation extends SparkSessionWrapper {
 
       ReconReport(validated = validated,
         workspaceId = orgId,
-        simpleMsg = simpleMsg,
+        reconType = reconType,
         sourceDB = sourceEtl,
         targetDB = targetEtl,
         tableName = target.name,
@@ -114,7 +114,7 @@ object DataReconciliation extends SparkSessionWrapper {
         val fullMsg = PipelineFunctions.appendStackStrace(e, "Got Exception while running recon,")
         ReconReport(
           workspaceId = orgId,
-          simpleMsg = simpleMsg,
+          reconType = reconType,
           sourceDB = sourceEtl,
           targetDB = targetEtl,
           tableName = target.tableFullName,
@@ -174,13 +174,13 @@ object DataReconciliation extends SparkSessionWrapper {
 
 private def getQuery(tableName: String,orgId: String,target:PipelineTable): String = {
   val _keys = target.keys.filterNot(_ == "Overwatch_RunID")
-  val reconColymns = target.reconColumns
-  val finalColumns = if(!reconColymns.isEmpty) {
-    _keys++reconColymns
+  val reconColumns = target.reconColumns
+  val derivedReconColumns = if(!reconColumns.isEmpty) {
+    _keys++reconColumns
   }else{
     _keys
   }
-  s"""select ${finalColumns.mkString(",")} from $tableName where organization_id = ${orgId} """
+  s"""select ${derivedReconColumns.mkString(",")} from $tableName where organization_id = ${orgId} """
 
 }
 
@@ -203,7 +203,7 @@ private def getQuery(tableName: String,orgId: String,target:PipelineTable): Stri
     (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets).filter(_.exists(dataValidation = true, catalogValidation = false)).par
   }
 
-  private[overwatch] def performBasicValidation(sourceOrgIDArr:Array[String],targetOrgIDArr:Array[String]):Unit = {
+  private[overwatch] def performBasicRecon(sourceOrgIDArr:Array[String],targetOrgIDArr:Array[String]):Unit = {
     println("Number of workspace in Source:" + sourceOrgIDArr.size)
     println("Number of workspace in Target:" + targetOrgIDArr.size)
     if(sourceOrgIDArr.size<1 || targetOrgIDArr.size<1){
