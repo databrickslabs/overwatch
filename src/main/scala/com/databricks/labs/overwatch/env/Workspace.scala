@@ -62,6 +62,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       "expand_tasks" -> "true"
     )
     ApiCallV2(config.apiEnv, jobsEndpoint,query,2.1)
+      .setSuccessTempPath(apiTempPath)
       .execute()
       .asDF()
       .withColumn("organization_id", lit(config.organizationId))
