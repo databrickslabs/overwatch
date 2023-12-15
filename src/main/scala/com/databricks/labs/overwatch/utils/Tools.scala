@@ -8,6 +8,7 @@ import com.databricks.labs.overwatch.api.ApiMetaFactory
 import java.io.FileNotFoundException
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.validation.DataReconciliation
 import com.fasterxml.jackson.annotation.JsonInclude.{Include, Value}
 import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -1281,6 +1282,30 @@ object Helpers extends SparkSessionWrapper {
    */
   def getTraceDFByPath(apiEventPath: String, endPoint: String): DataFrame = {
     deriveTraceDFByApiName(spark.read.load(apiEventPath).filter('endPoint === endPoint), endPoint)
+  }
+
+
+  /**
+   * This function will  perform the data reconciliation between two deployments, we need two overwatch deployments with current and previous versions.
+   * After running the reconciliation it will generate a report which will contain all comparison results for each table.
+   *
+   * @param sourceEtl : ETL database name of previous version of OW
+   * @param targetEtl : ETL database name of current version of OW
+   */
+  def performRecon(sourceEtl: String, targetEtl: String) = {
+    DataReconciliation.performRecon(sourceEtl, targetEtl)
+  }
+
+  /**
+   * This function will  perform the data reconciliation between two tables.
+   * Function will return a dataframe which has that data which is present in source but not present in target with hashcode for each columns.
+   *
+   * @param sourceTable : ETL database name of previous version of OW
+   * @param targetTable : ETL database name of current version of OW
+   * @param includeNonHashCol : If true the result dataframe will contain all the columns with the real value.
+   */
+  def reconSingleTable(sourceTable: String, targetTable: String,includeNonHashCol:Boolean= true ) = {
+    DataReconciliation.reconTable(sourceTable, targetTable)
   }
 
 }
