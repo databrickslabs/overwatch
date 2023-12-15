@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
@@ -16,15 +15,12 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.LocalDateTime
-import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 
 trait BronzeTransforms extends SparkSessionWrapper {
@@ -1034,11 +1030,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
       .withColumn("cluster_log_conf",
         coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
-//      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
       .withColumn("cluster_log_conf",
         fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
           isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_log_conf.isNotNull)
+      .filter('cluster_log_conf =!= "s3://")
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
     // This captures clusters that have not been edited/restarted since the last run with
@@ -1056,7 +1052,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("cluster_log_conf",
             fetchClusterLogConfiguration(cloudProvider, coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
               isMultiWorkSpaceDeployment, organisationId))
-          .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
+          .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull && 'cluster_log_conf =!= "s3://")
           .select('cluster_id, 'cluster_log_conf)
       }
     }
