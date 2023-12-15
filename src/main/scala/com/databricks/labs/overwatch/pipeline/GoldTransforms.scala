@@ -816,7 +816,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     // when there is no input data break out of module, progress timeline and continue with pipeline
     val emptyMsg = s"No new streaming data found."
-    if (streamRawDF.isEmpty) throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
+    if (streamRawDF.filter('progress.isNotNull).isEmpty) throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
 
     val lastStreamValue = Window.partitionBy('organization_id, 'SparkContextId, 'clusterId, 'stream_id, 'stream_run_id).orderBy('stream_timestamp)
     val onlyOnceEventGuaranteeW = Window.partitionBy(streamTargetKeys map col: _*).orderBy('fileCreateEpochMS.desc)
