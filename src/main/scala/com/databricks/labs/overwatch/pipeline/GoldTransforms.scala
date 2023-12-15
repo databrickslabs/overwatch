@@ -499,11 +499,16 @@ trait GoldTransforms extends SparkSessionWrapper {
                                    clsfIncrementalDF : DataFrame,
                                  )(auditIncrementalDF: DataFrame): DataFrame = {
 
+    if (auditIncrementalDF.isEmpty || notebook.asDF.isEmpty || clsfIncrementalDF.isEmpty) {
+      throw new NoNewDataException("No New Data", Level.WARN, true)
+    }
+
     val auditDF_base = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
       .selectExpr("*", "requestParams.*").drop("requestParams")
 
     if (auditDF_base.columns.contains("executionTime")){
+
       val notebookLookupTSDF = notebook.asDF
         .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS", "date")
         .withColumnRenamed("notebook_id", "notebookId")
