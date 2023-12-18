@@ -715,7 +715,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .withColumn("db_id_in_job",
         when(isDatabricksJob && 'db_run_id.isNull, extractDBIdInJob('jobGroupAr))
           .otherwise(
-            when(isAutomatedCluster && 'db_run_id.isNull, extractDBJobId('cluster_name))
+            when(isAutomatedCluster && 'db_run_id.isNull, extractDBIdInJob('cluster_name))
             .otherwise('db_run_id)
           )
       )
