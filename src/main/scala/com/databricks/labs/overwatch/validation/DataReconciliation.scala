@@ -59,11 +59,10 @@ object DataReconciliation extends SparkSessionWrapper {
    */
   private def hashValidation(target: PipelineTable,orgId: String, sourceEtl:String,targetEtl:String ):ReconReport ={
     val reconType = "Validation by hashing"
-    spark.conf.set("spark.sql.legacy.allowHashOnMapType","true")
     try {
-      val sourceQuery = getQuery(s"""${target.tableFullName}""", orgId, target)
+      val sourceQuery = getQuery(s"""${target.tableFullName}""", orgId)
       val sourceTable = hashAllColumns(getTableDF(sourceQuery,target))
-      val targetQuery = getQuery(s"""${target.tableFullName.replaceAll(sourceEtl,targetEtl)}""", orgId,target)
+      val targetQuery = getQuery(s"""${target.tableFullName.replaceAll(sourceEtl,targetEtl)}""", orgId)
       val targetTable = hashAllColumns(getTableDF(targetQuery,target))
       val sourceCount = sourceTable.count()
       val targetCount = targetTable.count()
@@ -128,12 +127,21 @@ object DataReconciliation extends SparkSessionWrapper {
 
   }
 
+  /**
+   * This method runs the reconciliation for all targets in parallel.
+   *
+   * @param targets        : Array of PipelineTable
+   * @param sourceEtl      : ETL name of Previous version of OW
+   * @param sourceOrgIDArr : Array of organization IDs
+   * @param targetEtl      : ETL name of the current version of OW
+   * @return Array of ReconReport
+   */
   private[overwatch] def runRecon(targets: ParArray[PipelineTable] ,
                                   sourceEtl:String,
                                   sourceOrgIDArr: Array[String],
                                   targetEtl:String,
                                   ):Array[ReconReport]={
-
+    spark.conf.set("spark.sql.legacy.allowHashOnMapType","true")
       val reconStatus: ArrayBuffer[ReconReport] = new ArrayBuffer[ReconReport]()
       sourceOrgIDArr.foreach(orgId=> {
         targets.foreach(target => {
@@ -175,13 +183,25 @@ object DataReconciliation extends SparkSessionWrapper {
   }
 
 
-
-  private def getQuery(tableName: String, orgId: String, target: PipelineTable): String = {
+  /**
+   * This method generates a query to fetch data from a table for a specific organization.
+   *
+   * @param tableName : Name of the table
+   * @param orgId     : Organization ID
+   * @return String : Query
+   */
+  private def getQuery(tableName: String, orgId: String): String = {
     s"""select * from $tableName where organization_id = ${orgId} """
   }
 
 
-
+  /**
+   * This method fetches a DataFrame from a table using a query.
+   *
+   * @param query  : Query to fetch data
+   * @param target : PipelineTable object
+   * @return DataFrame
+   */
   private def getTableDF(query: String,target: PipelineTable):DataFrame = {
     try{
       val excludedCol = target.excludedReconColumn
@@ -196,6 +216,12 @@ object DataReconciliation extends SparkSessionWrapper {
 
   }
 
+  /**
+   * This method fetches all targets for a workspace.
+   *
+   * @param workspace : Workspace object
+   * @return ParArray of PipelineTable
+   */
   private[overwatch] def getAllTargets(workspace: Workspace): ParArray[PipelineTable] = {
     val b = Bronze(workspace)
     val s = Silver(workspace)
@@ -203,6 +229,12 @@ object DataReconciliation extends SparkSessionWrapper {
     (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets).filter(_.exists(dataValidation = true, catalogValidation = false)).par
   }
 
+  /**
+   * This method performs basic reconciliation between two arrays of organization IDs.
+   *
+   * @param sourceOrgIDArr : Array of organization IDs from source ETL
+   * @param targetOrgIDArr : Array of organization IDs from target ETL
+   */
   private[overwatch] def performBasicRecon(sourceOrgIDArr:Array[String],targetOrgIDArr:Array[String]):Unit = {
     println("Number of workspace in Source:" + sourceOrgIDArr.size)
     println("Number of workspace in Target:" + targetOrgIDArr.size)
@@ -214,6 +246,13 @@ object DataReconciliation extends SparkSessionWrapper {
 
   }
 
+  /**
+   * This method retrieves the Workspace configuration for a given ETL database and organization ID.
+   *
+   * @param sourceEtl The name of the ETL database.
+   * @param orgID     The organization ID.
+   * @return A Workspace object containing the configuration for the specified ETL database and organization ID.
+   */
   private[overwatch] def getConfig(sourceEtl: String, orgID: String): Workspace = {
     Helpers.getWorkspaceByDatabase(sourceEtl, Some(orgID))
   }
@@ -231,7 +270,19 @@ object DataReconciliation extends SparkSessionWrapper {
 
   }
 
-
+  /**
+   * This method hashes all columns of a DataFrame.
+   *
+   * @param df The DataFrame whose columns are to be hashed.
+   * @param includeNonHashCol A boolean flag indicating whether to include non-hash columns in the output DataFrame. Default is false.
+   * @return A DataFrame with the hashed columns. If includeNonHashCol is true, the original columns are also included.
+   *
+   * The method works as follows:
+   * 1. Retrieves the column names of the input DataFrame.
+   * 2. Creates a new set of columns where each column is the hash of the original column.
+   * 3. Selects the original columns and the hashed columns from the input DataFrame.
+   * 4. If includeNonHashCol is true, returns the DataFrame with both original and hashed columns. Otherwise, returns the DataFrame with only the hashed columns.
+   */
   private[overwatch] def hashAllColumns(df: DataFrame, includeNonHashCol:Boolean= false): DataFrame = {
     val columns = df.columns
     val hashCols = columns.map(column => hash(col(column)).alias(s"${column}_hash"))
@@ -246,6 +297,21 @@ object DataReconciliation extends SparkSessionWrapper {
   }
 
 
+  /**
+   * This method performs a reconciliation between two tables.
+   *
+   * @param sourceTable       The name of the source table to be reconciled.
+   * @param targetTable       The name of the target table to be reconciled.
+   * @param includeNonHashCol A boolean flag indicating whether to include non-hash columns in the reconciliation. Default is true.
+   * @return A DataFrame containing the data present in the source table but missing from the target table.
+   *
+   *         The method works as follows:
+   *         1. Reads the source and target tables from Spark.
+   *         2. Drops the columns "Overwatch_RunID", "Pipeline_SnapTS", "__overwatch_ctrl_noise" from both tables.
+   *         3. Hashes all columns of both tables using the `hashAllColumns` method.
+   *         4. Finds the data present in the source table but missing from the target table using the `exceptAll` method.
+   *         5. Returns the DataFrame containing the missing data.
+   */
   private[overwatch] def reconTable(sourceTable: String, targetTable: String, includeNonHashCol: Boolean = true): DataFrame = {
     val sourceHashTable = hashAllColumns(spark.read.table(sourceTable).drop("Overwatch_RunID", "Pipeline_SnapTS", "__overwatch_ctrl_noise"), includeNonHashCol)
     val targetHashTable = hashAllColumns(spark.read.table(targetTable).drop("Overwatch_RunID", "Pipeline_SnapTS", "__overwatch_ctrl_noise"), includeNonHashCol)
