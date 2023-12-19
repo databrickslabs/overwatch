@@ -96,7 +96,7 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Pipeline_SnapTS"),
       zOrderBy = Array("Overwatch_RunID"),
       withOverwatchRunID = if (config.cloudProvider == "azure") false else true,
-      checkpointPath = if (config.cloudProvider == "azure")
+      checkpointPath = if (config.cloudProvider == "azure" && !config.auditLogConfig.systemTableName.isDefined)
         config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
       else None
     )

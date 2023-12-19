@@ -54,7 +54,7 @@ trait SparkSessionWrapper extends Serializable {
 
   private def buildSpark(): SparkSession = {
     SparkSession
-      .builder()
+      .builder().master("local")
       .appName("Overwatch - GlobalSession")
       .getOrCreate()
   }
