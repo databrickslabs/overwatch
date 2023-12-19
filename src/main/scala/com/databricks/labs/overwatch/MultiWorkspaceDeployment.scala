@@ -114,10 +114,14 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val badRecordsPath = s"${config.storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
-      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure") {
+      println("inside build params..")
+      println(s"auditlogprefix_source_path ---- ${config.auditlogprefix_source_path}")
+      println("config audit checks----"+config.auditlogprefix_source_path.getOrElse("").equals("system.access.audit"))
+      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ||
+        config.auditlogprefix_source_path.getOrElse("").equals("system.access.audit")) {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
       } else {
-
+        println("inside build params else")
         val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
         val isAAD = config.aad_client_id.nonEmpty &&
           config.aad_tenant_id.nonEmpty &&
@@ -375,10 +379,18 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         println("Exception while reading config , please provide config csv path/config delta path/config delta table")
         throw e
     }
-
+    println("rawBaseConfigDF-----")
+    rawBaseConfigDF.show(false)
     val deploymentSelectsNoNullStrings = Schema.deployementMinimumSchema.fields.map(f => {
       when(trim(lower(col(f.name))) === "null", lit(null).cast(f.dataType)).otherwise(col(f.name)).alias(f.name)
     })
+
+    println("end result configs -----")
+    checkStoragePrefixColumnName(rawBaseConfigDF)
+    rawBaseConfigDF
+      .verifyMinimumSchema(Schema.deployementMinimumSchema)
+      .select(deploymentSelectsNoNullStrings: _*).show(false)
+
 
     checkStoragePrefixColumnName(rawBaseConfigDF)
     rawBaseConfigDF
@@ -409,6 +421,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
                                           ): Array[MultiWorkspaceConfig] = { // Array[MultiWorkspaceConfig] = {
     try {
       val baseConfig = generateBaseConfig(configLocation)
+      println("baseConfig")
+      baseConfig.show(false)
       val multiWorkspaceConfig = baseConfig
         .withColumn("api_url", removeTrailingSlashes('api_url))
         .withColumn("deployment_id", lit(deploymentId))
@@ -446,6 +460,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     Future {
       val threadDeploymentReport = ArrayBuffer[MultiWSDeploymentReport]()
       val deploymentId = deploymentParams.deploymentId
+      println(s"deploymentParams.args------${deploymentParams.args}")
       val workspace = Initializer(deploymentParams.args,
         apiURL = Some(deploymentParams.apiUrl),
         organizationID = Some(deploymentParams.workspaceId))
@@ -479,7 +494,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
       println("ParallelismLevel :" + parallelism)
       val multiWorkspaceConfig = generateMultiWorkspaceConfig(configLocation, deploymentId, outputPath)
-      snapshotConfig(multiWorkspaceConfig)
+      println(s"multiWorkspaceConfig auditlogprefix_source_path -------${multiWorkspaceConfig(0).auditlogprefix_source_path}")
+//      snapshotConfig(multiWorkspaceConfig)
       val params = DeploymentValidation
         .performMandatoryValidation(multiWorkspaceConfig, parallelism)
         .map(buildParams)

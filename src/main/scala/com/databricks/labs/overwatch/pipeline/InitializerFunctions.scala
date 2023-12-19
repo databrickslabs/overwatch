@@ -95,6 +95,7 @@ trait InitializerFunctions
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     /** Validate and set Audit Log Configs */
     val rawAuditLogConfig = rawParams.auditLogConfig
+    println(s"rawAuditLogConfig.rawAuditPath----- ${rawAuditLogConfig.rawAuditPath}")
     val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig)
     config.setAuditLogConfig(validatedAuditLogConfig)
 
@@ -401,13 +402,15 @@ trait InitializerFunctions
 
   @throws(classOf[BadConfigException])
   def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
-
     if (disableValidations) { //need to double check this
+      println("inside disableValidations")
       quickBuildAuditLogConfig(auditLogConfig)
     } else {
       if (auditLogConfig.rawAuditPath.contains("system.access.audit")) {
+        println("inside system table if")
         validateAuditLogConfigsFromSystemTable(auditLogConfig)
       } else {
+        println("inside system table else")
         validateAuditLogConfigsFromCloud(auditLogConfig)
       }
     }
