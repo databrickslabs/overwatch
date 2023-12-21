@@ -1006,6 +1006,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
+    val orderingWindow = Window.partitionBy("cluster_id").orderBy(desc("timestamp"))
 
     val nonBillableTypes = Array(
       "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
@@ -1022,7 +1023,6 @@ trait SilverTransforms extends SparkSessionWrapper {
     val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1)
       .over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
 
-    val orderingWindow = Window.partitionBy("cluster_id").orderBy(desc("timestamp"))
 
     val clusterEventsDF1 = clusterEventsDF
       .selectExpr("*", "details.*")
@@ -1030,20 +1030,21 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumnRenamed("type", "state")
 
     val clusterEventsDF1Filtered = clusterEventsDF1
-      // .filter('isAutomated === true)
       .withColumn("last_state", first(col("state")).over(orderingWindow))
-      .withColumn("rnk", rank().over(orderingWindow))
-      .filter('last_state =!= "TERMINATING" && 'rnk === 1)
+      .withColumn("row", row_number().over(orderingWindow))
+      .filter('last_state =!= "TERMINATING" && 'row === 1)
 
-    val exceptclusterEventsDF1 = clusterEventsDF1.join(clusterEventsDF1Filtered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
+    val exceptClusterEventsDF1 = clusterEventsDF1.join(clusterEventsDF1Filtered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
 
-    val jrSilverAgg= jrsilverDF.filter('clusterType === "job_cluster").groupBy("clusterID").agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
+    val jrSilverAgg= jrsilverDF
+      .groupBy("clusterID")
+      .agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
 
     val joined = clusterEventsDF1Filtered.join(jrSilverAgg, clusterEventsDF1Filtered("cluster_id") === jrSilverAgg("clusterID"), "left")
       .filter(!'clusterID.isNull)
       .withColumn("state", lit("TERMINATING_IMPUTED"))
 
-    val clusterEventsFinal = clusterEventsDF1.union(joined.drop("last_state","rnk","clusterID","end_run_time"))
+    val clusterEventsFinal = clusterEventsDF1.union(joined.drop("last_state","row","clusterID","end_run_time"))
 
 
     val clusterEventsBaseline = clusterEventsFinal
