@@ -241,12 +241,11 @@ trait GoldTransforms extends SparkSessionWrapper {
       )
   }
 
-    protected def buildClusterStateFact(
+  protected def buildClusterStateFact(
                                        instanceDetailsTarget: PipelineTable,
                                        dbuCostDetailsTarget: PipelineTable,
                                        clusterSnapshot: PipelineTable,
                                        clusterSpec: PipelineTable,
-                                       jrsilverDF: DataFrame,
                                        pipelineSnapTime: TimeTypes
                                      )(clusterStateDetail: DataFrame): DataFrame = {
     val instanceDetailsDF = instanceDetailsTarget.asDF
@@ -336,37 +335,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       .drop("activeFrom", "activeUntil", "activeFromEpochMillis", "activeUntilEpochMillis", "activeFromDate", "activeUntilDate", "worker_orgid", "node_type_id_lookup")
       // filling data is critical here to ensure jrcp dups don't occur
       // using noise generators to fill with two passes to reduce skew
-      .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores)
-      .withColumn("isAutomated",isAutomated('cluster_name))// scan back then forward to fill all
-
-      // Impute in CLSF when Terminating Event is not found
-      val orderingWindow = Window.partitionBy("cluster_id").orderBy(desc("unixTimeMS_state_end"))
-      val jrSilverAgg= jrsilverDF.groupBy("clusterID").agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
-
-      val clusterPotentialFiltered = clusterPotential.filter('isAutomated === true)
-        .withColumn("last_state", first(col("state")).over(orderingWindow))
-        .withColumn("rnk", rank().over(orderingWindow))
-        .filter('last_state =!= "TERMINATING" && 'rnk === 1)
-
-      val exceptClusterPotential = clusterPotential.except(clusterPotentialFiltered.drop("last_state").drop("rnk"))
-
-      val joined = clusterPotentialFiltered.join(jrSilverAgg, clusterPotentialFiltered("cluster_id") === jrSilverAgg("clusterID"), "left")
-        .withColumn("timestamp_state_end", coalesce('end_run_time, 'timestamp_state_end))
-        .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
-        .withColumn("days_in_state", size('state_dates))
-
-      val joinedFinal = joined.filter(!'clusterID.isNull)
-        .withColumn("state", lit("TERMINATING_IMPUTED"))
-        .withColumn("timestamp_state_start", col("end_run_time"))
-        .withColumn("timestamp_state_end", col("end_run_time"))
-        .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
-        .withColumn("days_in_state", size('state_dates))
-
-      val clusterPotentialFinal = exceptClusterPotential
-        .union(joined.drop("last_state","rnk","clusterID","end_run_time"))
-        .union(joinedFinal.drop("last_state","rnk","clusterID","end_run_time"))
-
-
+      .fillMeta(clusterPotMetaToFill, clusterPotKeys, clusterPotIncrementals, noiseBuckets = getTotalCores) // scan back then forward to fill all
 
     val isSingleNode = when(get_json_object('custom_tags, "$.ResourceClass") === "SingleNode", lit(true)).otherwise(lit(false))
     val workerPotentialCoreS = when('databricks_billable && isSingleNode, $"driverSpecs.vCPUs" * 'uptime_in_state_S)
@@ -433,22 +402,8 @@ trait GoldTransforms extends SparkSessionWrapper {
       (driverComputeCost + driverDBUCost + workerComputeCost + workerDBUCost).alias("total_cost")
     )
 
-    clusterPotentialFinal
+    clusterPotential
       .select(clusterStateFactCols: _*)
-
-//    val clsfDF1 =clsfDF.filter('state === "TERMINATING").filter('isAutomated === true).filter('days_in_state > 2)
-//    val clsfDF2 = clsfDF.except(clsfDF1)
-//
-//
-//    val joinedDF = clsfDF1.join(jrsilverDF1,clsfDF1("cluster_id")===jrsilverDF("clusterID"),"left")
-//    joinedDF.withColumn("timestamp_state_end", coalesce('end_run_time, 'timestamp_state_end))
-//      .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
-//      .withColumn("days_in_state", size('state_dates))
-//      .drop("end_run_time")
-//      .drop("clusterID")
-//
-//    clsfDF2.union(joinedDF)
-
   }
 
   protected def buildJobRunCostPotentialFact(
