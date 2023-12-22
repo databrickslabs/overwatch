@@ -1034,7 +1034,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
           isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_log_conf.isNotNull)
-      .filter('cluster_log_conf =!= "s3://")
+      .filter('cluster_log_conf =!= "s3://" && 'cluster_log_conf =!= "s3a://")
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
     // This captures clusters that have not been edited/restarted since the last run with
@@ -1052,7 +1052,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("cluster_log_conf",
             fetchClusterLogConfiguration(cloudProvider, coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
               isMultiWorkSpaceDeployment, organisationId))
-          .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull && 'cluster_log_conf =!= "s3://")
+          .filter('cluster_id.isNotNull)
+          .filter('cluster_log_conf.isNotNull && 'cluster_log_conf =!= "s3://" && 'cluster_log_conf =!= "s3a://")
           .select('cluster_id, 'cluster_log_conf)
       }
     }
