@@ -333,7 +333,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                overwatchRunID: String,
                                organizationId: String
                               ): DataFrame = {
-    println("inside getAuditLogsDF")
     println(s"auditLogConfig.systemTableName.isDefined --- ${auditLogConfig.systemTableName.isDefined}")
     if(auditLogConfig.systemTableName.isDefined)
       getAuditLogsDfFromSystemTables(fromTime, untilTime, organizationId)
@@ -1049,12 +1048,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                untilTime: LocalDateTime,
                                organizationId: String
                              ): DataFrame = {
-    println("fetching data from system tables")
+    println("Fetching data from system.access.audit")
     val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     val fromTimeSysTableCompatible = fromTime.withHour(0).withMinute(0).withSecond(0).format(sysTableFormat)
     val untilTimeSysTableCompatible = untilTime.withHour(23).withMinute(59).withSecond(59).format(sysTableFormat)
-    println(s"fromTimeSysTableCompatible---- ${fromTimeSysTableCompatible}")
-    println(s"untilTimeSysTableCompatible---- ${untilTimeSysTableCompatible}")
+    println(s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
+    println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
 
     val rawSystemTableFiltered = spark.table("system.access.audit")
                                   .filter('workspace_id === organizationId)

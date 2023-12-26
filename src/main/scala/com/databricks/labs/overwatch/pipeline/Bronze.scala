@@ -307,7 +307,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   private def executeModules(): Unit = {
     config.overwatchScope.foreach {
       case OverwatchScope.audit =>
-        println(s"inside execute module audit config.auditLogConfig.systemTableName.isDefined -- ${!config.auditLogConfig.systemTableName.isDefined}")
         if (config.cloudProvider == "azure" && !config.auditLogConfig.systemTableName.isDefined) {
           landAzureAuditEvents()
         }
