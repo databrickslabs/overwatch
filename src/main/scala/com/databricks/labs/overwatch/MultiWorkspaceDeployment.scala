@@ -379,18 +379,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         println("Exception while reading config , please provide config csv path/config delta path/config delta table")
         throw e
     }
-    println("rawBaseConfigDF-----")
-    rawBaseConfigDF.show(false)
+
     val deploymentSelectsNoNullStrings = Schema.deployementMinimumSchema.fields.map(f => {
       when(trim(lower(col(f.name))) === "null", lit(null).cast(f.dataType)).otherwise(col(f.name)).alias(f.name)
     })
-
-    println("end result configs -----")
-    checkStoragePrefixColumnName(rawBaseConfigDF)
-    rawBaseConfigDF
-      .verifyMinimumSchema(Schema.deployementMinimumSchema)
-      .select(deploymentSelectsNoNullStrings: _*).show(false)
-
 
     checkStoragePrefixColumnName(rawBaseConfigDF)
     rawBaseConfigDF
@@ -421,8 +413,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
                                           ): Array[MultiWorkspaceConfig] = { // Array[MultiWorkspaceConfig] = {
     try {
       val baseConfig = generateBaseConfig(configLocation)
-      println("baseConfig")
-      baseConfig.show(false)
+
       val multiWorkspaceConfig = baseConfig
         .withColumn("api_url", removeTrailingSlashes('api_url))
         .withColumn("deployment_id", lit(deploymentId))
