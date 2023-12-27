@@ -485,8 +485,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
       println("ParallelismLevel :" + parallelism)
       val multiWorkspaceConfig = generateMultiWorkspaceConfig(configLocation, deploymentId, outputPath)
-      println(s"multiWorkspaceConfig auditlogprefix_source_path -------${multiWorkspaceConfig(0).auditlogprefix_source_path}")
-//      snapshotConfig(multiWorkspaceConfig)
+
+      snapshotConfig(multiWorkspaceConfig)
       val params = DeploymentValidation
         .performMandatoryValidation(multiWorkspaceConfig, parallelism)
         .map(buildParams)
