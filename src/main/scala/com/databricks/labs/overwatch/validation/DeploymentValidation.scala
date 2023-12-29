@@ -364,7 +364,11 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
-
+    println(s"config.auditlogprefix_source_path - ${config.auditlogprefix_source_path.get}")
+    if(config.auditlogprefix_source_path.get.contains(".")) {
+      validateSystemTableAudit(config.auditlogprefix_source_path, config.workspace_id)
+    }
+    else
     config.cloud.toLowerCase match {
       case cloudType if cloudType == "aws" || cloudType == "gcp" =>
         validateAuditLog(
@@ -377,7 +381,6 @@ object DeploymentValidation extends SparkSessionWrapper {
         validateEventHub(
           config)
     }
-
   }
 
   /**
@@ -703,6 +706,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Valid_Excluded_Scopes" => "Excluded scope can be audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts."
       case "Storage_Access" => "ETL_STORAGE_PREFIX should have read,write and create access"
       case "Validate_Mount" => "Number of mount points in the workspace should not exceed 50"
+      case "Validate_SystemTablesAudit" => "System table name should be system.access.audit"
     }
   }
 
@@ -778,6 +782,27 @@ object DeploymentValidation extends SparkSessionWrapper {
 
     configDF.unpersist()
     validationStatus.toArray
+  }
+
+  private def validateSystemTableAudit(auditlogprefix_source_path: Option[String], workspace_id: String): DeploymentValidationReport = {
+    val testDetails = s"Testing for System table - ${auditlogprefix_source_path.get}"
+    if(spark.catalog.tableExists(auditlogprefix_source_path.get)) {
+      DeploymentValidationReport(true,
+        getSimpleMsg("Validate_SystemTablesAudit"),
+        testDetails,
+        Some("SUCCESS"),
+        Some(workspace_id)
+      )
+    } else {
+      DeploymentValidationReport(false,
+          getSimpleMsg("Validate_SystemTablesAudit"),
+          testDetails,
+          Some("FAILED"),
+          Some(workspace_id)
+        )
+    throw new BadConfigException(
+          s"${auditlogprefix_source_path} does not exists")
+    }
   }
 
 }
