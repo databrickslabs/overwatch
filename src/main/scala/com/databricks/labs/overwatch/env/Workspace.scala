@@ -308,7 +308,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     if(Helpers.pathExists(tempWorkingDir)) {
       try {
         spark.conf.set("spark.sql.caseSensitive", "true")
-        val df = spark.read.json(tempWorkingDir)
+        val baseDF = spark.read.json(tempWorkingDir)
+        val df = deriveRawApiResponseDF(baseDF)
           .select(explode(col("runs")).alias("runs")).select(col("runs" + ".*"))
           .withColumn("organization_id", lit(config.organizationId))
         spark.conf.set("spark.sql.caseSensitive", "false")
