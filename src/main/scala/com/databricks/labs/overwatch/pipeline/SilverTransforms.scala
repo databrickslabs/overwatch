@@ -1369,6 +1369,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     deriveInputForWarehouseBase(df,silver_warehouse_spec,auditBaseCols)
     .transform(deriveWarehouseBase())
-      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest))
+      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
   }
 }
