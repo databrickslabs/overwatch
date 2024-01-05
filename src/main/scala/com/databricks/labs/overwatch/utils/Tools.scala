@@ -655,11 +655,11 @@ object Helpers extends SparkSessionWrapper {
       .as[String].first()
 
     val workspace = if (isRemoteWorkspace) { // single workspace deployment
-      Initializer(testConfig, disableValidations = true)
+      Initializer(testConfig, disableValidations = true, initializeDatabase = false,Some(workspaceID))
     } else { // multi workspace deployment
       Initializer(
         testConfig,
-        disableValidations = disableValidations,
+        disableValidations = disableValidations ,
         apiURL = apiUrl,
         organizationID = organization_id
       )
@@ -705,7 +705,7 @@ object Helpers extends SparkSessionWrapper {
       .filter('organization_id === workspaceID)
       .select(to_json('inputConfig).alias("compactString"))
       .as[String].first()
-    Initializer(testConfig, disableValidations = true, initializeDatabase = false)
+    Initializer(testConfig, disableValidations = true, initializeDatabase = false,Some(workspaceID))
   }
 
   /**
