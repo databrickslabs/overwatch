@@ -548,14 +548,11 @@ object SchemaTools extends SparkSessionWrapper {
   def snakeToCamel(df: DataFrame) : DataFrame = {
     val columnNames = df.columns.toSeq
     var newColumnNames = Collections.synchronizedList(new util.ArrayList[String]())
-
     columnNames.foreach(
       x=>{
-//        println(x.split("_").head.concat(x.split("_").tail.map(_.capitalize).mkString("")))
         newColumnNames.add(x.split("_").head.concat(x.split("_").tail.map(_.capitalize).mkString("")))
       }
     )
-
     val renamedCols = newColumnNames.asScala.toSeq
     df.toDF(renamedCols:_*)
   }

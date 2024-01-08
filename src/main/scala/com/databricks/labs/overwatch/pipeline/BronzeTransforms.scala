@@ -1070,16 +1070,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val auditLogFromSysTableToStruct = auditLogFromSysTable
       .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
       .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
-//      .withColumn("time", 'timestamp.cast("timestamp"))
-//      .withColumn("timestamp", unix_timestamp('time) * 1000)
       .verifyMinimumSchema(Schema.auditMasterSchema)
       .drop("requestParamsString")
       .withColumn("response", $"response".withField("statusCode",
-        coalesce($"response.statusCode", $"response.status_code")))  //figure out a way to efficiently renaming this column
+        coalesce($"response.statusCode", $"response.status_code")))
       .withColumn("response", $"response".withField("errorMessage",
-        coalesce($"response.errorMessage", $"response.error_message")))  //figure out a way to efficiently renaming this column
+        coalesce($"response.errorMessage", $"response.error_message")))
 
-    // add time col from timetamp and make timestamp milli sec , multiply by 1000
     auditLogFromSysTableToStruct
   }
 
