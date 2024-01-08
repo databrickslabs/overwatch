@@ -403,14 +403,11 @@ trait InitializerFunctions
   @throws(classOf[BadConfigException])
   def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
     if (disableValidations) { //need to double check this
-      println("inside disableValidations")
       quickBuildAuditLogConfig(auditLogConfig)
     } else {
-      if (auditLogConfig.rawAuditPath.contains("system.access.audit")) {
-        println("inside system table if")
+      if (auditLogConfig.rawAuditPath.getOrElse("").equals("system.access.audit")) {
         validateAuditLogConfigsFromSystemTable(auditLogConfig)
       } else {
-        println("inside system table else")
         validateAuditLogConfigsFromCloud(auditLogConfig)
       }
     }

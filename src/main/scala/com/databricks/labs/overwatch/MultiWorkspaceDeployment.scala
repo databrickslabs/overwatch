@@ -114,14 +114,10 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val badRecordsPath = s"${config.storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
-      println("inside build params..")
-      println(s"auditlogprefix_source_path ---- ${config.auditlogprefix_source_path}")
-      println("config audit checks----"+config.auditlogprefix_source_path.getOrElse("").equals("system.access.audit"))
-      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ||
+      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ||  // for azure workspace we are following a different method to fetch data fro system tables
         config.auditlogprefix_source_path.getOrElse("").equals("system.access.audit")) {
         AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
       } else {
-        println("inside build params else")
         val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
         val isAAD = config.aad_client_id.nonEmpty &&
           config.aad_tenant_id.nonEmpty &&
@@ -413,7 +409,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
                                           ): Array[MultiWorkspaceConfig] = { // Array[MultiWorkspaceConfig] = {
     try {
       val baseConfig = generateBaseConfig(configLocation)
-
       val multiWorkspaceConfig = baseConfig
         .withColumn("api_url", removeTrailingSlashes('api_url))
         .withColumn("deployment_id", lit(deploymentId))
@@ -421,7 +416,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         .as[MultiWorkspaceConfig]
         .filter(_.active)
         .collect()
-      if(multiWorkspaceConfig.length < 1){
+      if (multiWorkspaceConfig.length < 1) {
         throw new BadConfigException("Config file has 0 record, config file:" + configLocation)
       }
       multiWorkspaceConfig
@@ -431,7 +426,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         logger.log(Level.ERROR, fullMsg)
         throw e
     }
-
   }
 
 
@@ -451,7 +445,6 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     Future {
       val threadDeploymentReport = ArrayBuffer[MultiWSDeploymentReport]()
       val deploymentId = deploymentParams.deploymentId
-      println(s"deploymentParams.args------${deploymentParams.args}")
       val workspace = Initializer(deploymentParams.args,
         apiURL = Some(deploymentParams.apiUrl),
         organizationID = Some(deploymentParams.workspaceId))
