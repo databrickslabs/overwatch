@@ -37,10 +37,11 @@ object DataReconciliation extends SparkSessionWrapper {
     val targetWorkspace = getConfig(targetEtl,targetOrgIDArr(0))
     val targets = getAllTargets(sourceWorkspace)
     println("Number of tables for recon: "+targets.length)
-    println("Tables for recon: "+targets.foreach(t=>println(t.name)))
-    val report = runRecon(targets,sourceEtl,sourceOrgIDArr,targetEtl)
+    println(targets.foreach(t => println(t.name)))
+    val report = runRecon(targets, sourceEtl, sourceOrgIDArr, targetEtl)
     val reconRunId: String = java.util.UUID.randomUUID.toString
-    saveReconReport(report,targetWorkspace.getConfig.etlDataPathPrefix,"ReconReport",reconRunId)
+    val etlStoragePrefix = targetWorkspace.getConfig.etlDataPathPrefix.substring(0, targetWorkspace.getConfig.etlDataPathPrefix.length - 13)
+    saveReconReport(report, etlStoragePrefix, "ReconReport", reconRunId)
   }
 
   /**
