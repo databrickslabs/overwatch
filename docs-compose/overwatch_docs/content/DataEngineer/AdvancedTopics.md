@@ -436,3 +436,42 @@ standing up / configuring the real-time infrastructure itself.
 Simple Spark Dashboard | IO Dashboard | Advanced Dashboard
 :-------------------------:|:-------------------------:|:-------------------------:
 ![RealTime Dasboard1](/images/_index/spark_dashboard1.png) | ![RealTime Dasboard2](/images/_index/spark_dashboard2.png) | ![RealTime Dasboard3](/images/_index/spark_dashboard3.png)
+
+
+
+## API Traceability
+The Overwatch pipeline runs in multiple threads, making numerous API calls in parallel and asynchronously to enhance processing speed. 
+Due to the challenge of capturing lineage between requests and responses, a traceability module has been implemented.
+Through traceability, we can record the request made and the corresponding response received. 
+All data captured as part of traceability will be stored in the apiEventDetails table, which can be found in the ETL database.
+
+### How to enable Traceability
+
+By default, the traceability module is disabled. To enable traceability, please set the following configuration in the advanced Spark settings: "overwatch.traceapi true".
+
+### Column Descriptions of ApiEventDetails
+
+| Column          | Type      | Description                                                                                                                                                                                                            |
+|:----------------|:----------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| end_point       | String    | Api call end point.                                                                                                                                                                                                    |
+| type  | String    | Type of api call.                                                                                                                                                                                                      | 
+| apiVersion       | String    | Api call version.                                                                                                                                                                                                      |
+| batch_key_filter     | String    | Parameters that has been specified in the api call.It will be String of Json.                                                                                                                                          |
+| response_code   | long      | Response code for the api call.                                                                                                                                                                                        | 
+| data          | String    | Response which is stored in binary format.                                                                                                                                                                             |
+| moduleID         | long      | Id of the module from which Api call was initiated.                                                                                                                                                                    |
+| moduleName          | String    | Name of the module from which api call was initiated.                                                                                                                                                                  |
+| organization_id   | Long      | Id of the workspace.                                                                                                                                                                                                   |  
+| snap_ts | timestamp | Time in which this row was inserted into the table.                                                                                                                                                                    |
+| timestamp | long      | Timestamp in which this row was inserted into the table.                                                                                                                                                                                           
+| Overwatch_RunID | long      | GUID for the overwatch run.                                                                                                                                                                                             
+
+### How to read the binary data which has been stored in ApiEventDetils
+
+With the help of helper functions has been introduced in release 0730 the binary data can be decoded to human readable format.
+```scala
+import com.databricks.labs.overwatch.utils._
+val df = Helpers.transformBinaryDf(spark.read.table("<etl_db_name>.apieventdetails"))
+display(df)
+
+```
