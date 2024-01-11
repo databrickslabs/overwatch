@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.validation
 
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
+import com.databricks.labs.overwatch.utils.Helpers.getAllPipelineTargets
 import com.databricks.labs.overwatch.utils.{Helpers, ReconReport, SparkSessionWrapper}
 import org.apache.log4j.Logger
 import org.apache.spark.sql.DataFrame
@@ -35,7 +36,7 @@ object DataReconciliation extends SparkSessionWrapper {
     performBasicRecon(sourceOrgIDArr,targetOrgIDArr)
     val sourceWorkspace = getConfig(sourceEtl,sourceOrgIDArr(0))
     val targetWorkspace = getConfig(targetEtl,targetOrgIDArr(0))
-    val targets = getAllTargets(sourceWorkspace)
+    val targets = getAllPipelineTargets(sourceWorkspace)
     println("Number of tables for recon: "+targets.length)
     println(targets.foreach(t => println(t.name)))
     val report = runRecon(targets, sourceEtl, sourceOrgIDArr, targetEtl)
@@ -217,18 +218,6 @@ object DataReconciliation extends SparkSessionWrapper {
 
   }
 
-  /**
-   * This method fetches all targets for a workspace.
-   *
-   * @param workspace : Workspace object
-   * @return ParArray of PipelineTable
-   */
-  private[overwatch] def getAllTargets(workspace: Workspace): ParArray[PipelineTable] = {
-    val b = Bronze(workspace)
-    val s = Silver(workspace)
-    val g = Gold(workspace)
-    (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets).filter(_.exists(dataValidation = true, catalogValidation = false)).par
-  }
 
   /**
    * This method performs basic reconciliation between two arrays of organization IDs.
@@ -236,11 +225,11 @@ object DataReconciliation extends SparkSessionWrapper {
    * @param sourceOrgIDArr : Array of organization IDs from source ETL
    * @param targetOrgIDArr : Array of organization IDs from target ETL
    */
-  private[overwatch] def performBasicRecon(sourceOrgIDArr:Array[String],targetOrgIDArr:Array[String]):Unit = {
+  private[overwatch] def performBasicRecon(sourceOrgIDArr: Array[String], targetOrgIDArr: Array[String]): Unit = {
     println("Number of workspace in Source:" + sourceOrgIDArr.size)
     println("Number of workspace in Target:" + targetOrgIDArr.size)
-    if(sourceOrgIDArr.size<1 || targetOrgIDArr.size<1){
-      val msg ="Number of workspace in source/target etl is 0 , Exiting"
+    if (sourceOrgIDArr.size < 1 || targetOrgIDArr.size < 1) {
+      val msg = "Number of workspace in source/target etl is 0 , Exiting"
       println(msg)
       throw new Exception(msg)
     }

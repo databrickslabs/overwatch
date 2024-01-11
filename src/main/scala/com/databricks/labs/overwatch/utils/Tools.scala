@@ -28,6 +28,7 @@ import org.apache.spark.sql.streaming.StreamingQueryListener.{QueryProgressEvent
 import java.net.URI
 import java.time.LocalDate
 import scala.collection.parallel.ForkJoinTaskSupport
+import scala.collection.parallel.mutable.ParArray
 import scala.concurrent.forkjoin.ForkJoinPool
 
 // TODO -- Add loggers to objects with throwables
@@ -1307,5 +1308,19 @@ object Helpers extends SparkSessionWrapper {
   def reconSingleTable(sourceTable: String, targetTable: String,includeNonHashCol:Boolean= true ) = {
     DataReconciliation.reconTable(sourceTable, targetTable)
   }
+
+  /**
+   * This method fetches all targets for a workspace.
+   *
+   * @param workspace : Workspace object
+   * @return ParArray of PipelineTable
+   */
+   def getAllPipelineTargets(workspace: Workspace): ParArray[PipelineTable] = {
+    val b = Bronze(workspace)
+    val s = Silver(workspace)
+    val g = Gold(workspace)
+    (b.getAllTargets ++ s.getAllTargets ++ g.getAllTargets).filter(_.exists(dataValidation = true, catalogValidation = false)).par
+  }
+
 
 }
