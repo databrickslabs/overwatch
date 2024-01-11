@@ -705,7 +705,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    * @return
    */
   private def writeTraceApiFlag(): Boolean ={
-    spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean && !apiMeta.batchPersist && successTempPath.nonEmpty
+    spark.conf.getOption("overwatch.traceapi").getOrElse("false").toBoolean && !apiMeta.batchPersist && successTempPath.nonEmpty
   }
 
   /**

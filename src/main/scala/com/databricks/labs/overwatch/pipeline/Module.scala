@@ -425,7 +425,7 @@ class Module(
         logger.log(Level.ERROR, msg, e)
         fail(msg)
     } finally {
-      if (spark.conf.getOption("overwatch.traceapi").getOrElse("true").toBoolean) {
+      if (spark.conf.getOption("overwatch.traceapi").getOrElse("false").toBoolean) {
         persistApiEvents()
       }
       spark.catalog.clearCache()
