@@ -542,6 +542,7 @@ object SchemaTools extends SparkSessionWrapper {
 
   /**
    * Function to change to column's naming convention from snake case  to camel case
+   * For example: "cluster_id" to "clusterId" and "cluster_name" to "clusterName"
    * @param df
    * @return
    */
