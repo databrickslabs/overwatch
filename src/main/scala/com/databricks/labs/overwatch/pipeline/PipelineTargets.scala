@@ -329,7 +329,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("timestamp", "cluster_id"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("timestamp")// It will be SnapTS in epoc
     )
 
     lazy private[overwatch] val clusterStateDetailTarget: PipelineTable = PipelineTable(
@@ -375,7 +376,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       _permitDuplicateKeys = false,
       incrementalColumns = Array("query_start_time_ms"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("Timestamp") //Timestamp is the pipelineSnapTs in epoc
     )
 
     lazy private[overwatch] val warehousesSpecTarget: PipelineTable = PipelineTable(
@@ -383,7 +385,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("timestamp", "warehouse_id"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("Timestamp") //Timestamp is the pipelineSnapTs in epoc
     )
 
   }
@@ -519,7 +522,8 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
       maxMergeScanDates = 31, // 1 greater than clusterStateDetail
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
-      zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
+      zOrderBy = Array("cluster_id", "unixTimeMS_state_start"),
+      excludedReconColumn = Array("driverSpecs","workerSpecs") //driverSpecs and workerSpecs contains PipelineSnapTs and runID
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(
