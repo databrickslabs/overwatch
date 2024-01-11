@@ -786,7 +786,8 @@ object DeploymentValidation extends SparkSessionWrapper {
 
   private def validateSystemTableAudit(auditlogprefix_source_path: Option[String], workspace_id: String): DeploymentValidationReport = {
     val testDetails = s"Testing for System table - ${auditlogprefix_source_path.get}"
-    if(spark.catalog.tableExists(auditlogprefix_source_path.get)) {
+    val ifDataExists = checkSystemTableAudit(auditlogprefix_source_path, workspace_id)
+    if(spark.catalog.tableExists(auditlogprefix_source_path.get) && !ifDataExists) {
       DeploymentValidationReport(true,
         getSimpleMsg("Validate_SystemTablesAudit"),
         testDetails,
@@ -803,6 +804,12 @@ object DeploymentValidation extends SparkSessionWrapper {
     throw new BadConfigException(
           s"${auditlogprefix_source_path} does not exists")
     }
+  }
+
+  private def checkSystemTableAudit(auditlogprefix_source_path: Option[String], workspace_id: String): Boolean = {
+    val auditLogData = spark.read.table(auditlogprefix_source_path.get)
+      .filter('workspace_id === workspace_id)
+    auditLogData.isEmpty
   }
 
 }

@@ -335,7 +335,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
                               ): DataFrame = {
     println(s"auditLogConfig.systemTableName.isDefined --- ${auditLogConfig.systemTableName.isDefined}")
     if(auditLogConfig.systemTableName.isDefined)
-      getAuditLogsDfFromSystemTables(fromTime, untilTime, organizationId)
+      getAuditLogsDfFromSystemTables(fromTime, untilTime, organizationId,auditLogConfig)
     else
       getAuditLogsDfFromCloud(auditLogConfig, cloudProvider, fromTime, untilTime, auditRawLand, overwatchRunID, organizationId)
   }
@@ -1046,38 +1046,53 @@ trait BronzeTransforms extends SparkSessionWrapper {
   def getAuditLogsDfFromSystemTables(
                                fromTime: LocalDateTime,
                                untilTime: LocalDateTime,
-                               organizationId: String
+                               organizationId: String,
+                               auditLogConfig: AuditLogConfig
                              ): DataFrame = {
-    println("Fetching data from system.access.audit")
-    val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
-    val fromTimeSysTableCompatible = fromTime.withHour(0).withMinute(0).withSecond(0).format(sysTableFormat)
-    val untilTimeSysTableCompatible = untilTime.withHour(23).withMinute(59).withSecond(59).format(sysTableFormat)
-    println(s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
-    println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
+    try {
+      println("Fetching data from system.access.audit")
+      val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+      // Adding the below code to add time so that the whole day data can be fetched, despite of the fromTime and untilTime
+      val fromTimeSysTableCompatible = fromTime.withHour(0).withMinute(0).withSecond(0).format(sysTableFormat)
+      val untilTimeSysTableCompatible = untilTime.withHour(23).withMinute(59).withSecond(59).format(sysTableFormat)
+      logger.log(Level.INFO,s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
+      logger.log(Level.INFO,s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
+      println(s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
+      println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
 
-    val rawSystemTableFiltered = spark.table("system.access.audit")
-                                  .filter('workspace_id === organizationId)
-                                  .filter('event_time >= fromTimeSysTableCompatible
-                                                && 'event_time <= untilTimeSysTableCompatible)
+      val rawSystemTableFiltered = spark.table(auditLogConfig.systemTableName.get.toString)
+        .filter('workspace_id === organizationId)
+        .filter('event_time >= fromTimeSysTableCompatible
+          && 'event_time <= untilTimeSysTableCompatible)
 
-    val auditLogFromSysTable = SchemaTools.snakeToCamel(rawSystemTableFiltered)
-      .withColumn("organization_id",col("workspaceID"))
-      .withColumnRenamed("eventDate", "date")
-      .withColumn("timestamp",(col("eventTime").cast("double")* 1000).cast("long"))
-      .withColumn("requestParamsString",to_json(col("requestParams")))
-      .drop("requestParams","eventTime")
+      if (rawSystemTableFiltered.isEmpty) {
+        throw new Exception(s"No data found in system.access.audit for organizationId: $organizationId " +
+          s"and fromTime: $fromTimeSysTableCompatible and untilTime: $untilTimeSysTableCompatible")
+      }
 
-    val auditLogFromSysTableToStruct = auditLogFromSysTable
-      .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
-      .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
-      .verifyMinimumSchema(Schema.auditMasterSchema)
-      .drop("requestParamsString")
-      .withColumn("response", $"response".withField("statusCode",
-        coalesce($"response.statusCode", $"response.status_code")))
-      .withColumn("response", $"response".withField("errorMessage",
-        coalesce($"response.errorMessage", $"response.error_message")))
+      val auditLogFromSysTable = SchemaTools.snakeToCamel(rawSystemTableFiltered)
+        .withColumn("organization_id", col("workspaceID"))
+        .withColumnRenamed("eventDate", "date")
+        .withColumn("timestamp", (col("eventTime").cast("double") * 1000).cast("long"))
+        .withColumn("requestParamsString", to_json(col("requestParams")))
+        .drop("requestParams", "eventTime")
 
-    auditLogFromSysTableToStruct
+      val auditLogFromSysTableToStruct = auditLogFromSysTable
+        .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
+        .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
+        .verifyMinimumSchema(Schema.auditMasterSchema)
+        .drop("requestParamsString")
+        .withColumn("response", $"response".withField("statusCode",
+          coalesce($"response.statusCode", $"response.status_code")))
+        .withColumn("response", $"response".withField("errorMessage",
+          coalesce($"response.errorMessage", $"response.error_message")))
+
+      auditLogFromSysTableToStruct
+  } catch {
+      case e: org.apache.spark.sql.AnalysisException =>
+        throw new Exception(s"Access issue with table system.access.audit: ${e.getMessage}")
+      case e: Exception => throw e
+    }
   }
 
 

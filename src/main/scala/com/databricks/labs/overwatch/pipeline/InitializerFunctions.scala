@@ -95,8 +95,7 @@ trait InitializerFunctions
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     /** Validate and set Audit Log Configs */
     val rawAuditLogConfig = rawParams.auditLogConfig
-    println(s"rawAuditLogConfig.rawAuditPath----- ${rawAuditLogConfig.rawAuditPath}")
-    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig)
+    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig,config.organizationId)
     config.setAuditLogConfig(validatedAuditLogConfig)
 
     // must happen AFTER data target validation
@@ -401,15 +400,23 @@ trait InitializerFunctions
   }
 
   @throws(classOf[BadConfigException])
-  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
+  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig,organization_id: String): AuditLogConfig = {
     if (disableValidations) { //need to double check this
       quickBuildAuditLogConfig(auditLogConfig)
     } else {
-      if (auditLogConfig.rawAuditPath.getOrElse("").equals("system.access.audit")) {
-        validateAuditLogConfigsFromSystemTable(auditLogConfig)
+      if (ifFetchFromSystemTable(auditLogConfig)){
+        validateAuditLogConfigsFromSystemTable(auditLogConfig,organization_id)
       } else {
         validateAuditLogConfigsFromCloud(auditLogConfig)
       }
+    }
+  }
+
+  def ifFetchFromSystemTable(auditLogConfig: AuditLogConfig): Boolean = {
+    if (auditLogConfig.rawAuditPath.getOrElse("").toLowerCase.equals("system")) {
+      true
+    } else {
+      false
     }
   }
 
@@ -486,9 +493,13 @@ trait InitializerFunctions
    */
   def validateAndSetDataTarget(dataTarget: DataTarget): Unit
 
-  def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig): AuditLogConfig = {
+  def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig, organizationId: String): AuditLogConfig = {
     val auditLogFormat = "delta"
-    val systemTableName = "system.access.audit"
+    val systemTableName = config.systemTableAudit
+    val systemTableNameDf = spark.table(systemTableName).filter(s"organization_id = '$organizationId'")
+    if (systemTableNameDf.isEmpty) {
+      throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
+    }
     auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName))
   }
 

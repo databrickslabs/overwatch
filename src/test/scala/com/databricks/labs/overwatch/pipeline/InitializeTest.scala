@@ -111,7 +111,8 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
       val expectedAuditConf = AuditLogConfig(Some("path/to/auditLog"), "json", None)
-      val actualAuditConf = init.validateAuditLogConfigs(configInput)
+      val organizationId = "123"
+      val actualAuditConf = init.validateAuditLogConfigs(configInput,organizationId)
       assert(expectedAuditConf == actualAuditConf)
     }
 
@@ -124,9 +125,10 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val conf = new Config
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
+      val organizationId = "123"
       val expectedAuditConf = AuditLogConfig(None, "json", Some(AzureAuditLogEventhubConfig("sample.connection.string",
         "auditLog", "path/to/auditLog/prefix",10000,10, Some("path/to/auditLog/prefix/rawEventsCheckpoint"), Some("path/to/auditLog/prefix/auditLogBronzeCheckpoint"))))
-      val actualAuditConf = init.validateAuditLogConfigs(configInput)
+      val actualAuditConf = init.validateAuditLogConfigs(configInput,organizationId)
       assert(expectedAuditConf == actualAuditConf)
     }
 
@@ -143,7 +145,8 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setCloudProvider("aws")
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
-      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput))
+      val organizationId = "123"
+      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput,organizationId))
     }
 
     ignore ("validateAuditLogConfigs function validate audit log format in the config ") {
@@ -154,9 +157,10 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setCloudProvider("aws")
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
+      val organizationId = "123"
       val quickBuildAuditLogConfig = PrivateMethod[AuditLogConfig]('validateAuditLogConfigs)
 
-      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput))
+      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput,organizationId))
     }
   }
 
