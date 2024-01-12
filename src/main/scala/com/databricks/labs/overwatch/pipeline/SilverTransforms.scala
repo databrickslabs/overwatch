@@ -1013,8 +1013,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
     )
 
-    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because they
-    // occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
+    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because
+    // they occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
     // goal is to be certain about the 99th percentile
     val runningStates = Array(
       "STARTING", "INIT_SCRIPTS_STARTED", "RUNNING", "CREATING",
