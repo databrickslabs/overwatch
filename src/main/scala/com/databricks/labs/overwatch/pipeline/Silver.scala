@@ -319,7 +319,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
+  lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005,2011,2014))
   lazy private val appendClusterStateDetailProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
@@ -330,7 +330,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         ),
         Seq(buildClusterStateDetail(
           clusterStateDetailModule.untilTime,
-          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1) //Added to get the Removed Cluster
+          BronzeTargets.auditLogsTarget.asIncrementalDF(clusterSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1), //Added to get the Removed Cluster,
+          SilverTargets.dbJobRunsTarget.asIncrementalDF(clusterStateDetailModule, SilverTargets.dbJobRunsTarget.incrementalColumns, 30),
+          SilverTargets.clustersSpecTarget
         )),
         append(SilverTargets.clusterStateDetailTarget)
       )
