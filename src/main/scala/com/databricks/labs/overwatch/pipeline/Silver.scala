@@ -319,7 +319,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005))
+  lazy private[overwatch] val clusterStateDetailModule = Module(2019, "Silver_ClusterStateDetail", this, Array(1005,2011,2014))
   lazy private val appendClusterStateDetailProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
