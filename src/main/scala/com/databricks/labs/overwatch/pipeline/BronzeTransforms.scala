@@ -1044,6 +1044,24 @@ trait BronzeTransforms extends SparkSessionWrapper {
     cleanDF
   }
 
+  def fetchDatafromSystemTableAuditLog(
+                                        fromTimeSysTableCompatible: String,
+                                        untilTimeSysTableCompatible: String,
+                                         organizationId: String,
+                                         auditLogConfig: AuditLogConfig
+                                       ): DataFrame = {
+    try {
+      spark.table(auditLogConfig.systemTableName.get.toString)
+        .filter('workspace_id === organizationId)
+        .filter('event_time >= fromTimeSysTableCompatible
+          && 'event_time <= untilTimeSysTableCompatible)
+    } catch {
+      case e: org.apache.spark.sql.AnalysisException =>
+        throw new Exception(s"Access issue with table system.access.audit: ${e.getMessage}")
+    }
+  }
+
+
   def getAuditLogsDfFromSystemTables(
                                fromTime: LocalDateTime,
                                untilTime: LocalDateTime,
@@ -1051,20 +1069,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                auditLogConfig: AuditLogConfig
                              ): DataFrame = {
     try {
-      println("Fetching data from system.access.audit")
+      println(s"Fetching data from system.access.audit for workspace_id - ${organizationId}")
       val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
       // Adding the below code to add time so that the whole day data can be fetched, despite of the fromTime and untilTime
       val fromTimeSysTableCompatible = fromTime.withHour(0).withMinute(0).withSecond(0).format(sysTableFormat)
       val untilTimeSysTableCompatible = untilTime.withHour(23).withMinute(59).withSecond(59).format(sysTableFormat)
-      logger.log(Level.INFO,s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
-      logger.log(Level.INFO,s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
       println(s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
       println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
 
-      val rawSystemTableFiltered = spark.table(auditLogConfig.systemTableName.get.toString)
-        .filter('workspace_id === organizationId)
-        .filter('event_time >= fromTimeSysTableCompatible
-          && 'event_time <= untilTimeSysTableCompatible)
+      val rawSystemTableFiltered = fetchDatafromSystemTableAuditLog(fromTimeSysTableCompatible,
+        untilTimeSysTableCompatible, organizationId, auditLogConfig)
 
       if (rawSystemTableFiltered.isEmpty) {
         throw new Exception(s"No data found in system.access.audit for organizationId: $organizationId " +

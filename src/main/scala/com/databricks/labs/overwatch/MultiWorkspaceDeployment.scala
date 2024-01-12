@@ -73,6 +73,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
 
   private var _pipelineSnapTime: Long = _
 
+  private var _systemTableAudit: String = "system.access.audit"
+
+  private def systemTableAudit: String = _systemTableAudit
 
   private def setConfigLocation(value: String): this.type = {
     _configLocation = value
@@ -114,9 +117,14 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val badRecordsPath = s"${config.storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
-      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ||  // for azure workspace we are following a different method to fetch data fro system tables
-        config.auditlogprefix_source_path.getOrElse("").equals("system.access.audit")) {
-        AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
+      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ) {
+        // for azure workspace we are following a different method to fetch data fro system tables
+        if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system"))
+          AuditLogConfig(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableAudit))
+        else
+          AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
+
+
       } else {
         val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
         val isAAD = config.aad_client_id.nonEmpty &&
