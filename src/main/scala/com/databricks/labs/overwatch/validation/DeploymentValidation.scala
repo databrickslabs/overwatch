@@ -365,7 +365,7 @@ object DeploymentValidation extends SparkSessionWrapper {
    */
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
     println(s"config.auditlogprefix_source_path - ${config.auditlogprefix_source_path.get}")
-    if(config.auditlogprefix_source_path.get.contains(".")) {
+    if(config.auditlogprefix_source_path.get.toLowerCase.equals("system")) {
       validateSystemTableAudit(config.auditlogprefix_source_path, config.workspace_id)
     }
     else
