@@ -112,7 +112,10 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       val init = Initializer.buildInitializer(conf)
       val expectedAuditConf = AuditLogConfig(Some("path/to/auditLog"), "json", None)
       val organizationId = "123"
-      val actualAuditConf = init.validateAuditLogConfigs(configInput,organizationId)
+      val workspace_url = "https://test.databricks.com"
+      val sql_endpoint = "/sql/1.0/warehouses/123abc"
+      val token = "123abc"
+      val actualAuditConf = init.validateAuditLogConfigs(configInput,organizationId,workspace_url,sql_endpoint,token)
       assert(expectedAuditConf == actualAuditConf)
     }
 
@@ -126,9 +129,12 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
       val organizationId = "123"
+      val workspace_url = "https://test.databricks.com"
+      val sql_endpoint = "/sql/1.0/warehouses/123abc"
+      val token = "123abc"
       val expectedAuditConf = AuditLogConfig(None, "json", Some(AzureAuditLogEventhubConfig("sample.connection.string",
         "auditLog", "path/to/auditLog/prefix",10000,10, Some("path/to/auditLog/prefix/rawEventsCheckpoint"), Some("path/to/auditLog/prefix/auditLogBronzeCheckpoint"))))
-      val actualAuditConf = init.validateAuditLogConfigs(configInput,organizationId)
+      val actualAuditConf = init.validateAuditLogConfigs(configInput,organizationId,workspace_url, sql_endpoint, token)
       assert(expectedAuditConf == actualAuditConf)
     }
 
@@ -146,7 +152,10 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
       val organizationId = "123"
-      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput,organizationId))
+      val workspace_url = "https://test.databricks.com"
+      val sql_endpoint = "/sql/1.0/warehouses/123abc"
+      val token = "123abc"
+      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput,organizationId,workspace_url,sql_endpoint,token))
     }
 
     ignore ("validateAuditLogConfigs function validate audit log format in the config ") {
@@ -158,9 +167,12 @@ class InitializeTest extends AnyFunSpec with DataFrameComparer with SparkSession
       conf.setDeploymentType("default")
       val init = Initializer.buildInitializer(conf)
       val organizationId = "123"
+      val workspace_url = "https://test.databricks.com"
+      val sql_endpoint = "/sql/1.0/warehouses/123abc"
+      val token = "123abc"
       val quickBuildAuditLogConfig = PrivateMethod[AuditLogConfig]('validateAuditLogConfigs)
 
-      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput,organizationId))
+      assertThrows[BadConfigException](init.validateAuditLogConfigs(configInput,organizationId,workspace_url,sql_endpoint,token))
     }
   }
 

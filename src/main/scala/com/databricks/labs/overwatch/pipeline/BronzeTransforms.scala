@@ -332,11 +332,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                untilTime: LocalDateTime,
                                auditRawLand: PipelineTable,
                                overwatchRunID: String,
-                               organizationId: String
+                               organizationId: String,
+                               sqlEndpoint: String,
+                               apiEnv: ApiEnv
                               ): DataFrame = {
     println(s"auditLogConfig.systemTableName.isDefined --- ${auditLogConfig.systemTableName.isDefined}")
     if(auditLogConfig.systemTableName.isDefined)
-      getAuditLogsDfFromSystemTables(fromTime, untilTime, organizationId,auditLogConfig)
+      getAuditLogsDfFromSystemTables(fromTime, untilTime, organizationId, auditLogConfig, sqlEndpoint, apiEnv)
     else
       getAuditLogsDfFromCloud(auditLogConfig, cloudProvider, fromTime, untilTime, auditRawLand, overwatchRunID, organizationId)
   }
@@ -1047,14 +1049,35 @@ trait BronzeTransforms extends SparkSessionWrapper {
   def fetchDatafromSystemTableAuditLog(
                                         fromTimeSysTableCompatible: String,
                                         untilTimeSysTableCompatible: String,
-                                         organizationId: String,
-                                         auditLogConfig: AuditLogConfig
+                                        organizationId: String,
+                                        auditLogConfig: AuditLogConfig,
+                                        sqlEndpoint: String,
+                                        apiEnv: ApiEnv
                                        ): DataFrame = {
     try {
-      spark.table(auditLogConfig.systemTableName.get.toString)
-        .filter('workspace_id === organizationId)
-        .filter('event_time >= fromTimeSysTableCompatible
-          && 'event_time <= untilTimeSysTableCompatible)
+      if(auditLogConfig.sqlEndpoint.isDefined) {
+        spark.table(auditLogConfig.systemTableName.get.toString)
+          .filter('workspace_id === organizationId)
+          .filter('event_time >= fromTimeSysTableCompatible
+            && 'event_time <= untilTimeSysTableCompatible)
+      }
+      else{
+        val host = apiEnv.workspaceURL.stripPrefix("https://").stripSuffix("/")
+        val query =
+          s"""select * from ${auditLogConfig.systemTableName.get.toString}
+             |where workspace_id='${organizationId}'
+             |and event_time >= '${fromTimeSysTableCompatible}'
+             |and event_time <= '${untilTimeSysTableCompatible}'
+             |""".stripMargin
+        val systemTableNameDf = spark.read
+          .format("databricks")
+          .option("host", host)
+          .option("httpPath", sqlEndpoint)
+          .option("personalAccessToken", apiEnv.rawToken)
+          .option("query", query)
+          .load()
+        systemTableNameDf
+      }
     } catch {
       case e: org.apache.spark.sql.AnalysisException =>
         throw new Exception(s"Access issue with table system.access.audit: ${e.getMessage}")
@@ -1066,7 +1089,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                fromTime: LocalDateTime,
                                untilTime: LocalDateTime,
                                organizationId: String,
-                               auditLogConfig: AuditLogConfig
+                               auditLogConfig: AuditLogConfig,
+                               sqlEndpoint: String,
+                               apiEnv: ApiEnv
                              ): DataFrame = {
     try {
       println(s"Fetching data from system.access.audit for workspace_id - ${organizationId}")
@@ -1078,7 +1103,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
       println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
 
       val rawSystemTableFiltered = fetchDatafromSystemTableAuditLog(fromTimeSysTableCompatible,
-        untilTimeSysTableCompatible, organizationId, auditLogConfig)
+                                                                    untilTimeSysTableCompatible,
+                                                                    organizationId,
+                                                                    auditLogConfig,
+                                                                    sqlEndpoint,
+                                                                    apiEnv
+                                                                    )
 
       if (rawSystemTableFiltered.isEmpty) {
         throw new Exception(s"No data found in system.access.audit for organizationId: $organizationId " +

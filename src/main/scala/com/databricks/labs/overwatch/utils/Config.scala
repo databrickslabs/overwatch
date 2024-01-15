@@ -51,6 +51,7 @@ class Config() {
   private var _etlCatalogName: String = _
   private var _consumerCatalogName: String = _
   private val _systemTableAudit: String = "system.access.audit"
+  private var _sqlEndpoint: String = _
 
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -146,6 +147,8 @@ class Config() {
   def consumerCatalogName: String = _consumerCatalogName
 
   def systemTableAudit: String = _systemTableAudit
+
+  def sqlEndpoint: String = _sqlEndpoint
 
   /**
    * OverwatchScope defines the modules active for the current run

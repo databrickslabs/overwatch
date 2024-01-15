@@ -95,7 +95,8 @@ trait InitializerFunctions
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     /** Validate and set Audit Log Configs */
     val rawAuditLogConfig = rawParams.auditLogConfig
-    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig,config.organizationId)
+    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig, config.organizationId,
+        config.workspaceURL, config.sqlEndpoint, validatedTokenSecret.get.key)
     config.setAuditLogConfig(validatedAuditLogConfig)
 
     // must happen AFTER data target validation
@@ -400,12 +401,16 @@ trait InitializerFunctions
   }
 
   @throws(classOf[BadConfigException])
-  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig,organization_id: String): AuditLogConfig = {
+  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig,
+                              organization_id: String,
+                              workspace_url: String,
+                              sql_endpoint: String,
+                              token: String): AuditLogConfig = {
     if (disableValidations) { //need to double check this
       quickBuildAuditLogConfig(auditLogConfig)
     } else {
       if (ifFetchFromSystemTable(auditLogConfig)){
-        validateAuditLogConfigsFromSystemTable(auditLogConfig,organization_id)
+        validateAuditLogConfigsFromSystemTable(auditLogConfig,organization_id, workspace_url, sql_endpoint, token)
       } else {
         validateAuditLogConfigsFromCloud(auditLogConfig)
       }
@@ -493,14 +498,32 @@ trait InitializerFunctions
    */
   def validateAndSetDataTarget(dataTarget: DataTarget): Unit
 
-  def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig, organizationId: String): AuditLogConfig = {
+  def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig,
+                                             organizationId: String,
+                                             workspace_url: String,
+                                             sql_endpoint: String,
+                                             token: String): AuditLogConfig = {
     val auditLogFormat = "delta"
     val systemTableName = config.systemTableAudit
-    val systemTableNameDf = spark.table(systemTableName).filter(s"organization_id = '$organizationId'")
-    if (systemTableNameDf.isEmpty) {
-      throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
+    if(auditLogConfig.sqlEndpoint.get.isEmpty) {
+      val systemTableNameDf = spark.table(systemTableName).filter(s"organization_id = '$organizationId'")
+      if (systemTableNameDf.isEmpty)
+        throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
+      auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName))
     }
-    auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName))
+    else {
+      val host = workspace_url.stripPrefix("https://").stripSuffix("/")
+      val systemTableNameDf = spark.read
+        .format("databricks")
+        .option("host", host)
+        .option("httpPath", sql_endpoint)
+        .option("personalAccessToken", token)
+        .option("query", s"select * from ${systemTableName} where workspace_id='${organizationId}'")
+        .load()
+      if (systemTableNameDf.isEmpty)
+        throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
+      auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName),sqlEndpoint = Some(sql_endpoint))
+    }
   }
 
   def validateAuditLogConfigsFromCloud(auditLogConfig: AuditLogConfig): AuditLogConfig = {

@@ -147,7 +147,9 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
           auditLogsModule.untilTime.asLocalDateTime,
           BronzeTargets.auditLogAzureLandRaw,
           config.runID,
-          config.organizationId
+          config.organizationId,
+          config.sqlEndpoint,
+          config.apiEnv
         ),
         append(BronzeTargets.auditLogsTarget)
       )

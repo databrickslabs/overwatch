@@ -118,13 +118,18 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
       val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
       val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ) {
-        // for azure workspace we are following a different method to fetch data fro system tables
-        if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system"))
+        // for azure workspace we are following a different method to fetch data from system tables
+        // we need to check if the auditlogprefix_source_path is set to system and sql_endpoint is not empty
+        // to check if it is a multi account deployment or not
+        if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system")
+            && config.sql_endpoint.isEmpty)
           AuditLogConfig(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableAudit))
+        else if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system")
+          && !config.sql_endpoint.isEmpty)
+          AuditLogConfig(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableAudit),
+            sqlEndpoint = Some(config.sql_endpoint))
         else
           AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
-
-
       } else {
         val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
         val isAAD = config.aad_client_id.nonEmpty &&

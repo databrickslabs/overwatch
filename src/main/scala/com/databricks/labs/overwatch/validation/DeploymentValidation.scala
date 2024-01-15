@@ -366,7 +366,8 @@ object DeploymentValidation extends SparkSessionWrapper {
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
     println(s"config.auditlogprefix_source_path - ${config.auditlogprefix_source_path.get}")
     if(config.auditlogprefix_source_path.get.toLowerCase.equals("system")) {
-      validateSystemTableAudit(config.auditlogprefix_source_path, config.workspace_id)
+      validateSystemTableAudit(config.auditlogprefix_source_path, config.workspace_id, config.sql_endpoint,
+        config.workspace_url, config.secret_scope, config.secret_key_dbpat)
     }
     else
     config.cloud.toLowerCase match {
@@ -784,9 +785,20 @@ object DeploymentValidation extends SparkSessionWrapper {
     validationStatus.toArray
   }
 
-  private def validateSystemTableAudit(auditlogprefix_source_path: Option[String], workspace_id: String): DeploymentValidationReport = {
+  private def validateSystemTableAudit(auditlogprefix_source_path: Option[String],
+                                       workspace_id: String,
+                                       sql_endpoint: String,
+                                       workspace_host: String,
+                                       workspace_token_key: String,
+                                       workspace_scope:String
+                                      ): DeploymentValidationReport = {
     val testDetails = s"Testing for System table - ${auditlogprefix_source_path.get}"
-    val ifDataExists = checkSystemTableAudit(auditlogprefix_source_path, workspace_id)
+    val ifDataExists = if(sql_endpoint.isEmpty)
+      verifySystemTableAudit(auditlogprefix_source_path, workspace_id)
+    else
+      verifyAuditLogFromExternalAccount(workspace_id, workspace_host,
+        sql_endpoint, workspace_token_key, workspace_scope)
+
     if(spark.catalog.tableExists(auditlogprefix_source_path.get) && !ifDataExists) {
       DeploymentValidationReport(true,
         getSimpleMsg("Validate_SystemTablesAudit"),
@@ -806,9 +818,26 @@ object DeploymentValidation extends SparkSessionWrapper {
     }
   }
 
-  private def checkSystemTableAudit(auditlogprefix_source_path: Option[String], workspace_id: String): Boolean = {
+  private def verifySystemTableAudit(auditlogprefix_source_path: Option[String], workspace_id: String): Boolean = {
     val auditLogData = spark.read.table(auditlogprefix_source_path.get)
       .filter('workspace_id === workspace_id)
+    auditLogData.isEmpty
+  }
+
+  private def verifyAuditLogFromExternalAccount(workspace_id: String,
+                                                workspace_host: String,
+                                                sql_endpoint: String,
+                                                workspace_token_key: String,
+                                                workspace_scope: String): Boolean = {
+    val patToken = dbutils.secrets.get(scope = workspace_scope, key = workspace_token_key)
+    val host = workspace_host.stripPrefix("https://").stripSuffix("/")
+    val auditLogData = spark.read
+      .format("databricks")
+      .option("host",host)
+      .option("httpPath",sql_endpoint)
+      .option("personalAccessToken",patToken)
+      .option("query",s"select * from system.access.audit where workspace_id='${workspace_id}'")
+      .load()
     auditLogData.isEmpty
   }
 

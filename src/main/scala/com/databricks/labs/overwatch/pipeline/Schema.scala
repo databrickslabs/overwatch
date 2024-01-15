@@ -1135,7 +1135,8 @@ object Schema extends SparkSessionWrapper {
     StructField("aad_tenant_id", StringType, nullable = true),
     StructField("aad_client_id", StringType, nullable = true),
     StructField("aad_client_secret_key", StringType, nullable = true),
-    StructField("aad_authority_endpoint", StringType, nullable = true)
+    StructField("aad_authority_endpoint", StringType, nullable = true),
+    StructField("sql_endpoint", StringType, nullable = false)
   ))
 
   val mountMinimumSchema: StructType = StructType(Seq(
