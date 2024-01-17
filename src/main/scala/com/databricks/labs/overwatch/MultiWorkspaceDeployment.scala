@@ -116,34 +116,45 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val tokenSecret = TokenSecret(config.secret_scope, config.secret_key_dbpat)
       val badRecordsPath = s"${config.storage_prefix}/${config.workspace_id}/sparkEventsBadrecords"
       // TODO -- ISSUE 781 - quick fix to support non-json audit logs but needs to be added back to external parameters
-      val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
-      val auditLogConfig = if (s"${config.cloud.toLowerCase()}" != "azure" ) {
-        // for azure workspace we are following a different method to fetch data fro system tables
-        if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system"))
-          AuditLogConfig(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableAudit))
-        else
-          AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
-
-
-      } else {
-        val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
-        val isAAD = config.aad_client_id.nonEmpty &&
-          config.aad_tenant_id.nonEmpty &&
-          config.aad_client_secret_key.nonEmpty &&
-          config.eh_conn_string.nonEmpty
-        val azureLogConfig = if(isAAD){
-          AzureAuditLogEventhubConfig(connectionString = config.eh_conn_string.get, eventHubName = config.eh_name.get
-            , auditRawEventsPrefix = ehStatePath,
-            azureClientId = Some(config.aad_client_id.get),
-            azureClientSecret = Some(dbutils.secrets.get(config.secret_scope, key = config.aad_client_secret_key.get)),
-            azureTenantId = Some(config.aad_tenant_id.get),
-            azureAuthEndpoint = config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/")
-          )
-        }else{
-          val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
-          AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+      val auditLogConfig = if (config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system")) {
+        if(config.sql_endpoint.getOrElse("").isEmpty) {
+          val auditLogFormat = "delta"
+          AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path,
+            auditLogFormat = auditLogFormat, systemTableName = Some(systemTableAudit))
         }
-        AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
+        else {
+          val auditLogFormat = "delta"
+          AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path,
+            auditLogFormat = auditLogFormat, systemTableName = Some(systemTableAudit),
+            sqlEndpoint = config.sql_endpoint)
+        }
+//        else
+//          AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
+      } else {
+        if(s"${config.cloud.toLowerCase()}" != "azure") {
+          val auditLogFormat = spark.conf.getOption("overwatch.auditlogformat").getOrElse("json")
+          AuditLogConfig(rawAuditPath = config.auditlogprefix_source_path, auditLogFormat = auditLogFormat)
+        }
+        else {
+          val ehStatePath = s"${config.storage_prefix}/${config.workspace_id}/ehState"
+          val isAAD = config.aad_client_id.nonEmpty &&
+            config.aad_tenant_id.nonEmpty &&
+            config.aad_client_secret_key.nonEmpty &&
+            config.eh_conn_string.nonEmpty
+          val azureLogConfig = if (isAAD) {
+            AzureAuditLogEventhubConfig(connectionString = config.eh_conn_string.get, eventHubName = config.eh_name.get
+              , auditRawEventsPrefix = ehStatePath,
+              azureClientId = Some(config.aad_client_id.get),
+              azureClientSecret = Some(dbutils.secrets.get(config.secret_scope, key = config.aad_client_secret_key.get)),
+              azureTenantId = Some(config.aad_tenant_id.get),
+              azureAuthEndpoint = config.aad_authority_endpoint.getOrElse("https://login.microsoftonline.com/")
+            )
+          } else {
+            val ehConnString = s"{{secrets/${config.secret_scope}/${config.eh_scope_key.get}}}"
+            AzureAuditLogEventhubConfig(connectionString = ehConnString, eventHubName = config.eh_name.get, auditRawEventsPrefix = ehStatePath)
+          }
+          AuditLogConfig(azureAuditLogEventhubConfig = Some(azureLogConfig))
+        }
       }
       val interactiveDBUPrice: Double = config.interactive_dbu_price
       val automatedDBUPrice: Double = config.automated_dbu_price
@@ -160,6 +171,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       val stringDate = dateFormat.format(primordialDateString)
       val apiEnvConfig = getProxyConfig(config)
       val temp_dir_path = config.temp_dir_path.getOrElse("")
+      val sql_endpoint = config.sql_endpoint
 
       val params = OverwatchParams(
         auditLogConfig = auditLogConfig,
@@ -173,7 +185,8 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
         workspace_name = Some(customWorkspaceName),
         externalizeOptimize = true,
         apiEnvConfig = Some(apiEnvConfig),
-        tempWorkingDir = temp_dir_path
+        tempWorkingDir = temp_dir_path,
+        sqlEndpoint = sql_endpoint
       )
       MultiWorkspaceParams(JsonUtils.objToJson(params).compactString,
         s"""${config.api_url}""",

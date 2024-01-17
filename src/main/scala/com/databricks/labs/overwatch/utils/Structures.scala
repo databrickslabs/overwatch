@@ -138,7 +138,8 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 aad_authority_endpoint: Option[String],
                                 deployment_id: String,
                                 output_path: String,
-                                temp_dir_path: Option[String]
+                                temp_dir_path: Option[String],
+                                sql_endpoint: Option[String] = None
                                )
 case class RulesValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
 
@@ -197,7 +198,8 @@ case class AuditLogConfig(
                            rawAuditPath: Option[String] = None,
                            auditLogFormat: String = "json",
                            azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None,
-                           systemTableName: Option[String] = None
+                           systemTableName: Option[String] = None,
+                           sqlEndpoint: Option[String] = None
                          )
 
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
@@ -214,7 +216,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
                            apiEnvConfig: Option[ApiEnvConfig] = None,
-                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
+                           tempWorkingDir: String = "", // will be set after data target validated if not overridden
+                           sqlEndpoint: Option[String] = None
                           )
 
 case class ParsedConfig(
