@@ -139,7 +139,7 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 deployment_id: String,
                                 output_path: String,
                                 temp_dir_path: Option[String],
-                                sql_endpoint: String = ""
+                                sql_endpoint: Option[String] = None
                                )
 case class RulesValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
 
@@ -217,7 +217,7 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            externalizeOptimize: Boolean = false,
                            apiEnvConfig: Option[ApiEnvConfig] = None,
                            tempWorkingDir: String = "", // will be set after data target validated if not overridden
-                           sqlEndpoint: String = "",
+                           sqlEndpoint: Option[String] = None
                           )
 
 case class ParsedConfig(
