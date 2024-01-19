@@ -1030,32 +1030,34 @@ trait SilverTransforms extends SparkSessionWrapper {
       .drop("details")
       .withColumnRenamed("type", "state")
 
-    val refinedClusterEventsDFFiltered = refinedClusterEventsDF
-      .withColumn("last_state", first(col("state")).over(orderingWindow))
-      .withColumn("row", row_number().over(orderingWindow))
-      .filter('last_state =!= "TERMINATING" && 'row === 1)
+    val clusterEventsFinal  = if (jrsilverDF.isEmpty || clusterSpec.asDF.isEmpty) {
+      refinedClusterEventsDF
+    }else{
+      val refinedClusterEventsDFFiltered = refinedClusterEventsDF
+        .withColumn("row", row_number().over(orderingWindow))
+        .filter('state =!= "TERMINATING" && 'row === 1)
 
-    val exceptClusterEventsDF1 = refinedClusterEventsDF.join(refinedClusterEventsDFFiltered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
+      val exceptClusterEventsDF1 = refinedClusterEventsDF.join(refinedClusterEventsDFFiltered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
 
-    val jrSilverAgg= jrsilverDF
-      .groupBy("clusterID")
-      .agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
-      .filter('end_run_time.isNotNull)
+      val jrSilverAgg= jrsilverDF
+        .groupBy("clusterID")
+        .agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
+        .filter('end_run_time.isNotNull)
 
-    val joined = refinedClusterEventsDFFiltered.join(jrSilverAgg, refinedClusterEventsDFFiltered("cluster_id") === jrSilverAgg("clusterID"), "inner")
-      .withColumn("state", lit("TERMINATING_IMPUTED"))
+      val joined = refinedClusterEventsDFFiltered.join(jrSilverAgg, refinedClusterEventsDFFiltered("cluster_id") === jrSilverAgg("clusterID"), "inner")
+        .withColumn("state", lit("TERMINATING_IMPUTED"))
 
 
-    val clusterSpecDF = clusterSpec.asDF.withColumnRenamed("cluster_id","clusterID")
-    .withColumn("isAutomated",isAutomated('cluster_name))
-      .select("clusterID","cluster_name","isAutomated")
-      .filter('isAutomated).dropDuplicates()
+      val clusterSpecDF = clusterSpec.asDF.withColumnRenamed("cluster_id","clusterID")
+        .withColumn("isAutomated",isAutomated('cluster_name))
+        .select("clusterID","cluster_name","isAutomated")
+        .filter('isAutomated).dropDuplicates()
 
-    val jobClusterImputed = joined.join(clusterSpecDF,Seq("clusterID"),"inner")
-      .drop("last_state","row","clusterID","end_run_time","cluster_name","isAutomated")
+      val jobClusterImputed = joined.join(clusterSpecDF,Seq("clusterID"),"inner")
+        .drop("row","clusterID","end_run_time","cluster_name","isAutomated")
 
-    val clusterEventsFinal = refinedClusterEventsDF.union(jobClusterImputed)
-
+      refinedClusterEventsDF.union(jobClusterImputed)
+    }
 
     val clusterEventsBaseline = clusterEventsFinal
       .withColumn(
