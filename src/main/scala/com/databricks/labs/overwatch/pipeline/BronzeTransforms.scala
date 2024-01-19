@@ -1044,7 +1044,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     cleanDF
   }
 
-  def fetchDatafromSystemTableAuditLog(
+  private def fetchDatafromSystemTableAuditLog(
                                         fromTimeSysTableCompatible: String,
                                         untilTimeSysTableCompatible: String,
                                         organizationId: String,
@@ -1148,7 +1148,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       auditLogFromSysTableToStruct
   } catch {
       case e: org.apache.spark.sql.AnalysisException =>
-        throw new Exception(s"Access issue with table system.access.audit: ${e.getMessage}")
+        throw new Exception(s"Issues while fetching data from table system.access.audit: ${e.getMessage}")
       case e: Exception => throw e
     }
   }

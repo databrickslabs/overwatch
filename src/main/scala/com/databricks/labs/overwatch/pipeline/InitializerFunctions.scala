@@ -5,8 +5,15 @@ import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope.{OverwatchScope, _}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.catalyst.dsl.expressions.{DslExpression, DslSymbol}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{lit, rank, row_number}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+
 
 trait InitializerFunctions
   extends SparkSessionWrapper {
@@ -99,6 +106,9 @@ trait InitializerFunctions
     val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig, config.organizationId,
         config.workspaceURL, config.sqlEndpoint, validatedTokenSecret)
     config.setAuditLogConfig(validatedAuditLogConfig)
+
+    // check if it is a valid migration from cloud to system table
+    checkSystemTableMigrationValidity(config)
 
     // must happen AFTER data target validation
     // persistent location for corrupted spark event log files
@@ -495,15 +505,24 @@ trait InitializerFunctions
    */
   def validateAndSetDataTarget(dataTarget: DataTarget): Unit
 
+  def validateSqlEndpoint(sqlEndpoint: String, organizationId: String): String = {
+    val pattern = """/sql/1\.0/warehouses/.*""".r
+    sqlEndpoint.trim match {
+      case pattern(_*) => sqlEndpoint
+      case "" => sqlEndpoint
+      case _ => throw new Exception(s"Invalid sqlEndpoint for organizationId: $organizationId ")
+    }
+  }
   def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig,
                                              organizationId: String,
                                              workspace_url: String,
                                              token: Option[TokenSecret]): AuditLogConfig = {
     val auditLogFormat = "delta"
     val systemTableName = auditLogConfig.systemTableName.get
-    val sqlEndpoint = auditLogConfig.sqlEndpoint.getOrElse("")
+
+    val sqlEndpoint = validateSqlEndpoint(auditLogConfig.sqlEndpoint.getOrElse(""),organizationId)
     if(sqlEndpoint.isEmpty) {
-      val systemTableNameDf = spark.table(systemTableName).filter(s"workspace_id = '$organizationId'")
+      val systemTableNameDf = spark.table(systemTableName).filter(s"workspace_id = '$organizationId'").limit(1)
       if (systemTableNameDf.isEmpty)
         throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
       auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName))
@@ -518,7 +537,7 @@ trait InitializerFunctions
         .option("host", host)
         .option("httpPath", sqlEndpoint)
         .option("personalAccessToken", rawToken)
-        .option("query", s"select * from ${systemTableName} where workspace_id='${organizationId}'")
+        .option("query", s"select * from ${systemTableName} where workspace_id='${organizationId}' limit 1")
         .load()
       if (systemTableNameDf.isEmpty)
         throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
@@ -582,6 +601,26 @@ trait InitializerFunctions
         // return validated auditLogConfig for Azure
         auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
       }
+    }
+
+    def checkSystemTableMigrationValidity(config: Config): Boolean = {
+      val workspaceID = config.organizationId
+      val latestConfigByOrg = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
+      val etlDBWithOutCatalog = config.databaseName
+      val lastValue = spark.table(s"${etlDBWithOutCatalog}.pipeline_report")
+        .filter(col("status") === "SUCCESS")
+        .withColumn("rnk", rank().over(latestConfigByOrg))
+        .withColumn("rn", row_number().over(latestConfigByOrg))
+        .filter(col("rnk") === 1 && col("rn") === 1)
+        .filter(col("organization_id") === workspaceID)
+        .select("inputConfig.auditLogConfig.rawAuditPath").collect.map(x=>x(0)).mkString
+
+      val currentValue = config.auditLogConfig.rawAuditPath.getOrElse("")
+      if( lastValue == "system" && currentValue !="system" )
+        throw new Exception(s"Cannot migrate from system table to cloud for organization_id - ${workspaceID}" +
+          s"Please use the same configuration as the last run")
+      else
+        true
     }
 
 }
