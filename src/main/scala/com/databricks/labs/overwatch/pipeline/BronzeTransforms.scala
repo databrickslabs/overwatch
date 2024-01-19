@@ -517,7 +517,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       tmpClusterEventsErrorPath, config)
     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsErrorPath))
+        spark.read.json(tmpClusterEventsErrorPath)
           .withColumn("from_ts", toTS(col("from_epoch")))
           .withColumn("until_ts", toTS(col("until_epoch"))),
         database,
