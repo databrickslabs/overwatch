@@ -2,6 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.utils.Helpers.{getCurrentCatalogName, setCurrentCatalog, spark}
 import com.databricks.labs.overwatch.utils.OverwatchScope.{OverwatchScope, _}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
@@ -606,7 +607,19 @@ trait InitializerFunctions
     def checkSystemTableMigrationValidity(config: Config): Boolean = {
       val workspaceID = config.organizationId
       val latestConfigByOrg = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
-      val etlDBWithOutCatalog = config.databaseName
+      val etlDB = config.databaseName
+      val initialCatalog = getCurrentCatalogName(spark)
+      val etlDBWithOutCatalog = if(etlDB.contains(".")){
+        setCurrentCatalog(spark, etlDB.split("\\.").head)
+        etlDB.split("\\.").last
+      } else etlDB
+
+      if(!spark.catalog.tableExists(s"${etlDBWithOutCatalog}.pipeline_report")) {
+        logger.log(Level.INFO, s"Since it is a first run no need to check for migration validity")
+        setCurrentCatalog(spark, initialCatalog)
+        return true
+      }
+
       val lastValue = spark.table(s"${etlDBWithOutCatalog}.pipeline_report")
         .filter(col("status") === "SUCCESS")
         .withColumn("rnk", rank().over(latestConfigByOrg))
@@ -615,10 +628,11 @@ trait InitializerFunctions
         .filter(col("organization_id") === workspaceID)
         .select("inputConfig.auditLogConfig.rawAuditPath").collect.map(x=>x(0)).mkString
 
+      setCurrentCatalog(spark, initialCatalog)
       val currentValue = config.auditLogConfig.rawAuditPath.getOrElse("")
       if( lastValue == "system" && currentValue !="system" )
         throw new Exception(s"Cannot migrate from system table to cloud for organization_id - ${workspaceID}" +
-          s"Please use the same configuration as the last run")
+          s" Please use the same configuration as the last run")
       else
         true
     }
