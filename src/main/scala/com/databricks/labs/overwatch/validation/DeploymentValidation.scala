@@ -364,7 +364,12 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
-
+    if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system")) {
+      val tableName = fetchTableName(config.auditlogprefix_source_path)
+      validateSystemTableAudit(tableName, config.workspace_id, config.sql_endpoint.getOrElse(""),
+        config.workspace_url, config.secret_scope, config.secret_key_dbpat)
+    }
+    else
     config.cloud.toLowerCase match {
       case cloudType if cloudType == "aws" || cloudType == "gcp" =>
         validateAuditLog(
@@ -377,7 +382,6 @@ object DeploymentValidation extends SparkSessionWrapper {
         validateEventHub(
           config)
     }
-
   }
 
   /**
@@ -703,6 +707,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Valid_Excluded_Scopes" => "Excluded scope can be audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts."
       case "Storage_Access" => "ETL_STORAGE_PREFIX should have read,write and create access"
       case "Validate_Mount" => "Number of mount points in the workspace should not exceed 50"
+      case "Validate_SystemTablesAudit" => "System table name should be system.access.audit"
     }
   }
 
@@ -778,6 +783,70 @@ object DeploymentValidation extends SparkSessionWrapper {
 
     configDF.unpersist()
     validationStatus.toArray
+  }
+
+  private def fetchTableName(auditlogprefix_source_path: Option[String]): String = {
+    if(auditlogprefix_source_path.get.toLowerCase().equals("system"))
+      "system.access.audit"
+    else
+      auditlogprefix_source_path.get
+  }
+
+  private def validateSystemTableAudit(table_name: String,
+                                       workspace_id: String,
+                                       sql_endpoint: String,
+                                       workspace_host: String,
+                                       workspace_token_key: String,
+                                       workspace_scope:String
+                                      ): DeploymentValidationReport = {
+    val testDetails = s"Testing for System table - ${table_name} and workspace_id - ${workspace_id}"
+    val ifDataExists = if(sql_endpoint.trim.isEmpty)
+      verifySystemTableAudit(table_name, workspace_id)
+    else
+      verifyAuditLogFromExternalAccount(table_name,workspace_id, workspace_host,
+        sql_endpoint, workspace_scope, workspace_token_key)
+
+    if(spark.catalog.tableExists(table_name) && !ifDataExists) {
+      DeploymentValidationReport(true,
+        getSimpleMsg("Validate_SystemTablesAudit"),
+        testDetails,
+        Some("SUCCESS"),
+        Some(workspace_id)
+      )
+    } else {
+      DeploymentValidationReport(false,
+          getSimpleMsg("Validate_SystemTablesAudit"),
+          testDetails,
+          Some("FAILED"),
+          Some(workspace_id)
+        )
+    throw new BadConfigException(
+      s"${table_name} does not exists for workspace_id - ${workspace_id}")
+    }
+  }
+
+  private def verifySystemTableAudit(table_name: String, workspace_id: String): Boolean = {
+    val auditLogData = spark.read.table(table_name)
+      .filter('workspace_id === workspace_id)
+    auditLogData.isEmpty
+  }
+
+  private def verifyAuditLogFromExternalAccount(table_name: String,
+                                                 workspace_id: String,
+                                                workspace_host: String,
+                                                sql_endpoint: String,
+                                                workspace_token_key: String,
+                                                workspace_scope: String): Boolean = {
+    val patToken = dbutils.secrets.get(scope = workspace_scope, key = workspace_token_key)
+    val host = workspace_host.stripPrefix("https://").stripSuffix("/")
+    val auditLogData = spark.read
+      .format("databricks")
+      .option("host",host)
+      .option("httpPath",sql_endpoint)
+      .option("personalAccessToken",patToken)
+      .option("query",s"select * from ${table_name} where workspace_id='${workspace_id}'")
+      .load()
+    auditLogData.isEmpty
   }
 
 }

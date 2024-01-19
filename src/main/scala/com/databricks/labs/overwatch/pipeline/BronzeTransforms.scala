@@ -1,5 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
@@ -15,13 +16,16 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.eventhubs.{ConnectionStringBuilder, EventHubsConf, EventPosition}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 import org.apache.spark.util.SerializableConfiguration
 
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.sql.Timestamp
+import java.util.concurrent.Executors
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
-
 
 trait BronzeTransforms extends SparkSessionWrapper {
 
@@ -327,114 +331,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                untilTime: LocalDateTime,
                                auditRawLand: PipelineTable,
                                overwatchRunID: String,
-                               organizationId: String
+                               organizationId: String,
+                               sqlEndpoint: String,
+                               apiEnv: ApiEnv
                               ): DataFrame = {
-    val fromDT = fromTime.toLocalDate
-    val untilDT = untilTime.toLocalDate
-    if (cloudProvider == "azure") {
-      val azureAuditSourceFilters = 'Overwatch_RunID === lit(overwatchRunID) && 'organization_id === organizationId
-      val rawBodyLookup = auditRawLand.asDF
-        .filter(azureAuditSourceFilters)
-
-      val requiredColumns : Array[Column] = Array(
-        col("category"),
-        col("version"),
-        col("timestamp"),
-        col("date"),
-        col("identity").alias("userIdentity"),
-        col("organization_id"),
-        col("properties.actionName"),
-        col("properties.logId"),
-        col("properties.requestId"),
-        col("properties.requestParams"),
-        col("properties.response"),
-        col("properties.serviceName"),
-        col("properties.sessionId"),
-        col("properties.sourceIPAddress"),
-        col("properties.userAgent"),
-      )
-
-      val schemaBuilders = auditRawLand.asDF
-        .filter(azureAuditSourceFilters)
-        .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
-        .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
-        .selectExpr("streamRecord.*", "organization_id")
-        .withColumn("version", 'operationVersion)
-        .withColumn("time", 'time.cast("timestamp"))
-        .withColumn("timestamp", unix_timestamp('time) * 1000)
-        .withColumn("date", 'time.cast("date"))
-        .select(requiredColumns: _*)
-
-      val baselineAuditLogs = auditRawLand.asDF
-        .filter(azureAuditSourceFilters)
-        .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
-        .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
-        .selectExpr("streamRecord.*", "organization_id")
-        .withColumn("version", 'operationVersion)
-        .withColumn("time", 'time.cast("timestamp"))
-        .withColumn("timestamp", unix_timestamp('time) * 1000)
-        .withColumn("date", 'time.cast("date"))
-        .select(requiredColumns: _*)
-        .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
-        .withColumn("requestParams", structFromJson(spark, schemaBuilders, "requestParams"))
-
-      val auditDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
-        .withColumn("response", structFromJson(spark, schemaBuilders, "response"))
-        .withColumn("requestParamsJson", to_json('requestParams))
-        .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
-        .drop("logId", "requestParamsJson")
-
-      auditDF
-
-    } else {
-
-      // inclusive from exclusive to
-      val datesGlob = if (fromDT == untilDT) {
-        Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
-      } else {
-        getDatesGlob(fromDT, untilDT.plusDays(1)) // add one day to until to ensure intra-day audit logs prior to untilTS are captured.
-          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
-          .filter(Helpers.pathExists)
-      }
-
-      val auditLogsFailureMsg = s"Audit Logs Module Failure: Audit logs are required to use Overwatch and no data " +
-        s"was found in the following locations: ${datesGlob.mkString(", ")}"
-
-      if (datesGlob.nonEmpty) {
-        val rawDF = try {
-          spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-        } catch { // corrupted audit logs with duplicate columns in the source
-          case e: AnalysisException if e.message.contains("Found duplicate column(s) in the data schema") =>
-            spark.conf.set("spark.sql.caseSensitive", "true")
-            spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
-        }
-        // clean corrupted source audit logs even when there is only one of the duplicate columns in the source
-        // but still will conflict with the existing columns in the target
-        val cleanRawDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
-
-        val baseDF = if (auditLogConfig.auditLogFormat == "json") cleanRawDF else {
-          val rawDFWRPJsonified = cleanRawDF
-            .withColumn("requestParams", to_json('requestParams))
-          rawDFWRPJsonified
-            .withColumn("requestParams", structFromJson(spark, rawDFWRPJsonified, "requestParams"))
-        }
-
-        baseDF
-          // When globbing the paths, the date must be reconstructed and re-added manually
-          .withColumn("organization_id", lit(organizationId))
-          .withColumn("requestParamsJson", to_json('requestParams))
-          .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
-          .drop("requestParamsJson")
-          .withColumn("filename", input_file_name)
-          .withColumn("filenameAR", split(input_file_name, "/"))
-          .withColumn("date",
-            split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
-          .drop("filenameAR")
-          .verifyMinimumSchema(Schema.auditMasterSchema)
-      } else {
-        throw new Exception(auditLogsFailureMsg)
-      }
-    }
+    if(auditLogConfig.systemTableName.isDefined)
+      getAuditLogsDfFromSystemTables(fromTime, untilTime, organizationId, auditLogConfig, apiEnv)
+    else
+      getAuditLogsDfFromCloud(auditLogConfig, cloudProvider, fromTime, untilTime, auditRawLand, overwatchRunID, organizationId)
   }
 
   private def buildClusterEventBatches(apiEnv: ApiEnv,
@@ -1030,11 +934,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
       .withColumn("cluster_log_conf",
         coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
+//      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
       .withColumn("cluster_log_conf",
         fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
           isMultiWorkSpaceDeployment, organisationId))
       .filter('cluster_log_conf.isNotNull)
-      .filter('cluster_log_conf =!= "s3://" && 'cluster_log_conf =!= "s3a://")
 
     // Get latest incremental snapshot of clusters with logging dirs but not existing in audit updates
     // This captures clusters that have not been edited/restarted since the last run with
@@ -1052,8 +956,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
           .withColumn("cluster_log_conf",
             fetchClusterLogConfiguration(cloudProvider, coalesce($"cluster_log_conf.dbfs.destination", $"cluster_log_conf.s3.destination"),
               isMultiWorkSpaceDeployment, organisationId))
-          .filter('cluster_id.isNotNull)
-          .filter('cluster_log_conf.isNotNull && 'cluster_log_conf =!= "s3://" && 'cluster_log_conf =!= "s3a://")
+          .filter('cluster_id.isNotNull && 'cluster_log_conf.isNotNull)
           .select('cluster_id, 'cluster_log_conf)
       }
     }
@@ -1140,5 +1043,216 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .scrubSchema(SchemaScrubber(cullNullTypes = true))
     cleanDF
   }
+
+  private def fetchDatafromSystemTableAuditLog(
+                                        fromTimeSysTableCompatible: String,
+                                        untilTimeSysTableCompatible: String,
+                                        organizationId: String,
+                                        auditLogConfig: AuditLogConfig,
+                                        apiEnv: ApiEnv
+                                       ): DataFrame = {
+    try {
+      if(auditLogConfig.sqlEndpoint.getOrElse("").nonEmpty) {
+        val host = apiEnv.workspaceURL.stripPrefix("https://").stripSuffix("/")
+        val sqlEndpoint = auditLogConfig.sqlEndpoint.get
+        val query =
+          s"""select * from ${auditLogConfig.systemTableName.get.toString}
+             |where workspace_id='${organizationId}'
+             |and event_time >= '${fromTimeSysTableCompatible}'
+             |and event_time <= '${untilTimeSysTableCompatible}'
+             |""".stripMargin
+        logger.log(Level.INFO, query)
+        val systemTableNameDf = spark.read
+          .format("databricks")
+          .option("host", host)
+          .option("httpPath", sqlEndpoint)
+          .option("personalAccessToken", apiEnv.rawToken)
+          .option("query", query)
+          .load()
+        systemTableNameDf
+      }
+      else{
+        spark.table(auditLogConfig.systemTableName.get.toString)
+          .filter('workspace_id === organizationId)
+          .filter('event_time >= fromTimeSysTableCompatible
+            && 'event_time <= untilTimeSysTableCompatible)
+      }
+    } catch {
+      case e: org.apache.spark.sql.AnalysisException =>
+        throw new Exception(s"Issues while fetching data from  system.access.audit: ${e.getMessage}")
+    }
+  }
+
+
+  def getAuditLogsDfFromSystemTables(
+                               fromTime: LocalDateTime,
+                               untilTime: LocalDateTime,
+                               organizationId: String,
+                               auditLogConfig: AuditLogConfig,
+                               apiEnv: ApiEnv
+                             ): DataFrame = {
+    try {
+      println(s"Fetching data from system.access.audit for workspace_id - ${organizationId}")
+      val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+      // Adding the below code to add time so that the whole day data can be fetched, despite of the fromTime and untilTime
+      val fromTimeSysTableCompatible = fromTime.withHour(0).withMinute(0).withSecond(0).format(sysTableFormat)
+      val untilTimeSysTableCompatible = untilTime.withHour(23).withMinute(59).withSecond(59).format(sysTableFormat)
+      println(s"system.access.audit fromTime - ${fromTimeSysTableCompatible}")
+      println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
+
+      val rawSystemTableFiltered = fetchDatafromSystemTableAuditLog(fromTimeSysTableCompatible,
+                                                                    untilTimeSysTableCompatible,
+                                                                    organizationId,
+                                                                    auditLogConfig,
+                                                                    apiEnv
+                                                                    )
+
+      if (rawSystemTableFiltered.isEmpty) {
+        val message = s"No Data present in system.access.audit for organizationId: $organizationId " +
+          s"and fromTime: $fromTimeSysTableCompatible and untilTime: $untilTimeSysTableCompatible"
+        logger.log(Level.WARN, message)
+        throw new NoNewDataException(message, Level.WARN, allowModuleProgression = false)
+      }
+
+      val isSqlEndpointEmpty = auditLogConfig.sqlEndpoint.getOrElse("").isEmpty
+      // if sql endpoint is not empty, the audit log data will be fetched from
+      // internal system tables then we need to convert the requestParams to json
+      val deriveRequestParams = if(isSqlEndpointEmpty) to_json(col("requestParams")) else col("requestParams")
+
+
+      val auditLogFromSysTable = SchemaTools.snakeToCamel(rawSystemTableFiltered)
+          .withColumn("organization_id", col("workspaceID"))
+          .withColumnRenamed("eventDate", "date")
+          .withColumn("timestamp", (col("eventTime").cast("double") * 1000).cast("long"))
+          .withColumn("requestParamsString", deriveRequestParams)
+          .drop("requestParams", "eventTime")
+
+      // if sql endpoint is not empty, the audit log data will be derived from extenal system tables
+      // then userIdentity and response cols needs to be converted to struct from string
+      val deriveUserIdentity = if(isSqlEndpointEmpty) col("userIdentity")
+        else structFromJson(spark, auditLogFromSysTable, "userIdentity")
+      val deriveResponse = if(isSqlEndpointEmpty) col("response")
+        else structFromJson(spark, auditLogFromSysTable, "response")
+
+      val auditLogFromSysTableToStruct = auditLogFromSysTable
+          .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
+          .withColumn("userIdentity", deriveUserIdentity)
+          .withColumn("response", deriveResponse)
+          .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
+          .verifyMinimumSchema(Schema.auditMasterSchema)
+          .drop("requestParamsString")
+          .withColumn("response", $"response".withField("statusCode",
+            coalesce($"response.statusCode", $"response.status_code".cast(LongType))))
+          .withColumn("response", $"response".withField("errorMessage",
+            coalesce($"response.errorMessage", $"response.error_message")))
+         .withColumn("response", struct($"response.statusCode", $"response.errorMessage", $"response.result"))
+
+      auditLogFromSysTableToStruct
+  } catch {
+      case e: org.apache.spark.sql.AnalysisException =>
+        throw new Exception(s"Issues while fetching data from table system.access.audit: ${e.getMessage}")
+      case e: Exception => throw e
+    }
+  }
+
+
+  def getAuditLogsDfFromCloud(auditLogConfig: AuditLogConfig,
+                     cloudProvider: String,
+                     fromTime: LocalDateTime,
+                     untilTime: LocalDateTime,
+                     auditRawLand: PipelineTable,
+                     overwatchRunID: String,
+                     organizationId: String
+                    ): DataFrame = {
+    val fromDT = fromTime.toLocalDate
+    val untilDT = untilTime.toLocalDate
+    if (cloudProvider == "azure") {
+      val azureAuditSourceFilters = 'Overwatch_RunID === lit(overwatchRunID) && 'organization_id === organizationId
+      val rawBodyLookup = auditRawLand.asDF
+        .filter(azureAuditSourceFilters)
+      val schemaBuilders = auditRawLand.asDF
+        .filter(azureAuditSourceFilters)
+        .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
+        .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
+        .selectExpr("streamRecord.*", "organization_id")
+        .withColumn("version", 'operationVersion)
+        .withColumn("time", 'time.cast("timestamp"))
+        .withColumn("timestamp", unix_timestamp('time) * 1000)
+        .withColumn("date", 'time.cast("date"))
+        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
+        .selectExpr("*", "properties.*").drop("properties")
+
+
+      val baselineAuditLogs = auditRawLand.asDF
+        .filter(azureAuditSourceFilters)
+        .withColumn("parsedBody", structFromJson(spark, rawBodyLookup, "deserializedBody"))
+        .select(explode($"parsedBody.records").alias("streamRecord"), 'organization_id)
+        .selectExpr("streamRecord.*", "organization_id")
+        .withColumn("version", 'operationVersion)
+        .withColumn("time", 'time.cast("timestamp"))
+        .withColumn("timestamp", unix_timestamp('time) * 1000)
+        .withColumn("date", 'time.cast("date"))
+        .select('category, 'version, 'timestamp, 'date, 'properties, 'identity.alias("userIdentity"), 'organization_id)
+        .withColumn("userIdentity", structFromJson(spark, schemaBuilders, "userIdentity"))
+        .selectExpr("*", "properties.*").drop("properties")
+        .withColumn("requestParams", structFromJson(spark, schemaBuilders, "requestParams"))
+
+      PipelineFunctions.cleanseCorruptAuditLogs(spark, baselineAuditLogs)
+        .withColumn("response", structFromJson(spark, schemaBuilders, "response"))
+        .withColumn("requestParamsJson", to_json('requestParams))
+        .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
+        .drop("logId", "requestParamsJson")
+
+    } else {
+
+      // inclusive from exclusive to
+      val datesGlob = if (fromDT == untilDT) {
+        Array(s"${auditLogConfig.rawAuditPath.get}/date=${fromDT.toString}")
+      } else {
+        getDatesGlob(fromDT, untilDT.plusDays(1)) // add one day to until to ensure intra-day audit logs prior to untilTS are captured.
+          .map(dt => s"${auditLogConfig.rawAuditPath.get}/date=${dt}")
+          .filter(Helpers.pathExists)
+      }
+
+      val auditLogsFailureMsg = s"Audit Logs Module Failure: Audit logs are required to use Overwatch and no data " +
+        s"was found in the following locations: ${datesGlob.mkString(", ")}"
+
+      if (datesGlob.nonEmpty) {
+        val rawDF = try {
+          spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        } catch { // corrupted audit logs with duplicate columns in the source
+          case e: AnalysisException if e.message.contains("Found duplicate column(s) in the data schema") =>
+            spark.conf.set("spark.sql.caseSensitive", "true")
+            spark.read.format(auditLogConfig.auditLogFormat).load(datesGlob: _*)
+        }
+        // clean corrupted source audit logs even when there is only one of the duplicate columns in the source
+        // but still will conflict with the existing columns in the target
+        val cleanRawDF = PipelineFunctions.cleanseCorruptAuditLogs(spark, rawDF)
+
+        val baseDF = if (auditLogConfig.auditLogFormat == "json") cleanRawDF else {
+          val rawDFWRPJsonified = cleanRawDF
+            .withColumn("requestParams", to_json('requestParams))
+          rawDFWRPJsonified
+            .withColumn("requestParams", structFromJson(spark, rawDFWRPJsonified, "requestParams"))
+        }
+
+        baseDF
+          // When globbing the paths, the date must be reconstructed and re-added manually
+          .withColumn("organization_id", lit(organizationId))
+          .withColumn("requestParamsJson", to_json('requestParams))
+          .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsJson))
+          .drop("requestParamsJson")
+          .withColumn("filename", input_file_name)
+          .withColumn("filenameAR", split(input_file_name, "/"))
+          .withColumn("date",
+            split(expr("filter(filenameAR, x -> x like ('date=%'))")(0), "=")(1).cast("date"))
+          .drop("filenameAR")
+          .verifyMinimumSchema(Schema.auditMasterSchema)
+      } else {
+        throw new Exception(auditLogsFailureMsg)
+      }
+    }
+  }
+
 
 }
