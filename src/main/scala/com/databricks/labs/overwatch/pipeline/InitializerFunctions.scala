@@ -513,13 +513,13 @@ trait InitializerFunctions
       case _ => throw new Exception(s"Invalid sqlEndpoint for organizationId: $organizationId ")
     }
   }
-
   def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig,
                                              organizationId: String,
                                              workspace_url: String,
                                              token: Option[TokenSecret]): AuditLogConfig = {
     val auditLogFormat = "delta"
     val systemTableName = auditLogConfig.systemTableName.get
+
     val sqlEndpoint = validateSqlEndpoint(auditLogConfig.sqlEndpoint.getOrElse(""),organizationId)
     if(sqlEndpoint.isEmpty) {
       val systemTableNameDf = spark.table(systemTableName).filter(s"workspace_id = '$organizationId'").limit(1)
