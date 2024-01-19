@@ -1079,7 +1079,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     } catch {
       case e: org.apache.spark.sql.AnalysisException =>
-        throw new Exception(s"Access issue with table system.access.audit: ${e.getMessage}")
+        throw new Exception(s"Issues while fetching data from  system.access.audit: ${e.getMessage}")
     }
   }
 
@@ -1108,8 +1108,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                                                     )
 
       if (rawSystemTableFiltered.isEmpty) {
-        throw new Exception(s"No data found in system.access.audit for organizationId: $organizationId " +
-          s"and fromTime: $fromTimeSysTableCompatible and untilTime: $untilTimeSysTableCompatible")
+        val message = s"No Data present in system.access.audit for organizationId: $organizationId " +
+          s"and fromTime: $fromTimeSysTableCompatible and untilTime: $untilTimeSysTableCompatible"
+        logger.log(Level.WARN, message)
+        throw new NoNewDataException(message, Level.WARN, allowModuleProgression = false)
       }
 
       val isSqlEndpointEmpty = auditLogConfig.sqlEndpoint.getOrElse("").isEmpty
