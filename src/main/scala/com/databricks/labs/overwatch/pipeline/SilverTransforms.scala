@@ -1034,9 +1034,8 @@ trait SilverTransforms extends SparkSessionWrapper {
       refinedClusterEventsDF
     }else{
       val refinedClusterEventsDFFiltered = refinedClusterEventsDF
-        .withColumn("last_state", first(col("state")).over(orderingWindow))
         .withColumn("row", row_number().over(orderingWindow))
-        .filter('last_state =!= "TERMINATING" && 'row === 1)
+        .filter('state =!= "TERMINATING" && 'row === 1)
 
       val exceptClusterEventsDF1 = refinedClusterEventsDF.join(refinedClusterEventsDFFiltered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
 
@@ -1055,7 +1054,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .filter('isAutomated).dropDuplicates()
 
       val jobClusterImputed = joined.join(clusterSpecDF,Seq("clusterID"),"inner")
-        .drop("last_state","row","clusterID","end_run_time","cluster_name","isAutomated")
+        .drop("row","clusterID","end_run_time","cluster_name","isAutomated")
 
       refinedClusterEventsDF.union(jobClusterImputed)
     }
