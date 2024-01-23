@@ -296,7 +296,7 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       2.1).executeMultiThread(acc)
 
     apiObj.forEach(
-      obj => if (obj.contains("runs")) {
+      obj => if (obj.contains("job_id")) {
         apiResponseArray.add(obj)
       }
     )
