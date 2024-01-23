@@ -533,6 +533,8 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @return
    */
   private def checkAAD(config: MultiWorkspaceConfig): Boolean = {
+    if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system"))
+      return true
     if (config.eh_name.isEmpty)
       throw new BadConfigException("eh_name should be nonempty, please check the configuration.")
 
