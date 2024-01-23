@@ -469,15 +469,11 @@ class Module(
   private def persistApiEvents(): Unit = {
     try {
       val successPath = deriveApiTempDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
-      val errPath = deriveApiTempErrDir(config.tempWorkingDir, moduleName, pipeline.pipelineSnapTime)
       if (pathExists(successPath)) {
         val rawTraceDF = spark.read.json(successPath)
         transformAndPersistApiEvents(rawTraceDF)
       }
-      if (pathExists(errPath)) {
-        val rawTraceDF = spark.read.json(errPath)
-        transformAndPersistApiEvents(rawTraceDF)
-      }
+
     } catch {
       case e: Throwable =>
         println("got exception while writing" + e.getMessage)
