@@ -18,45 +18,51 @@ make them easy to interrogate for insights. The steps to deploying Overwatch are
 specific details that may pertain to your deployment. Below are the top level steps that this section will walk you 
 through the process.
 
-## Steps
-1. Configure Cloud Infrastructure
-2. Build / Apply Security
-3. Configure Overwatch
-4. Run and Schedule the Job\[s\]
-5. Productionize Your Deployment
-6. Share Overwatch
+When wanting to monitor your Workspaces, you might want to:
+1. [Deploy Overwatch for the first time](#first-overwatch-deployment)
+2. [Add a new workspace to an existing Overwatch deployment](#add-workspace-to-existing-overwatch-deployment)
 
-### Configuring Your Cloud
-Select your cloud to find the details for cloud configuration here. 
-([AWS]({{%relref "DeployOverwatch/CloudInfra/AWS.md"%}}) | [Azure]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}))
+## First Overwatch deployment
+### Steps
+**1. Configure Cloud Infrastructure** 
+   
+   Select your cloud to find the details for cloud configuration here.
+   ([AWS]({{%relref "DeployOverwatch/CloudInfra/AWS.md"%}}) | [Azure]({{%relref "DeployOverwatch/CloudInfra/Azure.md"%}}) |
+   [GCP]({{%relref "DeployOverwatch/CloudInfra/GCP.md"%}}))
 
-### Build / Apply Security
-Reference [Security Considerations]({{%relref "DeployOverwatch/ConfigureOverwatch/SecurityConsiderations.md"%}}) page 
-to help you build and apply a security model commensurate with your needs.
+**2. Build / Apply Security**
+   
+   Reference [Security Considerations]({{%relref "DeployOverwatch/ConfigureOverwatch/SecurityConsiderations.md"%}}) page
+   to help you build and apply a security model commensurate with your needs.
 
-### Configure Overwatch
-Reference the [configuration page]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}) to clarify the 
-configuration details and help you get started.
+**3. Configure Overwatch inputs**
+   
+   Reference the [configuration page]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}}) to clarify the
+   configuration details and help you get started.
 
-For legacy deployment methods please reference the 
-[Legacy Configuration Page]({{%relref "DeployOverwatch/ConfigureOverwatch/ConfigurationLegacy.md"%}})
+**4. Run and Schedule the Job\[s\]**
+   
+   Decide whether you'd like to execute Overwatch as a [JAR]({{%relref "RunningOverwatch/JAR.md"%}})
+   or a [NOTEBOOK]({{%relref "RunningOverwatch/Notebook.md"%}}) and schedule a job to periodically
+   execute the job. 
+   It's recommended to run Overwatch as a JAR as it unifies the deployment and doesn't depend on another asset 
+   (the notebook) to secure and ensure no one edits, moves, or deletes it.
 
-### Run and Schedule the Job\[s\]
-Decide whether you'd like to execute Overwatch as a [JAR]({{%relref "RunningOverwatch/JAR.md"%}}) 
-or a [NOTEBOOK]({{%relref "RunningOverwatch/Notebook.md"%}}) and schedule a job to periodically 
-execute the job.
+**5. Productionize Your Deployment**
 
-It's recommended to run Overwatch as a JAR as it unifies the deployment and doesn't depend on another asset 
-(the notebook) to secure and ensure no one edits, moves, or deletes it.
+   Now that you're live it's important to
+   [optimize everything]({{%relref "DataEngineer/AdvancedTopics"%}}/#optimizing-overwatch) and ensure the data is safe
+   in case something unexpected happens -- see [Productionizing]({{%relref "DataEngineer/Productionizing.md"%}})
 
-### Productionize Your Deployment
-Now that you're live it's important to 
-[optimize everything]({{%relref "DataEngineer/AdvancedTopics"%}}/#optimizing-overwatch) and ensure the data is safe 
-in case something unexpected happens -- see [Productionizing]({{%relref "DataEngineer/Productionizing.md"%}})
+**6. Share/Utilize Overwatch**
+   
+   Now you're ready to onboard consumers across your workspaces. Details about how to do that can be found in the
+   [Sharing Overwatch]({{%relref "DeployOverwatch/SharingOverwatch.md"%}}) page.
 
-### Share Overwatch
-Now you're ready to onboard consumers across your workspaces. Details about how to do that can be found in the 
-[Sharing Overwatch]({{%relref "DeployOverwatch/SharingOverwatch.md"%}}) page.
+## Add workspace to existing Overwatch deployment
+When adding a new workspace, all you have to do is add a new row in the configuration table for Overwatch containing the 
+new workspace's information. Please go through the previous steps for cloud infrastructure and security considerations
+to keep in mind to ensure the driver workspace can monitor the new workspace
 
 ## Multi-Workspace Monitoring - Considerations
 As of 0.7.1.0 Overwatch is able to monitor remote workspaces but having one and only one global deployment often 
