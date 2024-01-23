@@ -1048,6 +1048,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("state", lit("TERMINATING_IMPUTED"))
 
 
+      // Join with Cluster Spec to get filter on automated cluster
       val clusterSpecDF = clusterSpec.asDF.withColumnRenamed("cluster_id","clusterID")
         .withColumn("isAutomated",isAutomated('cluster_name))
         .select("clusterID","cluster_name","isAutomated")
