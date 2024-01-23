@@ -12,19 +12,21 @@ date: 2022-12-12T11:29:59-05:00
 * [Mount Storage Accounts](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html)
 
 ## Configuring Overwatch on Azure Databricks
-Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
+Reach out to your Databricks representative to help you with these tasks as needed.
 <br>
-To get started, the [Basic Deployment](#configuring-the-event-hub-for-audit-log-delivery) configuration.
-As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.
+To get started, we suggest you deploy a single workspace end to end so that you can figure out the steps involved and you 
+can then apply these for the other workspaces to be deployed.
 
 There are two primary sources of data that need to be configured:
 * Audit Logs
-    * These will be delivered through Event Hubs. The audit logs contain data for every interaction within the environment
-      and are used to track the state of various objects through time along with which accounts interacted with them. This data
-      is relatively small and it certainly doesn't contain any large data sets like cluster/spark logs.
+    * The audit logs contain data for every interaction within the environment and are used to track the state of various 
+      objects through time along with which accounts interacted with them. This data is relatively small and it certainly 
+      doesn't contain any large data sets like cluster/spark logs.
+    * For ingesting this data, you have the option of using System tables (**RECOMMENDED**) or set up the delivery through Event Hubs
 * Cluster Logs - Crucial to get the most out of Overwatch
-    * These logs can get quite large and they are stored in a very inefficient format for query and long-term storage.
-      This is why it's crucial to create a dedicated storage account for these and ensure TTL (time-to-live) is enabled
+    * Cluster logs delivery location is configured in the cluster spec --> Advanced Options --> Logging. These logs can 
+      get quite large and they are stored in a very inefficient format for query and long-term storage.
+      This is why it's **crucial** to create a dedicated storage account for these and ensure TTL (time-to-live) is enabled
       to minimize long-term, unnecessary costs.
       It's not recommended to store these on DBFS directly (dbfs mount points are ok).
     * Best Practice - Multi-Workspace -- When multiple workspaces are using Overwatch within a single region it's best to
@@ -35,20 +37,13 @@ There are two primary sources of data that need to be configured:
 ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png)
 
 ## Reference Architecture
-As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details 
+Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details 
 on requirements see [Multi-Workspace Consideration]({{%relref "DeployOverwatch"%}}/#multi-workspace-monitoring---considerations). 
 There are many cases where some workspaces should be able to monitor many workspaces and others should only monitor 
 themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play, 
 this reference architecture can accommodate all of these needs. To learn more about the details walk through the 
 [deployment steps]({{%relref "DeployOverwatch"%}})
 ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)
-
-## Reference Architecture (Legacy)
-The legacy architecture method (pre 0.7.1.0) required that Overwtach be deployed as a job on all workspaces. Since 
-0.7.1 this is no longer the case. See [Reference Architecture](#reference-architecture)
-| Basic Deployment       | Multi-Region Deployment |
-| ---------------------- | ----------------------  |
-| ![BasicAzureArch](/images/EnvironmentSetup/Overwatch_Arch_Simple_Azure.png)| ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure_Legacy.png)|
 
 ### Audit Log Delivery via Event Hub
 * Audit Log Delivery

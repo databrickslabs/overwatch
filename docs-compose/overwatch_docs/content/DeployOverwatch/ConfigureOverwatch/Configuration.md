@@ -7,9 +7,10 @@ weight: 1
 
 ### How it works
 Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as 
-a csv format. This csv file will contain all the necessary details to perform the deployment. Since CSVs are a bit 
+a csv format or delta table. This configuration will contain all the necessary details to perform the deployment. Since CSVs are a bit 
 cantankerous we've offered two different methods for building the configuration file. If you're good at VSCode or 
-similar text editor and want to edit the CSV directly feel free to do so.
+similar text editor and want to edit the CSV directly feel free to do so. We **strongly** recommend that you create a delta 
+table with the csv file you just created and use that as your configuration input. 
 
 **IF YOU INTEND TO USE EXCEL (RECOMMENDED)** note that Excel may alter several pieces of the CSV; thus we recommend you **complete 
 all your edits in the .xlsx file** and then Save As a .csv extension. Before you upload the file spot-check the CSV 
