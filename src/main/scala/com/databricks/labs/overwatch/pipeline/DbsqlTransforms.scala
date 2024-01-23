@@ -163,11 +163,16 @@ object DbsqlTransforms extends SparkSessionWrapper {
       'warehouse_type
     )
 
-    val auditLogDfWithStructs = auditLogDf
+    val rawAuditLogDf = auditLogDf
       .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
         "editWarehouse", "deleteEndpoint", "deleteWarehouse")
         && responseSuccessFilter
         && 'serviceName === "databrickssql")
+
+    if(rawAuditLogDf.isEmpty)
+      throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
+
+    val auditLogDfWithStructs = rawAuditLogDf
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(warehouseSummaryCols: _*)
 
