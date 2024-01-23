@@ -7,6 +7,9 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 import scala.util.Random
+import java.util
+import java.util.Collections
+import scala.collection.JavaConverters._
 
 /**
  * SchemaTools is one of the more complex objects in Overwatch as it handles the schema (or lack there of rather)
@@ -535,6 +538,24 @@ object SchemaTools extends SparkSessionWrapper {
     } else { // no validation required
       validator
     }
+  }
+
+  /**
+   * Function to change to column's naming convention from snake case  to camel case
+   * For example: "cluster_id" to "clusterId" and "cluster_name" to "clusterName"
+   * @param df
+   * @return
+   */
+  def snakeToCamel(df: DataFrame) : DataFrame = {
+    val columnNames = df.columns.toSeq
+    var newColumnNames = Collections.synchronizedList(new util.ArrayList[String]())
+    columnNames.foreach(
+      x=>{
+        newColumnNames.add(x.split("_").head.concat(x.split("_").tail.map(_.capitalize).mkString("")))
+      }
+    )
+    val renamedCols = newColumnNames.asScala.toSeq
+    df.toDF(renamedCols:_*)
   }
 }
 

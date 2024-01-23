@@ -101,6 +101,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     val rawAuditPath = getOptionString(masterNode, "auditLogConfig.rawAuditPath")
     val auditLogFormat = getOptionString(masterNode, "auditLogConfig.auditLogFormat").getOrElse("json")
     val azureEventHubNode = getNodeFromPath(masterNode, "auditLogConfig.azureAuditLogEventhubConfig")
+    val systemTableName = getOptionString(masterNode, "auditLogConfig.systemTableName")
+    val sqlEndpoint= getOptionString(masterNode, "auditLogConfig.sqlEndpoint")
 
     val azureAuditEventHubConfig = if (azureEventHubNode.nonEmpty) {
       val node = azureEventHubNode.get
@@ -121,7 +123,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       None
     }
 
-    val auditLogConfig = AuditLogConfig(rawAuditPath, auditLogFormat, azureAuditEventHubConfig)
+    val auditLogConfig = AuditLogConfig(rawAuditPath, auditLogFormat, azureAuditEventHubConfig, systemTableName,
+    sqlEndpoint)
 
     val dataTarget = if (masterNode.has("dataTarget")) {
       Some(DataTarget(
@@ -194,7 +197,7 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
     } else {
       None
     }
-
+    val sql_endpoint = getOptionString(masterNode, "sqlEndpoint")
     OverwatchParams(
       auditLogConfig,
       token,
@@ -208,7 +211,8 @@ class ParamDeserializer() extends StdDeserializer[OverwatchParams](classOf[Overw
       workspace_name,
       externalizeOptimize,
       apiEnvConfig,
-      tempWorkingDir
+      tempWorkingDir,
+      sql_endpoint
     )
   }
 }

@@ -2,9 +2,11 @@ package com.databricks.labs.overwatch.api
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.utils.ApiEnv
-import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.log4j.{Level, Logger}
-import scalaj.http.{Http, HttpRequest}
+import org.json.JSONObject
+import scalaj.http.{Http, HttpRequest, HttpResponse}
 
 /**
  * Configuration for each API.
@@ -16,7 +18,7 @@ trait ApiMeta {
   protected var _paginationToken: String = _
   protected var _dataframeColumn: String = "*"
   protected var _apiCallType: String = _
-  protected var _storeInTempLocation = false
+  protected var _batchPersist  = false
   protected var _apiV = "api/2.0"
   protected var _isDerivePaginationLogic = false
   protected var _apiEnv: ApiEnv = _
@@ -33,7 +35,7 @@ trait ApiMeta {
 
   protected[overwatch] def apiCallType: String = _apiCallType
 
-  protected[overwatch] def storeInTempLocation: Boolean = _storeInTempLocation
+  protected[overwatch] def batchPersist : Boolean = _batchPersist
 
   protected[overwatch] def apiV: String = _apiV
 
@@ -55,8 +57,8 @@ trait ApiMeta {
     this
   }
 
-  private[overwatch] def setStoreInTempLocation(value: Boolean): this.type = {
-    _storeInTempLocation = value
+  private[overwatch] def setBatchPersist(value: Boolean): this.type = {
+    _batchPersist = value
     this
   }
 
@@ -147,7 +149,7 @@ trait ApiMeta {
        |paginationToken: ${paginationToken}
        |dataframeColumns: ${dataframeColumn}
        |apiCallType: ${apiCallType}
-       |storeInTempLocation: ${storeInTempLocation}
+       |storeInTempLocation: ${batchPersist}
        |apiV: ${apiV}
        |isDerivePaginationLogic: ${isDerivePaginationLogic}
        |""".stripMargin
@@ -161,6 +163,32 @@ trait ApiMeta {
   private[overwatch] def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
     logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
     Map[String, String]()
+  }
+
+  /**
+   * Function will add the meta info to the api response.
+   *
+   * @param response
+   * @param jsonQuery
+   * @param queryMap
+   * @return a string containing the api response and the meta for the api call.
+   */
+  private[overwatch] def enrichAPIResponse(response: HttpResponse[String], jsonQuery: String, queryMap: Map[String, String]): String = {
+    val filter: String = if (apiCallType.equals("POST")) jsonQuery else {
+      val mapper = new ObjectMapper()
+      mapper.registerModule(DefaultScalaModule)
+      mapper.writeValueAsString(queryMap)
+    }
+    val jsonObject = new JSONObject();
+    val apiTraceabilityMeta = new JSONObject();
+    apiTraceabilityMeta.put("endPoint", apiName)
+    apiTraceabilityMeta.put("type", apiCallType)
+    apiTraceabilityMeta.put("apiVersion", apiV)
+    apiTraceabilityMeta.put("responseCode", response.code)
+    apiTraceabilityMeta.put("batchKeyFilter", filter)
+    jsonObject.put("rawResponse", response.body.trim)
+    jsonObject.put("apiTraceabilityMeta", apiTraceabilityMeta)
+    jsonObject.toString
   }
 
 }
@@ -221,7 +249,7 @@ class SqlQueryHistoryApi extends ApiMeta {
   setPaginationToken("next_page_token")
   setDataframeColumn("res")
   setApiCallType("GET")
-  setStoreInTempLocation(true)
+  setBatchPersist(true)
   setIsDerivePaginationLogic(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
@@ -311,7 +339,7 @@ class ClusterEventsApi extends ApiMeta {
   setPaginationToken("next_page")
   setDataframeColumn("events")
   setApiCallType("POST")
-  setStoreInTempLocation(true)
+  setBatchPersist(true)
 
   private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long,jsonInput: Map[String, String]): Map[String, String] = {
     val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
@@ -342,7 +370,7 @@ class JobRunsApi extends ApiMeta {
   setPaginationKey("has_more")
   setPaginationToken("next_page_token")
   setIsDerivePaginationLogic(true)
-  setStoreInTempLocation(true)
+  setBatchPersist(true)
 
   private[overwatch] override def hasNextPage(jsonObject: JsonNode): Boolean = {
     jsonObject.get(paginationKey).asBoolean()

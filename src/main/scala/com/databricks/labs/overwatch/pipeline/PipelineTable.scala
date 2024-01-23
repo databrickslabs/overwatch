@@ -42,7 +42,8 @@ case class PipelineTable(
                           workspaceName: Boolean = true,
                           isTemp: Boolean = false,
                           checkpointPath: Option[String] = None,
-                          masterSchema: Option[StructType] = None
+                          masterSchema: Option[StructType] = None,
+                          excludedReconColumn: Array[String] = Array()
                         ) extends SparkSessionWrapper {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
