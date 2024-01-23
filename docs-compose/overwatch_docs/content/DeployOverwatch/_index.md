@@ -4,15 +4,6 @@ date: 2022-12-12T11:28:39-05:00
 weight: 2
 ---
 
-{{% notice warning%}}
-**EXISTING CUSTOMERS COMING FROM VERSION < 0.7.1.0** As of version 0.7.1.0 Overwatch will begin sunsetting
-the "legacy" deployment ([Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}}) | 
-[JAR]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}})) method and
-[Legacy Configuration]({{%relref "DeployOverwatch/ConfigureOverwatch/ConfigurationLegacy.md"%}}). Please review the
-benefits of using the new deployment method and plan to switch to this new deployment method by end of Q3 2023.
-**New customers may disregard this notice.**
-{{% /notice %}}
-
 Overwatch is a pipeline that executes to aggregate and normalize all of the logs from all the supported sources and 
 make them easy to interrogate for insights. The steps to deploying Overwatch are pretty simple but there are some 
 specific details that may pertain to your deployment. Below are the top level steps that this section will walk you 
@@ -64,7 +55,10 @@ When adding a new workspace, all you have to do is add a new row in the configur
 new workspace's information. Please go through the previous steps for cloud infrastructure and security considerations
 to keep in mind to ensure the driver workspace can monitor the new workspace
 
-## Multi-Workspace Monitoring - Considerations
+---
+
+## Other information pertaining to deployments
+### Multi-Workspace Monitoring - Considerations
 As of 0.7.1.0 Overwatch is able to monitor remote workspaces but having one and only one global deployment often 
 doesn't meet customer needs and there are some requirements for a deployment to monitor remote workspaces. More details 
 are available on the [Security Considerations]({{%relref "DeployOverwatch/ConfigureOverwatch/SecurityConsiderations.md"%}}) and 
@@ -79,17 +73,17 @@ need to be created for those outliers. It's completely fine to have a primary de
 a few workspaces that have to have their own Overwatch Job. The data from each deployment can be dropped into the same 
 or multiple targets, this is all part of the configuration.
 
-## Overwatch Landscapes
-### An Example Scenario
+### Overwatch Landscapes
+#### An Example Scenario
 Assume you have 23 workspaces, 20 of which meet the criteria discussed above and 3 that need to be locally configured. 
 All 23 workspaces an output their data into the same database (or multiple) but this would require that Overwatch run on 
 4 workspaces, 1 to manage the 20 and 1 on each of the 3 with special requirements.
 
-### Production
+#### Production
 Production can hold the data for all 23 workspaces even if some of the workspaces are deemed "non-prod". This is ideal 
 to allow an analyst to identify efficiency gains and metrics globally from a single location.
 
-### Non-Production
+#### Non-Production
 A non-prod Overwatch deployment is also recommended so that when new versions come out and/or schema upgrades come out 
 your team can review and test the upgrade and update any dependent dashboards before you upgrade all 23 workspaces. 
 
