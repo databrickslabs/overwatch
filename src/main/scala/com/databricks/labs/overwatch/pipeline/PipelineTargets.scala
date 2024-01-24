@@ -306,7 +306,7 @@ abstract class PipelineTargets(config: Config) {
       zOrderBy = Array("runId", "jobId"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       persistBeforeWrite = true,
-      excludedReconColumn = Array("requestDetails") //for system tables extra data are soming
+      excludedReconColumn = Array("requestDetails") //for system tables extra data are coming
     )
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
