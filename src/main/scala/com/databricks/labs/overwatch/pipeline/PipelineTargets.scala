@@ -84,7 +84,8 @@ abstract class PipelineTargets(config: Config) {
       _permitDuplicateKeys = false,
       _mode = WriteMode.merge,
       mergeScope = MergeScope.insertOnly,
-      masterSchema = Some(Schema.auditMasterSchema)
+      masterSchema = Some(Schema.auditMasterSchema),
+      excludedReconColumn = Array("hashKey","response","requestParams","userIdentity")// It will be different for system table
     )
 
     lazy private[overwatch] val auditLogAzureLandRaw: PipelineTable = PipelineTable(
@@ -304,7 +305,8 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
-      persistBeforeWrite = true
+      persistBeforeWrite = true,
+      excludedReconColumn = Array("requestDetails") //for system tables extra data are soming
     )
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
@@ -350,7 +352,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("request_details")
     )
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
@@ -358,7 +361,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("timestamp", "jobId", "actionName", "requestId"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("response")
     )
 
     lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable(
@@ -414,7 +418,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("request_details")
     )
 
     lazy private[overwatch] val poolsViewTarget: PipelineView = PipelineView(
@@ -428,7 +433,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("job_id", "unixTimeMS", "action", "request_id"),
       config,
       incrementalColumns = Array("unixTimeMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("response")
     )
 
     lazy private[overwatch] val jobViewTarget: PipelineView = PipelineView(
@@ -444,7 +450,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("request_detail")
     )
 
     lazy private[overwatch] val jobRunsViewTarget: PipelineView = PipelineView(
