@@ -66,7 +66,7 @@ are available on the [Security Considerations]({{%relref "DeployOverwatch/Config
 * Access to remote workspaces via API Token -- a token (PAT) authorizing access to the remote workspace is required to 
 be provisioned.
 * The Overwatch cluster must have direct read access (not via a mount point) to all cluster logging cloud storage
-* The remote workspace may not have more than 50 mount points
+* If you have more than 50 mountpoints, please follow the docs [here]({{%relref "DataEngineer/AdvancedTopics.md"%}}/#remote-workspaces-with-50-mounts-config-process)
 
 If some of your workspaces do not meet these requirements; that's ok, a local deployment with a simpler config will 
 need to be created for those outliers. It's completely fine to have a primary deployment that manages 20 workspaces and 
@@ -76,7 +76,7 @@ or multiple targets, this is all part of the configuration.
 ### Overwatch Landscapes
 #### An Example Scenario
 Assume you have 23 workspaces, 20 of which meet the criteria discussed above and 3 that need to be locally configured. 
-All 23 workspaces an output their data into the same database (or multiple) but this would require that Overwatch run on 
+All 23 workspaces output their data into the same database (or multiple) but this would require that Overwatch run on 
 4 workspaces, 1 to manage the 20 and 1 on each of the 3 with special requirements.
 
 #### Production
