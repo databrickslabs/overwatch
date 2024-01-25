@@ -249,14 +249,14 @@ to ensure there are no data gaps or overlaps.
 import com.databricks.labs.overwatch.utils.Helpers
 val workspace = Helpers.getWorkspaceByDatabase("overwatch_etl")
 val rollbackToTS = 1609416000000L // unix millis midnight Dec 31 2020
-val moudlesToRollback = Array(3005, 3015) // gold cost tables
+val modulesToRollback = Array(3005, 3015) // gold cost tables
 val isDryRun = true // switch to false when you're ready to run
 val rollbackStatusText = "DataRepair_Example" // text to appear in the status column after the rollback
 val workspaceIDs = Array("123", "456") // two workspaces to rollback the modules in
 // val workspaceIDs = Array("global") // use "global" to rollback all workspaces
 
 // Putting it all together
-Helpers.rollbackPipelineForModule(workspace, rollbackToTS, moudlesToRollback, workspaceIDs, isDryRun, rollbackStatusText)
+Helpers.rollbackPipelineForModule(workspace, rollbackToTS, modulesToRollback, workspaceIDs, isDryRun, rollbackStatusText)
 ```
 
 Steps -- Manual Method:
@@ -308,6 +308,6 @@ no new data is ingested into bronze, no modules outside of the two we rolled_bac
 will essentially be skipped resulting in the re-processing of only the two tables we're working on. 
 
 The main class parameters allows for a single pipeline (bronze, silver, or gold) or all to be run. Refer to the 
-[Getting Started - Run Via Main Class]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}}) for more 
+[Getting Started - Run Via Main Class]({{%relref "DeployOverwatch/RunningOverwatch/JAR.md"%}}/#main-class) for more 
 information on how to run a single pipeline from main class. The same can also be done via a notebook run, refer to 
-[Getting Started - Run Via Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}}) for more information on this.
+[Getting Started - Run Via Notebook]({{%relref "DeployOverwatch/RunningOverwatch/Notebook.md"%}}) for more information on this.

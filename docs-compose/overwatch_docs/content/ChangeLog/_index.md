@@ -4,6 +4,27 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.8.0.0 (Major Release)
+
+### Major Feature
+* First integration with System Tables! Now Overwatch can collect audit logs directly from System Tables. You can find 
+  the docs [here]({{%relref "DeployOverwatch/SystemTableIntegration"%}})
+ 
+### Bug Fixes
+In this version there were many bug fixes, as well as the development of internal tooling to help us validate new 
+releases. Some of the most notable bug fixes include:
+* Created a workaround for cases when job clusters are missing terminating cluster events. This fix is very important as 
+  it will improve the accuracy of the data. We recommend that you rollback and backprocess the data for modules 2019, 3005 and 3015.
+  If you need a step by step guide on how to do this, follow the steps [here](https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/)
+* Improve error handling for empty upstream sources for Gold_SparkStream, NotebookCommands, and SilverWarehouseSpec
+* Fixed `Helpers.getWorkspaceByDatabase` which was broken for retrieving remote workspaces 
+* Performance improvements for NotebookCommands
+* Added a notebook for troubleshooting configuration issues under [Troubleshooting](https://databrickslabs.github.io/overwatch/troubleshooting/) 
+
+Released Jan 25, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/31?closed=1)
+
+------------------------------------------------------------------------------------------------
+
 ## 0.7.2.2.1 (Patch)
 
 This patch addresses some critical fixes. If you ran versions 0721 or 0722, you need to run the upgrade script in 
@@ -328,7 +349,7 @@ the same as 0700 with the bug fixes closed in [PR 559](https://github.com/databr
   * DBSQL Query History is our first step into first-party support for DBSQL. Warehouses are expected to follow shortly
     but was unable to make the cut for this release
   * Be sure to enable the new scope "dbsql" or use the new
-    [0.7.0 Runner Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy"%}}/#jump-start-notebooks) to ensure you're loading
+    0.7.0 Runner Notebook to ensure you're loading
     the DBSQL tables if your workspace[s] are using DBSQL.
   * Limitation - Databricks does not publish Warehouse events yet and as such, explicit cost anlaysis is not yet
     possible for DBSQL. As soon as this is made available the Overwatch Dev team will begin work to integrate it.
@@ -638,7 +659,7 @@ Below are the major feature and enhancements in 0.4.2
   * Costing for additional SKUs were added to the configuration such that they can be tracked. Note that as of 0.4.2
     release, no calculation changes in costing as it relates to sku have yet been incorporated. These recalculations for
     jobs light and DatabricksSQL are in progress.
-* Enabled [Main class execution]({{%relref "DeployOverwatch/RunningOverwatch/JarLegacy"%}}/#via-main-class) to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily
+* Enabled Main class execution to execute only a single layer of the pipeline such as bronze / silver / gold. Primarily
   enabled for future enablement with jobs pipelines and for development / testing purposes.
   * User can now pass 2 arguments to the databricks job where the first is 'bronze', 'silver', or 'gold' and the second
     is the escaped configuration string and only that pipeline layer will execute.

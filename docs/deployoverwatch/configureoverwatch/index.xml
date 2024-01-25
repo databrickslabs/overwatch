@@ -13,7 +13,7 @@
       <pubDate>Mon, 12 Dec 2022 11:35:40 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
-      <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format. This csv file will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
+      <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format or delta table. This configuration will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
     </item>
     
     <item>
@@ -44,16 +44,6 @@ The node type (instanceDetails.Api_Name) and its associated contract price (inst
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</guid>
       <description>Deployment Validations Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below
 Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key.</description>
-    </item>
-    
-    <item>
-      <title>Configuration (Legacy)</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/</link>
-      <pubDate>Mon, 12 Dec 2022 11:35:49 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/</guid>
-      <description>NEW CUSTOMERS &amp;ndash; This is a legacy configuration, please use the new deployment model. EXISTING CUSTOMERS COMING FROM VERSION &amp;lt; 0.7.1.0 As of version 0.7.1.0 Overwatch will begin sunsetting this &amp;ldquo;legacy&amp;rdquo; deployment method and configuration. Please review the benefits of the new deployment method and plan to switch to this new deployment method by end of Q3 2023.
-Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.</description>
     </item>
     
     <item>
