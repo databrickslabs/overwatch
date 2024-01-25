@@ -9,7 +9,7 @@ weight: 4
 ### Major Feature
 * First integration with System Tables! Now Overwatch can collect audit logs directly from System Tables. You can find 
   the docs [here]({{%relref "DeployOverwatch/SystemTableIntegration"%}})
-
+ 
 ### Bug Fixes
 In this version there were many bug fixes, as well as the development of internal tooling to help us validate new 
 releases. Some of the most notable bug fixes include:
@@ -19,7 +19,9 @@ releases. Some of the most notable bug fixes include:
 * Improve error handling for empty upstream sources for Gold_SparkStream, NotebookCommands, and SilverWarehouseSpec
 * Fixed `Helpers.getWorkspaceByDatabase` which was broken for retrieving remote workspaces 
 * Performance improvements for NotebookCommands
-* Added a notebook for troubleshooting configuration issues under [Troubleshooting](https://databrickslabs.github.io/overwatch/troubleshooting/)
+* Added a notebook for troubleshooting configuration issues under [Troubleshooting](https://databrickslabs.github.io/overwatch/troubleshooting/) 
+
+Released Jan 25, 2024 - Full Change Inventory
 
 ------------------------------------------------------------------------------------------------
 
