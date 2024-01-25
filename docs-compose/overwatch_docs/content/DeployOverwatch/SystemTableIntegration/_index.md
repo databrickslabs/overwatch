@@ -21,7 +21,7 @@ audit logs, but in future releases, we will be expanding our integration to incl
 these documents to know more about 
 [System Table Audit Logs](https://docs.databricks.com/en/administration-guide/system-tables/audit-logs.html)
 
-Pros of Moving to System Table Integrations: 
+Advantages of Moving to System Table Integrations: 
 
 * **Seamless Integration with Overwatch**:
 System table integration seamlessly aligns with Overwatch.
@@ -44,14 +44,14 @@ The transition is smooth, minimizing disruptions and ensuring continuous monitor
 without requiring extensive reconfigurations.
 
 * **Extended Data Retention for Azure Deployments in Overwatch**:
-Particularly advantageous for Azure deployments within the Overwatch environment, the use of system tables extends the 
-audit log retention period beyond 30 days for audit log bronze. This eliminates the previous dependency on Events Hub, 
-which had periodic data flushing or deletion. Overwatch users can now access historical audit logs for extended periods,
-facilitating in-depth analysis and compliance reporting.
+Particularly advantageous for Overwatch Azure deployments, the use of system tables extends the 
+audit log retention period beyond 30 days for audit log bronze. This eliminates the previous dependency on Events Hub's
+retention period.
 
-
-
-## System Table Integration Specific Differences
+## System Table Integration Configuration Specific Differences
+As mentioned earlier, the deployment process is almost the same as other deployments. Therefore, the
+[Deployment Guide]({{%relref "DeployOverwatch"%}}) contains relevant information that will guide your deployment. 
+Specific deviations are referenced below and detailed in this section of the documentation.
 
 * [System Table Integration Pre-Requisites]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTablePreReq"%}})
 * [Configuration Details]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}})
@@ -69,8 +69,8 @@ Follow the below steps to migrate to System Table Integration:
 
 ## Fetching data from Multi Account System Table  
 
-With the introduction of this new feature in Overwatch, we have expanded the capabilities to fetch system table data 
-from multiple different accounts, enabling seamless multi-account deployments. This enhancement requires minimal 
-adjustments in configuration and additional infrastructure setup in the workspaces of other accounts.
+With the integration of System Table in Overwatch, fetching system table data from multiple different accounts 
+becomes easy, enabling seamless multi-account deployments. This setup requires minimal adjustments in 
+configuration and additional infrastructure setup in the workspaces of other accounts.
 Follow the link to configure 
 [Multi Account System Table Integration]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}}/#ConfigurationChangesRequiredForMultiAccountSystemTableIntegration)
