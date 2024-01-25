@@ -32,7 +32,9 @@ Note that there are two modules that simply cannot be linearly parallelized for 
 write-up. These limiting factors are only present in Bronze and thus one optimization is to utilize one cluster
 spec for bronze and another for silver/gold. To do this, utilize Databricks' [multi-task jobs feature](https://databricks.com/blog/2021/07/13/announcement-orchestrating-multiple-tasks-with-databricks-jobs-public-preview.html)
 to run into three steps and specify two cluster. To split the Overwatch Pipeline into bronze/silver/gold steps
-refer to the [Main Class Setup Configuration]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy"%}}/#via-main-class)
+refer to the [jar]({{%relref "DeployOverwatch/RunningOverwatch/JAR"%}}/#parameters) or 
+[notebook]({{%relref "DeployOverwatch/RunningOverwatch/notebook"%}}/#deployment-example) deployment method, 
+as pertintent
 * Bronze - small static (no autoscaling) cluster to trickle load slow modules
 * Silver/Gold - slightly larger (autoscaling enabled as needed) - cluster to blaze through the modules as
   silver and gold modules are nearly linearly scalable. Overwatch developers will continue to strive for linear

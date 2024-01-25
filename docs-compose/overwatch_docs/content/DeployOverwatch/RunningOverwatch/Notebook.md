@@ -10,48 +10,6 @@ rapid testing and validation.
 
 **This deployment method requires Overwatch Version 0.7.1.0+**
 
-### Converting Your Config From CSV To Delta
-**AS OF version 0.7.1.1** you may now use a **CSV** OR a **Delta Table** OR **Delta Path** for your config
-
-We heard you! Customers want to set up their initial config as a CSV to get all their workspaces configured but once 
-they're configured it's challenging to make small edits. Now you can convert your initial CSV to delta and instead of 
-referencing the path to a config.csv file instead reference a delta table or delta path to the location of your 
-config. This allows for simple update statements to switch records from *active == true* to *active == false* or 
-quickly disable scopes, etc. Below are the details of how to reference the relevant path and some code to quickly and 
-safely convert your CSV to a delta source. To do so just upgrade to 0.7.1.1+ and everywhere the docs reference the 
-config.csv switch it to reference the appropriate path.
-
-| Source Config Format | Path Reference                                 |
-|----------------------|------------------------------------------------|
-| CSV                  | dbfs:/myPath/overwatch/configs/prod_config.csv |
-| Delta Table          | database.overwatch_prod_config                 |
-| Delta Path           | dbfs:/myPath/overwatch/configs/prod_config     |
-
-**Convert To Delta Table** (Example)
-```scala
-spark.read
-  .option("header", "true")
-  .option("ignoreLeadingWhiteSpace", true)
-  .option("ignoreTrailingWhiteSpace", true)
-  .csv("/path/to/config.csv")
-  .coalesce(1)
-  .write.format("delta")
-  .saveAsTable("database.overwatch_prod_config")
-```
-
-**Convert To Delta Path** (Example)
-```scala
-spark.read
-  .option("header", "true")
-  .option("ignoreLeadingWhiteSpace", true)
-  .option("ignoreTrailingWhiteSpace", true)
-  .csv("/path/to/config.csv")
-  .coalesce(1)
-  .write.format("delta")
-  .save("/myPath/overwatch/configs/prod_config")
-```
-
-
 ### Jumpstart Notebook
 Below is an example deployment. When you're ready to get started simply download the rapid start linked notebook below.
 
