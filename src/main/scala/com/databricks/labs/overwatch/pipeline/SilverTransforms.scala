@@ -998,20 +998,23 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   def buildClusterStateDetail(
                                untilTime: TimeTypes,
-                               auditLogDF: DataFrame
+                               auditLogDF: DataFrame,
+                               jrsilverDF: DataFrame,
+                               clusterSpec: PipelineTable,
                              )(clusterEventsDF: DataFrame): DataFrame = {
     val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
     val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
+    val orderingWindow = Window.partitionBy('organization_id, 'cluster_id).orderBy(desc("timestamp"))
 
     val nonBillableTypes = Array(
-      "STARTING", "TERMINATING", "CREATING", "RESTARTING"
+      "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
     )
 
-    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because they
-    // occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
+    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because
+    // they occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
     // goal is to be certain about the 99th percentile
     val runningStates = Array(
       "STARTING", "INIT_SCRIPTS_STARTED", "RUNNING", "CREATING",
@@ -1020,13 +1023,47 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1)
       .over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
-    val clusterEventsBaseline = clusterEventsDF
+
+
+    val refinedClusterEventsDF = clusterEventsDF
       .selectExpr("*", "details.*")
       .drop("details")
       .withColumnRenamed("type", "state")
+
+    val clusterEventsFinal  = if (jrsilverDF.isEmpty || clusterSpec.asDF.isEmpty) {
+      refinedClusterEventsDF
+    }else{
+      val refinedClusterEventsDFFiltered = refinedClusterEventsDF
+        .withColumn("row", row_number().over(orderingWindow))
+        .filter('state =!= "TERMINATING" && 'row === 1)
+
+      val exceptClusterEventsDF1 = refinedClusterEventsDF.join(refinedClusterEventsDFFiltered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
+
+      val jrSilverAgg= jrsilverDF
+        .groupBy("clusterID")
+        .agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
+        .filter('end_run_time.isNotNull)
+
+      val joined = refinedClusterEventsDFFiltered.join(jrSilverAgg, refinedClusterEventsDFFiltered("cluster_id") === jrSilverAgg("clusterID"), "inner")
+        .withColumn("state", lit("TERMINATING_IMPUTED"))
+
+
+      // Join with Cluster Spec to get filter on automated cluster
+      val clusterSpecDF = clusterSpec.asDF.withColumnRenamed("cluster_id","clusterID")
+        .withColumn("isAutomated",isAutomated('cluster_name))
+        .select("clusterID","cluster_name","isAutomated")
+        .filter('isAutomated).dropDuplicates()
+
+      val jobClusterImputed = joined.join(clusterSpecDF,Seq("clusterID"),"inner")
+        .drop("row","clusterID","end_run_time","cluster_name","isAutomated")
+
+      refinedClusterEventsDF.union(jobClusterImputed)
+    }
+
+    val clusterEventsBaseline = clusterEventsFinal
       .withColumn(
         "runningSwitch",
-        when('state === "TERMINATING", lit(false))
+        when('state.isin("TERMINATING","TERMINATING_IMPUTED"), lit(false))
           .when('state.isin("CREATING", "STARTING"), lit(true))
           .otherwise(lit(null).cast("boolean")))
       .withColumn(
@@ -1117,11 +1154,11 @@ trait SilverTransforms extends SparkSessionWrapper {
     val stateBeforeRemoval = clusterEventsBaselineForRemovedCluster
       .withColumn("rnk",rank().over(window))
       .withColumn("rn", row_number().over(window))
-      .withColumn("unixTimeMS_state_end",when('state === "TERMINATING",'unixTimeMS_state_end).otherwise('deletion_timestamp))
+      .withColumn("unixTimeMS_state_end",when('state.isin("TERMINATING","TERMINATING_IMPUTED"),'unixTimeMS_state_end).otherwise('deletion_timestamp))
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     val stateDuringRemoval = stateBeforeRemoval
-      .withColumn("timestamp",when('state === "TERMINATING",'unixTimeMS_state_end+1).otherwise(col("deletion_timestamp")+1))
+      .withColumn("timestamp",when('state.isin("TERMINATING","TERMINATING_IMPUTED"),'unixTimeMS_state_end+1).otherwise(col("deletion_timestamp")+1))
       .withColumn("isRunning",lit(false))
       .withColumn("unixTimeMS_state_start",('timestamp))
       .withColumn("unixTimeMS_state_end",('timestamp))
@@ -1143,7 +1180,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     clusterEventsBaselineFinal
       .withColumn("counter_reset",
         when(
-          lag('state, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED") ||
+          lag('state, 1).over(stateUnboundW).isin("TERMINATING", "RESTARTING", "EDITED","TERMINATING_IMPUTED") ||
             !'isRunning, lit(1)
         ).otherwise(lit(0))
       )
@@ -1369,6 +1406,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     deriveInputForWarehouseBase(df,silver_warehouse_spec,auditBaseCols)
     .transform(deriveWarehouseBase())
-      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest))
+      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
   }
 }

@@ -19,6 +19,16 @@ abstract class PipelineTargets(config: Config) {
       "writeOpsMetrics, lastOptimizedTS, Pipeline_SnapTS, primordialDateString").split(", ")
   )
 
+  val apiEventsTarget: PipelineTable = PipelineTable(
+    name = "apiEventDetails",
+    _keys = Array("organization_id", "Overwatch_RunID", "endPoint"),
+    config = config,
+    incrementalColumns = Array("Pipeline_SnapTS"),
+    partitionBy = Array("organization_id", "endPoint"),
+    statsColumns = ("organization_id,endPoint").split(", ")
+  )
+
+
   lazy private[overwatch] val pipelineStateViewTarget: PipelineView = PipelineView(
     name = "pipReport",
     pipelineStateTarget,
@@ -74,7 +84,8 @@ abstract class PipelineTargets(config: Config) {
       _permitDuplicateKeys = false,
       _mode = WriteMode.merge,
       mergeScope = MergeScope.insertOnly,
-      masterSchema = Some(Schema.auditMasterSchema)
+      masterSchema = Some(Schema.auditMasterSchema),
+      excludedReconColumn = Array("hashKey","response","requestParams","userIdentity")// It will be different for system table
     )
 
     lazy private[overwatch] val auditLogAzureLandRaw: PipelineTable = PipelineTable(
@@ -86,7 +97,7 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("Pipeline_SnapTS"),
       zOrderBy = Array("Overwatch_RunID"),
       withOverwatchRunID = if (config.cloudProvider == "azure") false else true,
-      checkpointPath = if (config.cloudProvider == "azure")
+      checkpointPath = if (config.cloudProvider == "azure" && !config.auditLogConfig.systemTableName.isDefined)
         config.auditLogConfig.azureAuditLogEventhubConfig.get.auditRawEventsChk
       else None
     )
@@ -294,7 +305,8 @@ abstract class PipelineTargets(config: Config) {
       incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
       zOrderBy = Array("runId", "jobId"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
-      persistBeforeWrite = true
+      persistBeforeWrite = true,
+      excludedReconColumn = Array("requestDetails") //for system tables extra data are coming
     )
 
     lazy private[overwatch] val accountLoginTarget: PipelineTable = PipelineTable(
@@ -319,7 +331,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("timestamp", "cluster_id"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("timestamp")// It will be SnapTS in epoc
     )
 
     lazy private[overwatch] val clusterStateDetailTarget: PipelineTable = PipelineTable(
@@ -339,7 +352,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("request_details")
     )
 
     lazy private[overwatch] val dbJobsStatusTarget: PipelineTable = PipelineTable(
@@ -347,7 +361,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("timestamp", "jobId", "actionName", "requestId"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("response")
     )
 
     lazy private[overwatch] val notebookStatusTarget: PipelineTable = PipelineTable(
@@ -365,7 +380,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       _permitDuplicateKeys = false,
       incrementalColumns = Array("query_start_time_ms"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("Timestamp") //Timestamp is the pipelineSnapTs in epoc
     )
 
     lazy private[overwatch] val warehousesSpecTarget: PipelineTable = PipelineTable(
@@ -373,7 +389,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("timestamp", "warehouse_id"),
       config,
       incrementalColumns = Array("timestamp"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("Timestamp") //Timestamp is the pipelineSnapTs in epoc
     )
 
   }
@@ -401,7 +418,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       incrementalColumns = Array("timestamp"),
       statsColumns = Array("instance_pool_id", "instance_pool_name", "node_type_id"),
-      partitionBy = Seq("organization_id")
+      partitionBy = Seq("organization_id"),
+      excludedReconColumn = Array("request_details")
     )
 
     lazy private[overwatch] val poolsViewTarget: PipelineView = PipelineView(
@@ -415,7 +433,8 @@ abstract class PipelineTargets(config: Config) {
       _keys = Array("job_id", "unixTimeMS", "action", "request_id"),
       config,
       incrementalColumns = Array("unixTimeMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("response")
     )
 
     lazy private[overwatch] val jobViewTarget: PipelineView = PipelineView(
@@ -431,7 +450,8 @@ abstract class PipelineTargets(config: Config) {
       _mode = WriteMode.merge,
       zOrderBy = Array("job_id", "run_id"),
       incrementalColumns = Array("startEpochMS"),
-      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise")
+      partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
+      excludedReconColumn = Array("request_detail")
     )
 
     lazy private[overwatch] val jobRunsViewTarget: PipelineView = PipelineView(
@@ -509,7 +529,8 @@ abstract class PipelineTargets(config: Config) {
       partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
       maxMergeScanDates = 31, // 1 greater than clusterStateDetail
       incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
-      zOrderBy = Array("cluster_id", "unixTimeMS_state_start")
+      zOrderBy = Array("cluster_id", "unixTimeMS_state_start"),
+      excludedReconColumn = Array("driverSpecs","workerSpecs") //driverSpecs and workerSpecs contains PipelineSnapTs and runID
     )
 
     lazy private[overwatch] val clusterStateFactViewTarget: PipelineView = PipelineView(

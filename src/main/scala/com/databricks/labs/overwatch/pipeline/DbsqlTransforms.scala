@@ -58,9 +58,11 @@ object DbsqlTransforms extends SparkSessionWrapper {
    * @param warehouseBaseWMetaDF
    * @return
    */
-  def deriveWarehouseBaseFilled(isFirstRun: Boolean, bronzeWarehouseSnapUntilCurrent: DataFrame)
+  def deriveWarehouseBaseFilled(isFirstRun: Boolean,
+                                bronzeWarehouseSnapUntilCurrent: DataFrame,
+                                warehouseSpecSilver: PipelineTable)
                                 (warehouseBaseWMetaDF: DataFrame): DataFrame = {
-   val result =  if (isFirstRun) {
+   val result =  if (isFirstRun || warehouseSpecSilver.exists(dataValidation = true)) {
       val firstRunMsg = "Silver_WarehouseSpec -- First run detected, will impute warehouse state from bronze to derive " +
         "current initial state for all existing warehouses."
       logger.log(Level.INFO, firstRunMsg)
@@ -161,11 +163,16 @@ object DbsqlTransforms extends SparkSessionWrapper {
       'warehouse_type
     )
 
-    val auditLogDfWithStructs = auditLogDf
+    val rawAuditLogDf = auditLogDf
       .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
         "editWarehouse", "deleteEndpoint", "deleteWarehouse")
         && responseSuccessFilter
         && 'serviceName === "databrickssql")
+
+    if(rawAuditLogDf.isEmpty)
+      throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
+
+    val auditLogDfWithStructs = rawAuditLogDf
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(warehouseSummaryCols: _*)
 
