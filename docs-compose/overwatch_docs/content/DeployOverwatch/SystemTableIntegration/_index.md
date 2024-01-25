@@ -60,7 +60,7 @@ Specific deviations are referenced below and detailed in this section of the doc
 
 {{% notice warning %}}
 Once the deployment is migrated to System Tables, it cannot be reverted back to source the audit logs from S, GC Bucket
-or Azure Event Hubs.
+or Azure Event Hubs i.e Legacy Deployment.
 {{% /notice %}}
 The migration to system tables is straightforward. Organizations can effortlessly transition from existing 
 configurations to system table integrations, minimizing downtime and ensuring a smooth migration experience.
