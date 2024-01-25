@@ -21,7 +21,7 @@ releases. Some of the most notable bug fixes include:
 * Performance improvements for NotebookCommands
 * Added a notebook for troubleshooting configuration issues under [Troubleshooting](https://databrickslabs.github.io/overwatch/troubleshooting/) 
 
-Released Jan 25, 2024 - Full Change Inventory
+Released Jan 25, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/31?closed=1)
 
 ------------------------------------------------------------------------------------------------
 
