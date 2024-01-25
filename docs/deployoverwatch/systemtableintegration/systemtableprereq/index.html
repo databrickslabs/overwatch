@@ -9,7 +9,7 @@
 
     <link rel="icon" href="https://databrickslabs.github.io/overwatch/images/favicon.png" type="image/png">
 
-    <title>AWS :: Overwatch</title>
+    <title>System Table Pre-Requisites :: Overwatch</title>
 
     
     <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1706209853" rel="stylesheet">
@@ -38,7 +38,7 @@
 
 <script async defer src="https://buttons.github.io/buttons.js"></script>
   </head>
-  <body class="" data-url="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
+  <body class="" data-url="https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/">
     <nav id="sidebar" class="">
 
 
@@ -121,7 +121,7 @@
   
     
     <li data-nav-id="/deployoverwatch/cloudinfra/" title="Cloud Infrastructure" class="dd-item
-        parent
+        
         
         
         ">
@@ -189,7 +189,7 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item active">
+      <li data-nav-id="/deployoverwatch/cloudinfra/aws/" title="AWS" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/">
         AWS
         
@@ -663,7 +663,7 @@
   
     
     <li data-nav-id="/deployoverwatch/systemtableintegration/" title="System Table Integration" class="dd-item
-        
+        parent
         
         
         ">
@@ -710,7 +710,7 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/systemtableintegration/systemtableprereq/" title="System Table Pre-Requisites" class="dd-item ">
+      <li data-nav-id="/deployoverwatch/systemtableintegration/systemtableprereq/" title="System Table Pre-Requisites" class="dd-item active">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/">
         System Table Pre-Requisites
         
@@ -1109,7 +1109,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/'>Cloud Infrastructure</a> > AWS
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/'>System Table Integration</a> > System Table Pre-Requisites
           
         
           
@@ -1124,13 +1124,7 @@
                 
                     <div class="progress">
     <div class="wrapper">
-<nav id="TableOfContents">
-  <ul>
-    <li><a href="#configuring-overwatch-on-aws---databricks">Configuring Overwatch on AWS - Databricks</a></li>
-    <li><a href="#reference-architecture">Reference Architecture</a></li>
-    <li><a href="#with-databricks-billable-usage-delivery-logs">With Databricks Billable Usage Delivery Logs</a></li>
-  </ul>
-</nav>
+<nav id="TableOfContents"></nav>
     </div>
 </div>
 
@@ -1146,59 +1140,59 @@
           
             <h1>
               
-              AWS
+              System Table Pre-Requisites
             </h1>
           
 
         
 
 
-<h2 id="configuring-overwatch-on-aws---databricks">Configuring Overwatch on AWS - Databricks</h2>
-<p>Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.</p>
-<p>There are two primary sources of data that need to be configured:</p>
+<p>This section will walk you through the steps necessary as a prerequisite for System Table Integration with Overwatch.</p>
 <ul>
-<li><a href="https://docs.databricks.com/administration-guide/account-settings/audit-logs.html">Audit Logs-AWS</a>
+<li>
+<p><strong>Workspace</strong> should be <strong>UC enabled</strong> and <strong>System Table enabled</strong>. Enabling system tables is straightforward,
+you do need to have at least one unity-catalog enabled workspace. System tables must be enabled by an account admin.
+You can enable system tables using the Unity Catalog REST API.  Once enabled, the tables will appear in a catalog
+called system, which is included in every Unity Catalog metastore. In the system catalog you’ll see schemas such as
+access and billing that contain the system tables. Follow the documents to enable
+<a href="https://docs.databricks.com/en/administration-guide/system-tables/index.html#enable-system-tables">System Tables</a></p>
+</li>
+<li>
+<p>Overwatch Pipeline <strong>Cluster</strong> must be <strong>UC enabled</strong> (single user and Databricks runtime version &gt;= 11.3).</p>
+</li>
+<li>
+<p>For multi account deployment Overwatch Pipeline <strong>Cluster</strong> must be <strong>UC enabled</strong> (single user and Databricks runtime version &gt;= 13.3).</p>
+</li>
+<li>
+<p>Overwatch latest version(0.8.0.0) should be deployed in the workspace</p>
+</li>
+<li>
+<p>Principal (user/SP) executing the Overwatch Pipeline must have access to the catalog - <strong>system</strong> with privileges:</p>
 <ul>
-<li>The audit logs contain data for every interaction
-within the environment and are used to track the state of various objects through time along with which accounts
-interacted with them. This data is relatively small and delivery occurs infrequently which is why it&rsquo;s
-rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.</li>
-<li>For ingesting this data, you have the option of using System tables (<strong>RECOMMENDED</strong>) or you can configure the audit
-logs to be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be
-delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.
-We don&rsquo;t want multiple workspaces delivering into the same prefix.</li>
+<li>USE CATALOG</li>
+<li>USE SCHEMA</li>
+<li>SELECT</li>
 </ul>
 </li>
-<li>Cluster Logs - Crucial to get the most out of Overwatch
+<li>
+<p>Principal (user/SP) executing the Overwatch Pipeline must have access to the schema - <strong>access</strong> with privileges:</p>
 <ul>
-<li>Cluster logs delivery location is configured in the cluster spec &ndash;&gt; Advanced Options &ndash;&gt; Logging. These logs can
-get quite large and they are stored in a very inefficient format for query and long-term storage. As such, it&rsquo;s
-<strong>crucial</strong> to store these logs in the same region as the worker nodes for best results. Additionally, using dedicated
-buckets provides more flexibility when configuring TTL (time-to-live) to minimize long-term, unnecessary costs.
-It&rsquo;s not recommended to store these on DBFS directly.</li>
-<li>Best Practice - Multi-Workspace &ndash; When multiple workspaces are using Overwatch within a single region it&rsquo;s best to
-ensure that each are going to their own prefix, even if sharing a storage account. This greatly reduces Overwatch scan times
-as the log files build up. If scan times get too long, the TTL can be reduced or additional storage accounts can
-be created to increase read IOPS throughput (rarely necessary) intra-region.</li>
+<li>USE SCHEMA</li>
+<li>SELECT</li>
 </ul>
 </li>
+<li>
+<p>Principal (user/SP) executing the Overwatch Pipeline must have access to the table - <strong>audit</strong> with privileges:</p>
+<ul>
+<li>SELECT</li>
 </ul>
-<h2 id="reference-architecture">Reference Architecture</h2>
-<p>As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from one or more workspaces. For more details
-on requirements see <a href="https://databrickslabs.github.io/overwatch/deployoverwatch//#multi-workspace-monitoring---considerations">Multi-Workspace Consideration</a>.
-There are many cases where some workspaces should be able to monitor many workspaces and others should only monitor
-themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play,
-this reference architecture can accommodate all of these needs. To learn more about the details walk through the
-<a href="https://databrickslabs.github.io/overwatch/deployoverwatch/">deployment steps</a>
-<img src="https://databrickslabs.github.io/overwatch/images/EnvironmentSetup/Overwatch_Arch_AWS.png" alt="AzureArch"></p>
-<h2 id="with-databricks-billable-usage-delivery-logs">With Databricks Billable Usage Delivery Logs</h2>
-<p>Detailed costs data
-<a href="https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html">directly from Databricks</a>.
-This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn&rsquo;t support this just yet,
-if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
-to load all the historical data from the day that you began receiving it.</p>
-<p>In the meantime, it&rsquo;s easy to join these up with the Overwatch data for cost validation and / or exact cost break
-down by dimensions not supported in the usage logs.</p>
+</li>
+<li>
+<p>Other overwatch prerequisites can be found <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/">here</a></p>
+</li>
+</ul>
+<p>Once all System Table Integration Pre-requisites are completed, please continue to <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/">Deploy Overwatch</a>
+section.</p>
 
 
 <footer class="footline">
@@ -1252,6 +1246,8 @@ down by dimensions not supported in the usage logs.</p>
             
                 
                     
+                        
+                        
                     
                 
                 
@@ -1266,8 +1262,21 @@ down by dimensions not supported in the usage logs.</p>
             
                 
                     
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
                         
-                        
+            
+            
+                
                     
                 
                 
@@ -1296,23 +1305,6 @@ down by dimensions not supported in the usage logs.</p>
             
         
                     
-                        
-            
-            
-                
-                    
-                    
-                
-                
-
-                    
-                    
-                    
-
-                    
-            
-        
-                    
             
         
                     
@@ -1320,9 +1312,6 @@ down by dimensions not supported in the usage logs.</p>
             
             
                 
-                    
-                        
-                        
                     
                 
                 
@@ -1619,6 +1608,7 @@ down by dimensions not supported in the usage logs.</p>
             
                 
                     
+                    
                 
                 
 
@@ -1632,6 +1622,9 @@ down by dimensions not supported in the usage logs.</p>
             
                 
                     
+                        
+                        
+                    
                 
                 
 
@@ -1648,6 +1641,7 @@ down by dimensions not supported in the usage logs.</p>
             
                 
                     
+                    
                 
                 
 
@@ -1669,6 +1663,9 @@ down by dimensions not supported in the usage logs.</p>
             
             
                 
+                    
+                        
+                        
                     
                 
                 
@@ -1878,10 +1875,10 @@ down by dimensions not supported in the usage logs.</p>
 	 
 	 
 		
-			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/" title="Azure"> <i class="fa fa-chevron-left"></i></a>
+			<a class="nav nav-prev" href="https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/" title="System Table Configuration"> <i class="fa fa-chevron-left"></i></a>
 		
 		
-			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/" title="Configure Overwatch" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+			<a class="nav nav-next" href="https://databrickslabs.github.io/overwatch/dataengineer/" title="Data Engineering" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
 		
 	
     </div>

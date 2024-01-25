@@ -6,7 +6,7 @@
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en</language>
-    <lastBuildDate>Thu, 07 Sep 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 23 Jan 2024 16:30:21 +0530</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>AWS</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
@@ -35,7 +35,7 @@ AWS IAM Role required for Storage Credentials This IAM Role to authorize access 
       <pubDate>Mon, 12 Dec 2022 11:35:40 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
-      <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format. This csv file will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
+      <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format or delta table. This configuration will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
     </item>
     
     <item>
@@ -79,7 +79,7 @@ The node type (instanceDetails.Api_Name) and its associated contract price (inst
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
       <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.
 This deployment method requires Overwatch Version 0.7.1.0+
-Converting Your Config From CSV To Delta AS OF version 0.7.1.1 you may now use a CSV OR a Delta Table OR Delta Path for your config</description>
+Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
     </item>
     
     <item>
@@ -124,10 +124,10 @@ etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;g
       <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+
 Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner
 Dependent Library com.databricks.labs:overwatch_2.12:0.7.x.x
-com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only)
-com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH)
+com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only - If not using system tables)
+com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH, if not using system tables)
 Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following
-&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .csv) &amp;ldquo;dbfs:/path/to/deltaTable&amp;rdquo; &amp;ndash; path to a delta table containing the config &amp;ldquo;myDatabase.</description>
+&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .</description>
     </item>
     
     <item>
@@ -169,16 +169,6 @@ If using a Hive Metastore you may still need to review your grants to ensure use
     </item>
     
     <item>
-      <title>As A Notebook (Legacy)</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/</link>
-      <pubDate>Mon, 12 Dec 2022 12:04:43 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebooklegacy/</guid>
-      <description>As of version 0.7.1.0 Overwatch will begin sunsetting this deployment method. Please reference Running A Job As A Notebook for the updated method for deploying Overwatch. This method will likely be deprecated in Overwatch version 0.8 and no longer be supported in 0.9.
-The new deployment method provides support for a &amp;ldquo;single-workspace deployment&amp;rdquo; or &amp;ldquo;multi-workspace deployment&amp;rdquo; where a single Overwatch job is configured and loads data from all workspaces. More details available in Running A Job As A Notebook.</description>
-    </item>
-    
-    <item>
       <title>Validation</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</link>
       <pubDate>Mon, 12 Dec 2022 11:36:53 -0500</pubDate>
@@ -194,18 +184,8 @@ Validation rules Name Validation Rule Impacted columns Api Url Validation API UR
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
-      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. The general upgrade process is:
-Use the compactString of parameters to instantiate the workspace The compact string can be found in your original runner notebook which you got from here Call the upgrade function for the version to which you&amp;rsquo;re upgrading and pass in the workspace object Basic pseudocode can be found below as a reference.</description>
-    </item>
-    
-    <item>
-      <title>As A JAR (Legacy)</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/</link>
-      <pubDate>Tue, 13 Dec 2022 16:09:07 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jarlegacy/</guid>
-      <description>As of version 0.7.1.0 Overwatch will begin sunsetting this deployment method. Please reference Running A Job As A Jar for the updated method for deploying Overwatch. This method will likely be deprecated in Overwatch version 0.8 and no longer be supported in 0.9.
-The new deployment method provides support for a &amp;ldquo;single-workspace deployment&amp;rdquo; or &amp;ldquo;multi-workspace deployment&amp;rdquo; where a single Overwatch job is configured and loads data from all workspaces. More importantly, there are at most 3 parameters that can be passed in much more simplistically.</description>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. Basic pseudocode can be found below as a reference. For actual version upgrade scripts please reference the upgrade scripts linked to your target version in the Changelog.
+When a schema upgrade is required between versions, this step cannot be skipped.</description>
     </item>
     
     <item>
@@ -229,6 +209,27 @@ Many users forget to enable cluster logging and without it Overwatch cannot prov
     </item>
     
     <item>
+      <title>System Table Configuration</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</link>
+      <pubDate>Tue, 23 Jan 2024 16:30:21 +0530</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</guid>
+      <description>Configuration changes required for System Table Integration There is no unique configuration process for System Table. The only change required to the configuration for integration is below -
+auditlogprefix_source_path - Instead of adding a fully qualified path (s3 or GC) for auditlog, add keyword system in this column. This will enable the system table integration. For all other configurations, please follow the Configuration
+Once the customer migrate to system table (version 0.</description>
+    </item>
+    
+    <item>
+      <title>System Table Pre-Requisites</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</link>
+      <pubDate>Tue, 23 Jan 2024 16:27:22 +0530</pubDate>
+      
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</guid>
+      <description>This section will walk you through the steps necessary as a prerequisite for System Table Integration with Overwatch.
+Workspace should be UC enabled and System Table enabled. Enabling system tables is straightforward, you do need to have at least one unity-catalog enabled workspace. System tables must be enabled by an account admin. You can enable system tables using the Unity Catalog REST API. Once enabled, the tables will appear in a catalog called system, which is included in every Unity Catalog metastore.</description>
+    </item>
+    
+    <item>
       <title>GCP</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/</link>
       <pubDate>Thu, 07 Sep 2023 00:00:00 +0000</pubDate>
@@ -240,22 +241,12 @@ Audit Logs-GCP These will be delivered to the configured bucket. These buckets a
     </item>
     
     <item>
-      <title>Configuration (Legacy)</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/</link>
-      <pubDate>Mon, 12 Dec 2022 11:35:49 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configurationlegacy/</guid>
-      <description>NEW CUSTOMERS &amp;ndash; This is a legacy configuration, please use the new deployment model. EXISTING CUSTOMERS COMING FROM VERSION &amp;lt; 0.7.1.0 As of version 0.7.1.0 Overwatch will begin sunsetting this &amp;ldquo;legacy&amp;rdquo; deployment method and configuration. Please review the benefits of the new deployment method and plan to switch to this new deployment method by end of Q3 2023.
-Configuration Basics The Overwatch configuration can be created as a case class of OverwatchParams or as a json string passed into the main class com.</description>
-    </item>
-    
-    <item>
       <title>Azure</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/</link>
       <pubDate>Mon, 12 Dec 2022 11:29:59 -0500</pubDate>
       
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/</guid>
-      <description>Fast Travel Configuring Overwatch on Azure Databricks Reference Architecture Reference Architecture (Legacy) Configuring Audit Log Delivery Through Event Hub Setting up Storage Accounts Mount Storage Accounts Configuring Overwatch on Azure Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed. To get started, the Basic Deployment configuration. As more modules are enabled, additional environment configuration may be required in addition to the Basic Deployment.</description>
+      <description>Fast Travel Configuring Overwatch on Azure Databricks Reference Architecture Reference Architecture (Legacy) Configuring Audit Log Delivery Through Event Hub Setting up Storage Accounts Mount Storage Accounts Configuring Overwatch on Azure Databricks Reach out to your Databricks representative to help you with these tasks as needed. To get started, we suggest you deploy a single workspace end to end so that you can figure out the steps involved and you can then apply these for the other workspaces to be deployed.</description>
     </item>
     
     <item>
@@ -266,7 +257,7 @@ Configuration Basics The Overwatch configuration can be created as a case class 
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</guid>
       <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
 There are two primary sources of data that need to be configured:
-Audit Logs-AWS These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions.</description>
+Audit Logs-AWS The audit logs contain data for every interaction within the environment and are used to track the state of various objects through time along with which accounts interacted with them. This data is relatively small and delivery occurs infrequently which is why it&amp;rsquo;s rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.</description>
     </item>
     
     <item>
