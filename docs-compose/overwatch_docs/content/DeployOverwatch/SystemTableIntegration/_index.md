@@ -3,11 +3,6 @@ title: "System Table Integration"
 date: 2024-01-22T19:35:23+05:30
 ---
 
-{{% notice note %}}
-At this time Overwatch only supports System Table Integration with AWS and Azure. 
-Currently System Table Integration is not supported on GCP.
-{{% /notice %}}
-
 Databricks system tables offer a robust mechanism for managing and understanding the intricacies of a Databricks 
 environment. From metadata exploration to performance optimization and security auditing, these tables provide a 
 comprehensive foundation for users and administrators to derive valuable insights and make informed decisions in a 
@@ -31,12 +26,8 @@ comprehensive monitoring and analysis.
 * **Simplified Setup within Overwatch**:
 Integration with system tables leads to a simplified setup within Overwatch. The need to configure audit log settings 
 independently within the Overwatch configurations is eliminated. This simplicity ensures a more user-friendly experience
-for both setup and ongoing management. 
-
-* **Reduced Dependency on IAM Roles and Service Accounts**:
-The move to system table integrations diminishes the necessity for setting up extra IAM roles or service accounts 
-specifically for audit log management within Overwatch. This reduction in dependencies streamlines the integration 
-process, enhancing the overall efficiency of the tool.
+for both setup and ongoing management. This also diminishes the necessity for setting up extra IAM roles or service accounts
+specifically for audit log management within Overwatch.
 
 * **Effortless Migration**:
 The migration process to system tables is designed to be effortless within the Overwatch framework. 

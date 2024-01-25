@@ -30,7 +30,6 @@ Please use the template for your version. If you are upgrading from 071x to 072x
 will upgrade the script for you.
 * 0.8.0.x+ ([.XLSX](/assets/DeployOverwatch/080x_overwatch_deployment_config_template.xlsx) |
   [.CSV](/assets/DeployOverwatch/080x_overwatch_deployment_config_template.csv))
-  * Use this configuration for **multi account System Table Integration**
   * Added sql_endpoint column for multi account deployment
 * 0.7.2.x+ ([.XLSX](/assets/DeployOverwatch/072x_overwatch_deployment_config_template.xlsx) |
   [.CSV](/assets/DeployOverwatch/072x_overwatch_deployment_config_template.csv))
