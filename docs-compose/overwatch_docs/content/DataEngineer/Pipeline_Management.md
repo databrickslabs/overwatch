@@ -308,6 +308,6 @@ no new data is ingested into bronze, no modules outside of the two we rolled_bac
 will essentially be skipped resulting in the re-processing of only the two tables we're working on. 
 
 The main class parameters allows for a single pipeline (bronze, silver, or gold) or all to be run. Refer to the 
-[Getting Started - Run Via Main Class]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy.md"%}}) for more 
+[Getting Started - Run Via Main Class]({{%relref "DeployOverwatch/RunningOverwatch/JAR.md"%}}/#main-class) for more 
 information on how to run a single pipeline from main class. The same can also be done via a notebook run, refer to 
-[Getting Started - Run Via Notebook]({{%relref "DeployOverwatch/RunningOverwatch/NotebookLegacy.md"%}}) for more information on this.
+[Getting Started - Run Via Notebook]({{%relref "DeployOverwatch/RunningOverwatch/Notebook.md"%}}) for more information on this.

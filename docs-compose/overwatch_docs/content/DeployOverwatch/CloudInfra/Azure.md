@@ -37,7 +37,7 @@ There are two primary sources of data that need to be configured:
 ![AzureClusterLogging](/images/EnvironmentSetup/Cluster_Logs_Azure.png)
 
 ## Reference Architecture
-Overwatch can be deployed on a single workspace and retrieve data from all workspaces. For more details 
+As of 0.7.1 Overwatch can be deployed on a single workspace and retrieve data from one or more workspaces. For more details 
 on requirements see [Multi-Workspace Consideration]({{%relref "DeployOverwatch"%}}/#multi-workspace-monitoring---considerations). 
 There are many cases where some workspaces should be able to monitor many workspaces and others should only monitor 
 themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play, 
