@@ -7,9 +7,10 @@ weight: 1
 
 ### How it works
 Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as 
-a csv format. This csv file will contain all the necessary details to perform the deployment. Since CSVs are a bit 
+a csv format or delta table. This configuration will contain all the necessary details to perform the deployment. Since CSVs are a bit 
 cantankerous we've offered two different methods for building the configuration file. If you're good at VSCode or 
-similar text editor and want to edit the CSV directly feel free to do so.
+similar text editor and want to edit the CSV directly feel free to do so. We **strongly** recommend that you create a delta 
+table with the csv file you just created and use that as your configuration input. 
 
 **IF YOU INTEND TO USE EXCEL (RECOMMENDED)** note that Excel may alter several pieces of the CSV; thus we recommend you **complete 
 all your edits in the .xlsx file** and then Save As a .csv extension. Before you upload the file spot-check the CSV 
@@ -110,3 +111,43 @@ Ensure the dependent library for AAD Auth is attached `com.microsoft.azure:msal4
 | aad_client_secret_key  | String | True (**AZURE**) | Name of the key in the <secret_scope> that holds the SPN secret for the Service principle.                 |
 | aad_authority_endpoint | String | True (**AZURE**) | Endpoint of the authority. Default value is "https://login.microsoftonline.com/"                           |
 
+### Converting Your Config From CSV To Delta (STRONGLY RECOMMENDED)
+**AS OF version 0.7.1.1** you may now use a **CSV** OR a **Delta Table** OR **Delta Path** for your config
+
+We heard you! Customers want to set up their initial config as a CSV to get all their workspaces configured but once
+they're configured it's challenging to make small edits. Now you can convert your initial CSV to delta and instead of
+referencing the path to a config.csv file instead reference a delta table or delta path to the location of your
+config. This allows for simple update statements to switch records from *active == true* to *active == false* or
+quickly disable scopes, etc. Below are the details of how to reference the relevant path and some code to quickly and
+safely convert your CSV to a delta source. To do so just upgrade to 0.7.1.1+ and everywhere the docs reference the
+config.csv switch it to reference the appropriate path.
+
+| Source Config Format | Path Reference                                 |
+|----------------------|------------------------------------------------|
+| CSV                  | dbfs:/myPath/overwatch/configs/prod_config.csv |
+| Delta Table          | database.overwatch_prod_config                 |
+| Delta Path           | dbfs:/myPath/overwatch/configs/prod_config     |
+
+**Convert To Delta Table** (Example)
+```scala
+spark.read
+  .option("header", "true")
+  .option("ignoreLeadingWhiteSpace", true)
+  .option("ignoreTrailingWhiteSpace", true)
+  .csv("/path/to/config.csv")
+  .coalesce(1)
+  .write.format("delta")
+  .saveAsTable("database.overwatch_prod_config")
+```
+
+**Convert To Delta Path** (Example)
+```scala
+spark.read
+  .option("header", "true")
+  .option("ignoreLeadingWhiteSpace", true)
+  .option("ignoreTrailingWhiteSpace", true)
+  .csv("/path/to/config.csv")
+  .coalesce(1)
+  .write.format("delta")
+  .save("/myPath/overwatch/configs/prod_config")
+```

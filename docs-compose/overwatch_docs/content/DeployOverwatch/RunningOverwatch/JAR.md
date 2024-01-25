@@ -13,9 +13,9 @@ The main class for job is `com.databricks.labs.overwatch.MultiWorkspaceRunner`<b
 ### Dependent Library
 `com.databricks.labs:overwatch_2.12:0.7.x.x`
 
-`com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21` **(Azure only)**
+`com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21` **(Azure only - If not using system tables)**
 
-`com.microsoft.azure:msal4j:1.10.1` **(Azure Only - With AAD Auth For EH)**
+`com.microsoft.azure:msal4j:1.10.1` **(Azure Only - With AAD Auth For EH, if not using system tables)**
 
 ### Parameters
 

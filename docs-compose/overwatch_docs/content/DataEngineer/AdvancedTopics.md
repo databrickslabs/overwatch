@@ -32,7 +32,9 @@ Note that there are two modules that simply cannot be linearly parallelized for 
 write-up. These limiting factors are only present in Bronze and thus one optimization is to utilize one cluster
 spec for bronze and another for silver/gold. To do this, utilize Databricks' [multi-task jobs feature](https://databricks.com/blog/2021/07/13/announcement-orchestrating-multiple-tasks-with-databricks-jobs-public-preview.html)
 to run into three steps and specify two cluster. To split the Overwatch Pipeline into bronze/silver/gold steps
-refer to the [Main Class Setup Configuration]({{%relref "DeployOverwatch/RunningOverwatch/JARLegacy"%}}/#via-main-class)
+refer to the [jar]({{%relref "DeployOverwatch/RunningOverwatch/JAR"%}}/#parameters) or 
+[notebook]({{%relref "DeployOverwatch/RunningOverwatch/notebook"%}}/#deployment-example) deployment method, 
+as pertintent
 * Bronze - small static (no autoscaling) cluster to trickle load slow modules
 * Silver/Gold - slightly larger (autoscaling enabled as needed) - cluster to blaze through the modules as
   silver and gold modules are nearly linearly scalable. Overwatch developers will continue to strive for linear
@@ -383,3 +385,54 @@ metricDf.toTSDF("timestamp", "cluster_id")
   .df
   .show(20, false)
 ```
+
+## Using Overwatch Data to enrich realtime monitoring
+{{% notice note %}}
+A supported **TSDB** (time-series database) is required to enable and integrate this. Databricks cannot provide
+support for deployment / configuration of TSDBs but can assist in integrating Databricks clusters
+with supported TSDBs. Supported TSDBs include:
+* Graphite
+* Prometheus
+* LogAnalytics (Azure)
+  {{% /notice %}}
+
+Overwatch is often integrated with real-time solutions to enhance the data provided as raw Spark Metrics. For example,
+you may be monitoring jobs in real-time but want job_names instead of job_ids, Overwatch's slow-changing dimensions
+can enhance this.
+
+Real-time monitoring usually comes from at least two different sources:
+* spark via [DropWizard](https://spark.apache.org/docs/latest/monitoring.html#metrics) (a default spark monitoring platform)
+* machine metrics via [collectd](https://collectd.org/) or some native cloud solutions such as CloudWatch or LogAnalytics.
+
+These real-time metrics can be captured as quickly as 5s intervals but it's critical to note that proper
+historization is a must for higher intervals; furthermore, it's critical to configure the metrics at the "correct"
+interval for your business needs. In other words, it can get quickly get expensive to load all metrics at 5s
+intervals. All of these details are likely common knowledge to a team that manages a time-series database (TSDB).
+
+Below is a scalable, reference architecture using Graphite and Grafana to capture these metrics. Overwatch
+creates several daily JSON time-series compatible exports to Grafana JSON that provide slow-changing dimensional
+lookups between real-time keys and dimensional values through joins for enhanced dashboards.
+
+Below is a link to a notebook offering samples for integrating Spark and machine metrics to some real-time
+infrastructure endpoint. The examples in this notebook offer examples to Prometheus, Graphite, and Log Analytics
+for Spark Metrics and collectD for machine metrics. **Critical** this is just a sample for review, this
+notebook is intended as a reference to guide you to creating your own implementation, you must
+create a script to be valid for your requirements and capture the right metrics and the right intervals for
+the namespaces from which you wish to capture metrics.
+
+Realtime Getting Started Reference Notebook [**HTML**](/assets/_index/realtime_helpers.html) | [**DBC**](/assets/_index/realtime_helpers.dbc)
+
+{{% notice note %}}
+The realtime reference architecture has been validated but 1-click delivery has not yet been enabled. The
+time-series database / infrastructure setup is the responsibility of the customer; Databricks can assist with
+integrating the spark metrics delivery with customer infrastructure but Databricks cannot offer much depth for
+standing up / configuring the real-time infrastructure itself.
+{{% /notice %}}
+
+#### Example Realtime Architecture
+![RealTime Diagram](/images/_index/Realtime_example_architecture.png)
+
+#### Example Realtime Dashboards
+Simple Spark Dashboard | IO Dashboard | Advanced Dashboard
+:-------------------------:|:-------------------------:|:-------------------------:
+![RealTime Dasboard1](/images/_index/spark_dashboard1.png) | ![RealTime Dasboard2](/images/_index/spark_dashboard2.png) | ![RealTime Dasboard3](/images/_index/spark_dashboard3.png)
