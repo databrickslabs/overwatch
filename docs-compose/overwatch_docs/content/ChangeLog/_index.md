@@ -4,6 +4,22 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.8.0.0 (Major Release)
+
+### Major Feature
+* First integration with System Tables! Now Overwatch can collect audit logs directly from System Tables.
+
+### Bug Fixes
+In this version there were many bug fixes, as well as the development of internal tooling to help us validate new 
+releases. Some of the most notable bug fixes include:
+* Created a workaround for cases when job clusters are missing terminating cluster events. This fix is very important as 
+  it will improve the accuracy of the data. We recommend that you rollback and backprocess the data for modules 2019, 3005 and 3015.
+  If you need a step by step guide on how to do this, follow the steps [here](https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/)
+* Improve error handling for empty upstream sources for Gold_SparkStream, NotebookCommands, and SilverWarehouseSpec
+* Fixed `Helpers.getWorkspaceByDatabase` which was broken for retrieving remote workspaces 
+
+------------------------------------------------------------------------------------------------
+
 ## 0.7.2.2.1 (Patch)
 
 This patch addresses some critical fixes. If you ran versions 0721 or 0722, you need to run the upgrade script in 
