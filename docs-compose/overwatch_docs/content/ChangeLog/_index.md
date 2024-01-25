@@ -7,7 +7,8 @@ weight: 4
 ## 0.8.0.0 (Major Release)
 
 ### Major Feature
-* First integration with System Tables! Now Overwatch can collect audit logs directly from System Tables.
+* First integration with System Tables! Now Overwatch can collect audit logs directly from System Tables. You can find 
+  the docs [here]({{%relref "DeployOverwatch/SystemTableIntegration"%}})
 
 ### Bug Fixes
 In this version there were many bug fixes, as well as the development of internal tooling to help us validate new 
@@ -17,6 +18,8 @@ releases. Some of the most notable bug fixes include:
   If you need a step by step guide on how to do this, follow the steps [here](https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/)
 * Improve error handling for empty upstream sources for Gold_SparkStream, NotebookCommands, and SilverWarehouseSpec
 * Fixed `Helpers.getWorkspaceByDatabase` which was broken for retrieving remote workspaces 
+* Performance improvements for NotebookCommands
+* Added a notebook for troubleshooting configuration issues under [Troubleshooting](https://databrickslabs.github.io/overwatch/troubleshooting/)
 
 ------------------------------------------------------------------------------------------------
 

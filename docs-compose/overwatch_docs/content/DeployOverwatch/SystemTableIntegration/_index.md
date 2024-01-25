@@ -26,8 +26,7 @@ comprehensive monitoring and analysis.
 * **Simplified Setup within Overwatch**:
 Integration with system tables leads to a simplified setup within Overwatch. The need to configure audit log settings 
 independently within the Overwatch configurations is eliminated. This simplicity ensures a more user-friendly experience
-for both setup and ongoing management. This also diminishes the necessity for setting up extra IAM roles or service accounts
-specifically for audit log management within Overwatch.
+for both setup and ongoing management. 
 
 * **Effortless Migration**:
 The migration process to system tables is designed to be effortless within the Overwatch framework. 
@@ -39,10 +38,10 @@ Particularly advantageous for Overwatch Azure deployments, the use of system tab
 audit log retention period beyond 30 days for audit log bronze. This eliminates the previous dependency on Events Hub's
 retention period.
 
-## System Table Integration Configuration Specific Differences
+## System Table Integration Specific Configuration Details
 As mentioned earlier, the deployment process is almost the same as other deployments. Therefore, the
 [Deployment Guide]({{%relref "DeployOverwatch"%}}) contains relevant information that will guide your deployment. 
-Specific deviations are referenced below and detailed in this section of the documentation.
+Specific differences are referenced below and detailed in this section of the documentation.
 
 * [System Table Integration Pre-Requisites]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTablePreReq"%}})
 * [Configuration Details]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}})

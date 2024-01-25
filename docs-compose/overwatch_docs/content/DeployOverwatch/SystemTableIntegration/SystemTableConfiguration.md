@@ -11,8 +11,6 @@ is below -
 * **auditlogprefix_source_path** - Instead of adding a fully qualified path (s3 or GC) for auditlog, 
 add keyword **system** in this column. This will enable the system table integration.
 
-**For migrating to system tables above same congifuration changes can be used.**
-
 For all other configurations, please follow the [Configuration]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}})
 
 {{% notice note %}}
