@@ -26,16 +26,21 @@ aad_authority_endpoint
 
 ## Configuration changes required for Multi Account System Table Integration
 The process for achieving multi-account deployment is straightforward. In the configuration table, for each workspace 
-in a different account, you'll need to enter a value for the sql_endpoint column, a new warehouse needs to be created 
-or you can use an already existing warehouse. We encourage you to use a serverless warehouse for this purpose. 
-The warehouse endpoint details are then passed to Overwatch through the configuration, specifically in the sql_endpoint 
-column. **sql_endpoint column needs to be added only for multi account deployment.** 
-Below are the details
+in a different account from the one where Overwatch is run from, you'll need to enter a value for the sql_endpoint column.
+In order to get this value, you can create a new warehouse or use an existing one on a workspace in the remote account. 
+We encourage you to use a serverless warehouse for this purpose. 
+You would then pass the warehouse endpoint details to Overwatch through the configuration in the sql_endpoint 
+column. **sql_endpoint column needs to be populated only for workspaces in a different account**
+You can use the same warehouse sql_endpoint to collect the data for all the workspaces in the remote account. 
 
-* **sql_endpoint** - the http path from the sql_warehouse need to be added in this field. This http path can be found 
-in the connection details table of the warehouse.
+Below are the details:
+
+* **sql_endpoint** - this will be the http path from the sql warehouse. This can be found 
+in the connection details table of the warehouse. See the below screenshot on how to find it
+  ![WarehouseHTTPPath](/images/DeployOverwatch/warehouse_http_path.png)
 * **auditlogprefix_source_path** - Instead of adding a fully qualified path (s3 or GC) for auditlog,
 add keyword **system** in this column. This will enable the system table integration.
 
 For all other configurations, please follow the
 [Configuration]({{%relref "DeployOverwatch/ConfigureOverwatch/Configuration.md"%}})
+

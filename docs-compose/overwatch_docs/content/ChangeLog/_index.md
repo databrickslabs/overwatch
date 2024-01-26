@@ -6,6 +6,13 @@ weight: 4
 
 ## 0.8.0.0 (Major Release)
 
+### Upgrading
+
+There are no mandatory changes in this release, you can simply swap the jar if you're not migrating Audit logs to read from system tables. 
+We've created a script to help you in migrating your deployment configuration to system tables, if you choose to do so. 
+
+Upgrade script: **[HTML](/assets/ChangeLog/0800_upgrade.html) | [DBC](/assets/ChangeLog/0800_upgrade.dbc)**
+
 ### Major Feature
 * First integration with System Tables! Now Overwatch can collect audit logs directly from System Tables. You can find 
   the docs [here]({{%relref "DeployOverwatch/SystemTableIntegration"%}})
