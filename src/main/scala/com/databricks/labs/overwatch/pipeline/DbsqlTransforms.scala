@@ -31,29 +31,21 @@ object DbsqlTransforms extends SparkSessionWrapper {
       .orderBy('timestamp).rowsBetween(Window.unboundedPreceding, 1000)
 
     val warehouseRaw = auditRawDF
-      .select(
-        'timestamp,
-        'date,
-        'organization_id,
-        'serviceName,
-        'actionName,
-        'userEmail,
-        'requestId,
-        'response,
-        'warehouse_id,
-        PipelineFunctions.fillForward("warehouse_name",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("cluster_size",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("min_num_clusters",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("max_num_clusters",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("auto_stop_mins",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("spot_instance_policy",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("enable_photon",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("channel",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("tags",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("enable_serverless_compute",warehouse_name_gen_w),
-        PipelineFunctions.fillForward("warehouse_type",warehouse_name_gen_w)
-      )
+      .withColumn("warehouse_name",PipelineFunctions.fillForward("warehouse_name",warehouse_name_gen_w))
+      .withColumn("cluster_size",PipelineFunctions.fillForward("cluster_size",warehouse_name_gen_w))
+      .withColumn("min_num_clusters",PipelineFunctions.fillForward("min_num_clusters",warehouse_name_gen_w))
+      .withColumn("max_num_clusters",PipelineFunctions.fillForward("max_num_clusters",warehouse_name_gen_w))
+      .withColumn("auto_stop_mins",PipelineFunctions.fillForward("auto_stop_mins",warehouse_name_gen_w))
+      .withColumn("spot_instance_policy",PipelineFunctions.fillForward("spot_instance_policy",warehouse_name_gen_w))
+      .withColumn("enable_photon",PipelineFunctions.fillForward("enable_photon",warehouse_name_gen_w))
+      .withColumn("channel",PipelineFunctions.fillForward("channel",warehouse_name_gen_w))
+      .withColumn("tags",PipelineFunctions.fillForward("tags",warehouse_name_gen_w))
+      .withColumn("enable_serverless_compute",PipelineFunctions.fillForward("enable_serverless_compute",warehouse_name_gen_w))
+      .withColumn("warehouse_type",PipelineFunctions.fillForward("warehouse_type",warehouse_name_gen_w))
+
     warehouseRaw
+      .filter('source_table === "audit_log_bronze")
+      .drop("source_table")
   }
 
   /**
@@ -66,9 +58,11 @@ object DbsqlTransforms extends SparkSessionWrapper {
    * @param warehouseBaseWMetaDF
    * @return
    */
-  def deriveWarehouseBaseFilled(isFirstRun: Boolean, bronzeWarehouseSnapUntilCurrent: DataFrame)
+  def deriveWarehouseBaseFilled(isFirstRun: Boolean,
+                                bronzeWarehouseSnapUntilCurrent: DataFrame,
+                                warehouseSpecSilver: PipelineTable)
                                 (warehouseBaseWMetaDF: DataFrame): DataFrame = {
-    if (isFirstRun) {
+   val result =  if (isFirstRun || warehouseSpecSilver.exists(dataValidation = true)) {
       val firstRunMsg = "Silver_WarehouseSpec -- First run detected, will impute warehouse state from bronze to derive " +
         "current initial state for all existing warehouses."
       logger.log(Level.INFO, firstRunMsg)
@@ -113,9 +107,42 @@ object DbsqlTransforms extends SparkSessionWrapper {
           (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
           'Pipeline_SnapTS.cast("date").alias("date"),
           'creator_name.alias("createdBy")
-        ).unionByName(warehouseBaseWMetaDF, allowMissingColumns = true)
+        )
       unionWithMissingAsNull(warehouseBaseWMetaDF, missingWareHouseBaseFromSnap)
-    } else warehouseBaseWMetaDF
+    } else
+      warehouseBaseWMetaDF
+
+    result.select(
+      'organization_id,
+      'warehouse_id,
+      'serviceName,
+      'actionName,
+      'warehouse_name,
+      'cluster_size,
+      'userEmail,
+      'requestId,
+      'response,
+      'min_num_clusters,
+      'max_num_clusters,
+      'auto_stop_mins,
+      'spot_instance_policy,
+      'enable_photon,
+      'channel,
+      'tags,
+      'enable_serverless_compute,
+      'warehouse_type,
+      'timestamp,
+      'date,
+      'createdBy,
+      'warehouse_state,
+      'size,
+      'auto_resume,
+      'creator_id,
+      'num_clusters,
+      'num_active_sessions,
+      'jdbc_url,
+      'odbc_params
+    )
   }
 
   def deriveInputForWarehouseBase(auditLogDf: DataFrame, warehouseSpecSilver: PipelineTable
@@ -136,11 +163,16 @@ object DbsqlTransforms extends SparkSessionWrapper {
       'warehouse_type
     )
 
-    val auditLogDfWithStructs = auditLogDf
+    val rawAuditLogDf = auditLogDf
       .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
         "editWarehouse", "deleteEndpoint", "deleteWarehouse")
         && responseSuccessFilter
         && 'serviceName === "databrickssql")
+
+    if(rawAuditLogDf.isEmpty)
+      throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
+
+    val auditLogDfWithStructs = rawAuditLogDf
       .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
       .select(warehouseSummaryCols: _*)
 
@@ -151,6 +183,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
 
     val filteredAuditLogDf = auditLogDfWithStructsToMap
       .withColumn("tags", SchemaTools.structToMap(auditLogDfWithStructsToMap, "tags"))
+      .withColumn("source_table",lit("audit_log_bronze"))
 
     val filteredDf = if(warehouseSpecSilver.exists(dataValidation = true)) {
       filteredAuditLogDf
@@ -175,8 +208,18 @@ object DbsqlTransforms extends SparkSessionWrapper {
             'channel,
             'tags,
             'enable_serverless_compute,
-            'warehouse_type
+            'warehouse_type,
+            'warehouse_state,
+            'size,
+            'auto_resume,
+            'creator_id,
+            'num_clusters,
+            'num_active_sessions,
+            'jdbc_url,
+            'odbc_params,
+            'createdBy
           )
+          .withColumn("source_table",lit("warehouse_spec_silver")),true
         )
     }
     else

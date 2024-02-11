@@ -138,11 +138,30 @@ case class MultiWorkspaceConfig(workspace_name: String,
                                 aad_authority_endpoint: Option[String],
                                 deployment_id: String,
                                 output_path: String,
-                                temp_dir_path: Option[String]
+                                temp_dir_path: Option[String],
+                                sql_endpoint: Option[String] = None
                                )
 case class RulesValidationResult(ruleName: String, passed: String, permitted: String, actual: String)
 
 case class RulesValidationReport(deployment_id: String, workspace_id: String, result: RulesValidationResult)
+
+case class ReconReport(
+                        validated: Boolean = false,
+                        workspaceId: String,
+                        reconType: String,
+                        sourceDB: String,
+                        targetDB: String,
+                        tableName: String,
+                        sourceCount: Option[Long] = None,
+                        targetCount: Option[Long] = None,
+                        missingInSource: Option[Long] = None,
+                        missingInTarget: Option[Long] = None,
+                        commonDataCount: Option[Long] = None,
+                        deviationPercentage: Option[Double] = None,
+                        sourceQuery: Option[String] = None,
+                        targetQuery: Option[String] = None,
+                        errorMsg: Option[String] = None
+                      )
 
 object MultiWorkspaceConfigColumns extends Enumeration {
   val workspace_name, workspace_id, workspace_url, api_url, cloud, primordial_date,
@@ -196,7 +215,9 @@ case class AzureAuditLogEventhubConfig(
 case class AuditLogConfig(
                            rawAuditPath: Option[String] = None,
                            auditLogFormat: String = "json",
-                           azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None
+                           azureAuditLogEventhubConfig: Option[AzureAuditLogEventhubConfig] = None,
+                           systemTableName: Option[String] = None,
+                           sqlEndpoint: Option[String] = None
                          )
 
 case class IntelligentScaling(enabled: Boolean = false, minimumCores: Int = 4, maximumCores: Int = 512, coeff: Double = 1.0)
@@ -213,7 +234,8 @@ case class OverwatchParams(auditLogConfig: AuditLogConfig,
                            workspace_name: Option[String] = None,
                            externalizeOptimize: Boolean = false,
                            apiEnvConfig: Option[ApiEnvConfig] = None,
-                           tempWorkingDir: String = "" // will be set after data target validated if not overridden
+                           tempWorkingDir: String = "", // will be set after data target validated if not overridden
+                           sqlEndpoint: Option[String] = None
                           )
 
 case class ParsedConfig(

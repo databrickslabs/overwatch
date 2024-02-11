@@ -499,11 +499,16 @@ trait GoldTransforms extends SparkSessionWrapper {
                                    clsfIncrementalDF : DataFrame,
                                  )(auditIncrementalDF: DataFrame): DataFrame = {
 
+    if (auditIncrementalDF.isEmpty || notebook.asDF.isEmpty || clsfIncrementalDF.isEmpty) {
+      throw new NoNewDataException("No New Data", Level.WARN, true)
+    }
+
     val auditDF_base = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
       .selectExpr("*", "requestParams.*").drop("requestParams")
 
     if (auditDF_base.columns.contains("executionTime")){
+
       val notebookLookupTSDF = notebook.asDF
         .select("organization_id", "notebook_id", "notebook_path", "notebook_name", "unixTimeMS", "date")
         .withColumnRenamed("notebook_id", "notebookId")
@@ -553,7 +558,7 @@ trait GoldTransforms extends SparkSessionWrapper {
         .drop("cluster_name", "custom_tags", "node_type_id")
 
 
-      val joinedDF = clsfDF.join(auditDF, Seq("clusterId", "organization_id"), "left")
+      val joinedDF = clsfDF.join(auditDF, Seq("clusterId", "organization_id"), "inner")
 
       // Cluster_state started before cmd start time and ended before command end time
       val state_before_before = 'unixTimeMS_state_start < 'unixTimeMSStart && 'unixTimeMS_state_end < 'unixTimeMSEnd
@@ -625,6 +630,14 @@ trait GoldTransforms extends SparkSessionWrapper {
     }
   }
 
+  private[overwatch] def extractDBJobId(column: Column): Column = {
+    split(regexp_extract(column, "(job-\\d+)", 1), "-")(1)
+  }
+
+  private[overwatch] def extractDBIdInJob(column: Column): Column = {
+    split(regexp_extract(column, "(-run-\\d+)", 1), "-")(2)
+  }
+
   protected def buildSparkJob(
                                cloudProvider: String
                              )(df: DataFrame): DataFrame = {
@@ -667,6 +680,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'ExecutionID.alias("execution_id"),
       'StageIDs.alias("stage_ids"),
       'clusterId.alias("cluster_id"),
+      $"PowerProperties.ClusterDetails.Name".alias("cluster_name"),
       $"PowerProperties.NotebookID".alias("notebook_id"),
       $"PowerProperties.NotebookPath".alias("notebook_path"),
       $"PowerProperties.SparkDBJobID".alias("db_job_id"),
@@ -685,21 +699,27 @@ trait GoldTransforms extends SparkSessionWrapper {
     val sparkContextW = Window.partitionBy('organization_id, 'spark_context_id)
 
     val isDatabricksJob = 'job_group_id.like("%job-%-run-%")
+    val isAutomatedCluster = 'cluster_name.like("%job-%-run-%")
 
     sparkJobsWImputedUser
       .select(sparkJobCols: _*)
       .withColumn("cluster_id", first('cluster_id, ignoreNulls = true).over(sparkContextW))
       .withColumn("jobGroupAr", split('job_group_id, "_")(2))
       .withColumn("db_job_id",
-        when(isDatabricksJob && 'db_job_id.isNull,
-          split(regexp_extract('jobGroupAr, "(job-\\d+)", 1), "-")(1))
-          .otherwise('db_job_id)
+        when(isDatabricksJob && 'db_job_id.isNull, extractDBJobId('jobGroupAr))
+          .otherwise(
+            when(isAutomatedCluster && 'db_job_id.isNull, extractDBJobId('cluster_name))
+            .otherwise('db_job_id)
+          )
       )
       .withColumn("db_id_in_job",
-        when(isDatabricksJob && 'db_run_id.isNull,
-          split(regexp_extract('jobGroupAr, "(-run-\\d+)", 1), "-")(2))
-          .otherwise('db_run_id)
+        when(isDatabricksJob && 'db_run_id.isNull, extractDBIdInJob('jobGroupAr))
+          .otherwise(
+            when(isAutomatedCluster && 'db_run_id.isNull, extractDBIdInJob('cluster_name))
+            .otherwise('db_run_id)
+          )
       )
+      .drop("cluster_name")
   }
 
   protected def buildSparkStage()(df: DataFrame): DataFrame = {
@@ -801,7 +821,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     // when there is no input data break out of module, progress timeline and continue with pipeline
     val emptyMsg = s"No new streaming data found."
-    if (streamRawDF.isEmpty) throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
+    if (streamRawDF.filter('progress.isNotNull).isEmpty) throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
 
     val lastStreamValue = Window.partitionBy('organization_id, 'SparkContextId, 'clusterId, 'stream_id, 'stream_run_id).orderBy('stream_timestamp)
     val onlyOnceEventGuaranteeW = Window.partitionBy(streamTargetKeys map col: _*).orderBy('fileCreateEpochMS.desc)

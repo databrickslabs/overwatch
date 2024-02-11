@@ -2,11 +2,19 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.utils.Helpers.{getCurrentCatalogName, setCurrentCatalog, spark}
 import com.databricks.labs.overwatch.utils.OverwatchScope.{OverwatchScope, _}
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.catalyst.dsl.expressions.{DslExpression, DslSymbol}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{lit, rank, row_number}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
+
 
 trait InitializerFunctions
   extends SparkSessionWrapper {
@@ -95,8 +103,13 @@ trait InitializerFunctions
     // Audit logs are required and paramount to Overwatch delivery -- they must be present and valid
     /** Validate and set Audit Log Configs */
     val rawAuditLogConfig = rawParams.auditLogConfig
-    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig)
+
+    val validatedAuditLogConfig = validateAuditLogConfigs(rawAuditLogConfig, config.organizationId,
+        config.workspaceURL, config.sqlEndpoint, validatedTokenSecret)
     config.setAuditLogConfig(validatedAuditLogConfig)
+
+    // check if it is a valid migration from cloud to system table
+    checkSystemTableMigrationValidity(config)
 
     // must happen AFTER data target validation
     // persistent location for corrupted spark event log files
@@ -400,67 +413,24 @@ trait InitializerFunctions
   }
 
   @throws(classOf[BadConfigException])
-  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig): AuditLogConfig = {
-
-    if (disableValidations) {
+  def validateAuditLogConfigs(auditLogConfig: AuditLogConfig,
+                              organization_id: String,
+                              workspace_url: String,
+                              sql_endpoint: String,
+                              token: Option[TokenSecret]): AuditLogConfig = {
+    if (disableValidations) { //need to double check this
       quickBuildAuditLogConfig(auditLogConfig)
     } else {
-      if (config.cloudProvider != "azure") {
-
-        val auditLogPath = auditLogConfig.rawAuditPath
-        val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
-        if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
-          throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
-        }
-
-        if (auditLogPath.nonEmpty)
-          dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
-            if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
-              s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
-          })
-
-        val supportedAuditLogFormats = Array("json", "parquet", "delta")
-        if (!supportedAuditLogFormats.contains(auditLogFormat)) {
-          throw new BadConfigException(s"Audit Log Format: Supported formats are ${supportedAuditLogFormats.mkString(",")} " +
-            s"but $auditLogFormat was placed in teh configuration. Please select a supported audit log format.")
-        }
-
-        val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
-
-        // return validated audit log config for aws
-        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
-
+      if (ifFetchFromSystemTable(auditLogConfig)){
+        validateAuditLogConfigsFromSystemTable(auditLogConfig,organization_id, workspace_url, token)
       } else {
-        val ehConfigOp = auditLogConfig.azureAuditLogEventhubConfig
-        require(ehConfigOp.nonEmpty, "When using Azure, an Eventhub must be configured for audit log retrieval")
-        val ehConfig = ehConfigOp.get
-        val ehPrefix = ehConfig.auditRawEventsPrefix
-
-        val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
-        val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
-        // TODO -- Audit log bronze is no longer streaming target -- remove this path
-        val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
-
-        if (config.debugFlag) {
-          println("DEBUG FROM Init")
-          println(s"cleanPrefix = ${cleanPrefix}")
-          println(s"rawEventsCheck = ${rawEventsCheckpoint}")
-          println(s"auditLogsBronzeChk = ${auditLogBronzeChk}")
-          println(s"ehPrefix = ${ehPrefix}")
-        }
-
-        val ehFinalConfig = ehConfig.copy(
-          auditRawEventsPrefix = cleanPrefix,
-          auditRawEventsChk = Some(rawEventsCheckpoint),
-          auditLogChk = Some(auditLogBronzeChk)
-        )
-
-        // parse the connection string to validate format
-        PipelineFunctions.parseAndValidateEHConnectionString(ehFinalConfig.connectionString, ehFinalConfig.azureClientId.isEmpty)
-        // return validated auditLogConfig for Azure
-        auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
+        validateAuditLogConfigsFromCloud(auditLogConfig)
       }
     }
+  }
+
+  def ifFetchFromSystemTable(auditLogConfig: AuditLogConfig): Boolean = {
+    auditLogConfig.rawAuditPath.getOrElse("").toLowerCase.equals("system")
   }
 
   /**
@@ -535,5 +505,136 @@ trait InitializerFunctions
    * @param dataTarget OW DataTarget
    */
   def validateAndSetDataTarget(dataTarget: DataTarget): Unit
+
+  def validateSqlEndpoint(sqlEndpoint: String, organizationId: String): String = {
+    val pattern = """/sql/1\.0/warehouses/.*""".r
+    sqlEndpoint.trim match {
+      case pattern(_*) => sqlEndpoint
+      case "" => sqlEndpoint
+      case _ => throw new Exception(s"Invalid sqlEndpoint for organizationId: $organizationId ")
+    }
+  }
+  def validateAuditLogConfigsFromSystemTable(auditLogConfig: AuditLogConfig,
+                                             organizationId: String,
+                                             workspace_url: String,
+                                             token: Option[TokenSecret]): AuditLogConfig = {
+    val auditLogFormat = "delta"
+    val systemTableName = auditLogConfig.systemTableName.get
+
+    val sqlEndpoint = validateSqlEndpoint(auditLogConfig.sqlEndpoint.getOrElse(""),organizationId)
+    if(sqlEndpoint.isEmpty) {
+      val systemTableNameDf = spark.table(systemTableName).filter(s"workspace_id = '$organizationId'").limit(1)
+      if (systemTableNameDf.isEmpty)
+        throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
+      auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName))
+    }
+    else {
+      val host = workspace_url.stripPrefix("https://").stripSuffix("/")
+      val scope = token.get.scope
+      val key = token.get.key
+      val rawToken = dbutils.secrets.get(scope, key)
+      val systemTableNameDf = spark.read
+        .format("databricks")
+        .option("host", host)
+        .option("httpPath", sqlEndpoint)
+        .option("personalAccessToken", rawToken)
+        .option("query", s"select * from ${systemTableName} where workspace_id='${organizationId}' limit 1")
+        .load()
+      if (systemTableNameDf.isEmpty)
+        throw new Exception(s"No data found in ${systemTableName} for organizationId: $organizationId ")
+      auditLogConfig.copy(auditLogFormat=auditLogFormat,systemTableName = Some(systemTableName),sqlEndpoint = Some(sqlEndpoint))
+    }
+  }
+
+  def validateAuditLogConfigsFromCloud(auditLogConfig: AuditLogConfig): AuditLogConfig = {
+      if (config.cloudProvider != "azure") {
+
+        val auditLogPath = auditLogConfig.rawAuditPath
+        val auditLogFormat = auditLogConfig.auditLogFormat.toLowerCase.trim
+        if (config.overwatchScope.contains(audit) && auditLogPath.isEmpty) {
+          throw new BadConfigException("Audit cannot be in scope without the 'auditLogPath' being set. ")
+        }
+
+        if (auditLogPath.nonEmpty)
+          dbutils.fs.ls(auditLogPath.get).foreach(auditFolder => {
+            if (auditFolder.isDir) require(auditFolder.name.startsWith("date="), s"Audit directory must contain " +
+              s"partitioned date folders in the format of ${auditLogPath.get}/date=. Received ${auditFolder} instead.")
+          })
+
+        val supportedAuditLogFormats = Array("json", "parquet", "delta")
+        if (!supportedAuditLogFormats.contains(auditLogFormat)) {
+          throw new BadConfigException(s"Audit Log Format: Supported formats are ${supportedAuditLogFormats.mkString(",")} " +
+            s"but $auditLogFormat was placed in teh configuration. Please select a supported audit log format.")
+        }
+
+        val finalAuditLogPath = if (auditLogPath.get.endsWith("/")) auditLogPath.get.dropRight(1) else auditLogPath.get
+
+        // return validated audit log config for aws
+        auditLogConfig.copy(rawAuditPath = Some(finalAuditLogPath), auditLogFormat = auditLogFormat)
+
+      } else {
+        val ehConfigOp = auditLogConfig.azureAuditLogEventhubConfig
+        require(ehConfigOp.nonEmpty, "When using Azure, an Eventhub must be configured for audit log retrieval")
+        val ehConfig = ehConfigOp.get
+        val ehPrefix = ehConfig.auditRawEventsPrefix
+
+        val cleanPrefix = if (ehPrefix.endsWith("/")) ehPrefix.dropRight(1) else ehPrefix
+        val rawEventsCheckpoint = ehConfig.auditRawEventsChk.getOrElse(s"${ehPrefix}/rawEventsCheckpoint")
+        // TODO -- Audit log bronze is no longer streaming target -- remove this path
+        val auditLogBronzeChk = ehConfig.auditLogChk.getOrElse(s"${ehPrefix}/auditLogBronzeCheckpoint")
+
+        if (config.debugFlag) {
+          println("DEBUG FROM Init")
+          println(s"cleanPrefix = ${cleanPrefix}")
+          println(s"rawEventsCheck = ${rawEventsCheckpoint}")
+          println(s"auditLogsBronzeChk = ${auditLogBronzeChk}")
+          println(s"ehPrefix = ${ehPrefix}")
+        }
+
+        val ehFinalConfig = ehConfig.copy(
+          auditRawEventsPrefix = cleanPrefix,
+          auditRawEventsChk = Some(rawEventsCheckpoint),
+          auditLogChk = Some(auditLogBronzeChk)
+        )
+
+        // parse the connection string to validate format
+        PipelineFunctions.parseAndValidateEHConnectionString(ehFinalConfig.connectionString, ehFinalConfig.azureClientId.isEmpty)
+        // return validated auditLogConfig for Azure
+        auditLogConfig.copy(azureAuditLogEventhubConfig = Some(ehFinalConfig))
+      }
+    }
+
+    def checkSystemTableMigrationValidity(config: Config): Boolean = {
+      val workspaceID = config.organizationId
+      val latestConfigByOrg = Window.partitionBy(col("organization_id")).orderBy(col("Pipeline_SnapTS").desc)
+      val etlDB = config.databaseName
+      val initialCatalog = getCurrentCatalogName(spark)
+      val etlDBWithOutCatalog = if(etlDB.contains(".")){
+        setCurrentCatalog(spark, etlDB.split("\\.").head)
+        etlDB.split("\\.").last
+      } else etlDB
+
+      if(!spark.catalog.tableExists(s"${etlDBWithOutCatalog}.pipeline_report")) {
+        logger.log(Level.INFO, s"Since it is a first run no need to check for migration validity")
+        setCurrentCatalog(spark, initialCatalog)
+        return true
+      }
+
+      val lastValue = spark.table(s"${etlDBWithOutCatalog}.pipeline_report")
+        .filter(col("status") === "SUCCESS")
+        .withColumn("rnk", rank().over(latestConfigByOrg))
+        .withColumn("rn", row_number().over(latestConfigByOrg))
+        .filter(col("rnk") === 1 && col("rn") === 1)
+        .filter(col("organization_id") === workspaceID)
+        .select("inputConfig.auditLogConfig.rawAuditPath").collect.map(x=>x(0)).mkString
+
+      setCurrentCatalog(spark, initialCatalog)
+      val currentValue = config.auditLogConfig.rawAuditPath.getOrElse("")
+      if( lastValue == "system" && currentValue !="system" )
+        throw new Exception(s"Cannot migrate from system table to cloud for organization_id - ${workspaceID}" +
+          s" Please use the same configuration as the last run")
+      else
+        true
+    }
 
 }
