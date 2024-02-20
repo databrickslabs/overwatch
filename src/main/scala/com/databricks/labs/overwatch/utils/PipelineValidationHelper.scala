@@ -113,7 +113,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
   }
 
   def validateLEQOne(ruleName: String, configColumns: String): Rule = {
-    Rule(ruleName, col(configColumns) <= lit(1) && col(configColumns).isNull)
+    Rule(ruleName, col(configColumns) > lit(1))
   }
 
   def checkRunningDays(ruleName: String, configColumns: String): Rule = {
@@ -203,9 +203,23 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     val targetTable = target.name
 
     if (spark.catalog.tableExists(s"$etlDB.$sourceTable") &&  spark.catalog.tableExists(s"$etlDB.$targetTable")){
-      val joinedDF = sourceDF.join(targetDF, Seq(column), "anti").select(key.map(col): _*)
+      if (sourceDF.count() == 0 || targetDF.count() == 0) {
+        val msg = s"Cross table validation between source $sourceTable and target $targetTable is not possible as either of them doesn't contain any data"
+        println(msg)
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
+      // In Case of NotebookCommands Table we should only consider the workspaces where verbose auditlog is enabled
+      val joinedDF = if (source == goldTargets.notebookCommandsTarget || target == goldTargets.notebookCommandsTarget){
+        val organizationID_list : Array[String] = spark.sql(s"select distinct organization_id from $etlDB.${goldTargets.notebookCommandsTarget}").collect().map(_.getString(0))
+//        val organizationID_list : Array[String]= sourceDF.select("organization_id").join(targetDF.select("organization_id"),Seq("organization_id"),"inner").distinct().collect().map(_.getString(0)))
+        sourceDF.filter('organization_id.isin(organizationID_list:_*)).join(targetDF.filter('organization_id.isin(organizationID_list:_*)), Seq(column), "anti").select(key.map(col): _*)
+      }else{
+        sourceDF.join(targetDF, Seq(column), "anti").select(key.map(col): _*)
+      }
       val joinedDFCount = joinedDF.count()
-      val ruleName = s"${column}_Present_In_${sourceTable}_But_Not_In_$targetTable"
+
+      val ruleName = s"${column.toUpperCase()}_Present_In_${sourceTable}_But_Not_In_$targetTable"
 
       if (joinedDFCount == 0) {
         val healthCheckMsg = s"HealthCheck Success: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
@@ -379,9 +393,12 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     )
 
     (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-      RuleSet(jobRunDF).add(validateRules),
+      RuleSet(jobRunDF).add(validateRules.take(4)),
       tableName, jobRunKey, validationStatus, quarantineStatus, "validate_not_null")
 
+    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+      RuleSet(jobRunDF.filter(!'task_type.isin("sqlalert","sqldashboard","pipeline"))).add(validateRules(4)),
+      tableName, jobRunKey, validationStatus, quarantineStatus, "validate_not_null")
 
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -430,27 +447,27 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.jobRunTarget,
       jrcpDF, jobRunDF, "cluster_id", jrcpKey, validationStatus, quarantineStatus)
 
-    //    Notebook_Id_Present_In_Notebook_gold_But_Not_In_NotebookCommands_gold
+    //Notebook_Id_Present_In_Notebook_gold_But_Not_In_NotebookCommands_gold
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.notebookTarget, goldTargets.notebookCommandsTarget,
       nbDF, nbcmdDF, "notebook_id", nbkey, validationStatus, quarantineStatus)
 
-    //    Notebook_Id_Present_In_NotebookCommands_Gold_But_Not_In_Notebook_Gold
+    //Notebook_Id_Present_In_NotebookCommands_Gold_But_Not_In_Notebook_Gold
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.notebookCommandsTarget, goldTargets.notebookTarget,
       nbcmdDF, nbDF, "notebook_id", nbcmdkey, validationStatus, quarantineStatus)
 
-    //    Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_JobRunCostPotentialFact_Gold
+    //Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_JobRunCostPotentialFact_Gold
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterStateFactTarget, goldTargets.jobRunCostPotentialFactTarget,
       clsfDF, jrcpDF, "cluster_id", clsfKey, validationStatus, quarantineStatus)
 
-    //    Cluster_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_ClusterStateFact_Gold
+    //Cluster_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_ClusterStateFact_Gold
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.clusterStateFactTarget,
       jrcpDF, clsfDF, "cluster_id", jrcpKey, validationStatus, quarantineStatus)
 
-    //    Cluster_ID_Present_In_Cluster_Gold_But_Not_In_ClusterStateFact_Gold
+    //Cluster_ID_Present_In_Cluster_Gold_But_Not_In_ClusterStateFact_Gold
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterTarget, goldTargets.clusterStateFactTarget,
       clusterDF, clsfDF, "cluster_id", clusterKey, validationStatus, quarantineStatus)
 
-    //    Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_Cluster_Gold
+    //Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_Cluster_Gold
     (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterStateFactTarget, goldTargets.clusterTarget,
       clsfDF, clusterDF, "cluster_id", clsfKey, validationStatus, quarantineStatus)
 
