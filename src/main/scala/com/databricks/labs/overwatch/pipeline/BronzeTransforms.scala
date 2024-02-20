@@ -519,7 +519,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       case e: Throwable =>
         val errMsg = s"Error in landing cluster events: ${e.getMessage}"
         logger.log(Level.ERROR, errMsg)
-        println(errMsg)
         throw e
     }
      if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
