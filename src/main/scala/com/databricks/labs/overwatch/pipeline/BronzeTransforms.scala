@@ -512,12 +512,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
-
-    landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
-      tmpClusterEventsErrorPath, config)
-    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+    try{
+      landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
+        tmpClusterEventsErrorPath, config)
+    }catch {
+      case e: Throwable =>
+        val errMsg = s"Error in landing cluster events: ${e.getMessage}"
+        logger.log(Level.ERROR, errMsg)
+        println(errMsg)
+        throw e
+    }
+     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath)
+        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsErrorPath))
           .withColumn("from_ts", toTS(col("from_epoch")))
           .withColumn("until_ts", toTS(col("until_epoch"))),
         database,
