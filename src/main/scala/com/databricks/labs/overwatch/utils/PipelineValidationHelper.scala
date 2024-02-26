@@ -101,7 +101,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
   val jobTable: String = goldTargets.jobTarget.name
 
 
-  print("Overwatch_RunIDs: "+Overwatch_RunIDs.mkString(","))
+  println("Overwatch_RunIDs: "+Overwatch_RunIDs.mkString(","))
   val filterCondition = 'Overwatch_RunID.isin(Overwatch_RunIDs:_*)
   val jrcpDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jrcpTable")) spark.read.table(s"$etlDB.$jrcpTable").filter(filterCondition) else spark.emptyDataFrame
   val clsfDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clsfTable")) spark.read.table(s"$etlDB.$clsfTable").filter(filterCondition) else spark.emptyDataFrame
@@ -137,7 +137,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
   }
 
   def checkRunningDays(ruleName: String, configColumns: String): Rule = {
-    Rule(ruleName, col(configColumns) === 1)
+    Rule(ruleName, col(configColumns) === 2)
   }
 
   def checkColumnInValues(ruleName: String, configColumns: String, value: Array[String]): Rule = {
@@ -181,7 +181,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
           case "validate_values_in_between" =>
             (s"HealthCheck Warning: got $countOfNegativeValidation ${colName}s which are not in between expected values", "Warning")
           case _ =>
-            (s"HealthCheck Warning : got $countOfNegativeValidation ${colName}s which are greater than 1", "Warning")
+            (s"HealthCheck Warning : got $countOfNegativeValidation ${colName}s which are greater than 2", "Warning")
         }
         vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation",Some(healthCheckMsg), Overwatch_RunID))
         dfWithNegativeValidation.toJSON.collect().foreach(jsonString => {
@@ -265,7 +265,9 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
 
     var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
     var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-    val table_name = clsfTable
+
+    val tableName = clsfTable
+    val key = clsfKey
 
     val validateRules = Seq[Rule](
       validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
@@ -276,203 +278,194 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
       checkRunningDays("Check_Whether_Any_Single_Cluster_State_is_Running_For_Multiple_Days", "days_in_state")
     )
 
-//    Overwatch_RunIDs.foreach(Overwatch_RunID =>{
-//      val clsfDF = clsfDF.filter('Overwatch_RunID === Overwatch_RunID)
-//      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//        RuleSet(clsfDF).add(validateRules.take(2)),
-//        table_name, clsfKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//        RuleSet(clsfDF.where("target_num_workers != 0")).add(validateRules(2)),
-//        table_name, clsfKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//        RuleSet(clsfDF.where("runtime_engine IN ('STANDARD','PHOTON')")).add(validateRules(3)),
-//        table_name, clsfKey, validationStatus, quarantineStatus, "validate_greater_than_zero")
-//
-//      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//        RuleSet(clsfDF.where("databricks_billable is true")).add(validateRules(4)),
-//        table_name, clsfKey, validationStatus, quarantineStatus, "validate_greater_than_zero")
-//
-//      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//        RuleSet(clsfDF).add(validateRules(5)),
-//        table_name, clsfKey, validationStatus, quarantineStatus)
-//
-//      (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//    })
     Overwatch_RunIDs.foreach(Overwatch_RunID =>{
-      val clsfdf : DataFrame= clsfDF.filter('Overwatch_RunID === Overwatch_RunID)
+      val clsf_df : DataFrame= clsfDF.filter('Overwatch_RunID === Overwatch_RunID)
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsfdf).add(validateRules.take(2)),
-        table_name, clsfKey, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        RuleSet(clsf_df).add(validateRules.take(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
 
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsfdf.where("target_num_workers != 0")).add(validateRules(2)),
-        table_name, clsfKey, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        RuleSet(clsf_df.where("target_num_workers != 0")).add(validateRules(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
 
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsfdf.where("runtime_engine IN ('STANDARD','PHOTON')")).add(validateRules(3)),
-        table_name, clsfKey, validationStatus, quarantineStatus, "validate_greater_than_zero",Overwatch_RunID)
+        RuleSet(clsf_df.where("runtime_engine IN ('STANDARD','PHOTON')")).add(validateRules(3)),
+        tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero",Overwatch_RunID)
 
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsfdf.where("databricks_billable is true")).add(validateRules(4)),
-        table_name, clsfKey, validationStatus, quarantineStatus, "validate_greater_than_zero",Overwatch_RunID)
+        RuleSet(clsf_df.where("databricks_billable is true")).add(validateRules(4)),
+        tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero",Overwatch_RunID)
 
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsfdf).add(validateRules(5)),
-        table_name, clsfKey, validationStatus, quarantineStatus,"",Overwatch_RunID)
+        RuleSet(clsf_df).add(validateRules(5)),
+        tableName, key, validationStatus, quarantineStatus,"",Overwatch_RunID)
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
 
-//  private[overwatch] def validateJRCP(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//    val table_name = jrcpTable
-//
-//    val jrcp_df = jrcpDF.withColumn("days_in_running", size(col("running_days")))
-//
-//    val validateRules = Seq[Rule](
-//      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
-//      validateNotNull("Driver_Node_Type_ID_Should_Not_be_NULL", "driver_node_type_id"),
-//      validateLEQOne("Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One", "Job_run_cluster_util"),
-//      checkRunningDays("Check_Whether_Any_Job_is_Running_For_Multiple_Days", "days_in_running")
-//    )
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jrcp_df).add(validateRules.take(2)),
-//      table_name, jrcpKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jrcp_df).add(validateRules(2)),
-//      table_name, jrcpKey, validationStatus, quarantineStatus, "validate_leq_one")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jrcp_df).add(validateRules(3)),
-//      table_name, jrcpKey, validationStatus, quarantineStatus)
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//  }
-//
-//  private[overwatch] def validateCluster(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//
-//    val table_name = clusterTable
-//
-//    val validateRules = Seq[Rule](
-//      validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
-//      validateNotNull("Driver_Node_Type_ID_Should_Not_be_NULL", "driver_node_type"),
-//      validateNotNull("Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster", "node_type"),
-//      checkColumnInValues("Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency", "cluster_type"
-//        , Array("Serverless", "SQL Analytics", "Single Node", "Standard", "High-Concurrency"))
-//    )
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(clusterDF).add(validateRules.take(2)),
-//      table_name, clusterKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(clusterDF.where("num_workers != 0")).add(validateRules(2)),
-//      table_name, clusterKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(clusterDF).add(validateRules(3)),
-//      table_name, clusterKey, validationStatus, quarantineStatus, "validate_values_in_between")
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//  }
-//
-//  private[overwatch] def validateSparkJob(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//
-//    val tableName = sparkJobTable
-//
-//    val validateRules = Seq[Rule](
-//      validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
-//      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
-//      validateNotNull("db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL", "db_id_in_job")
-//    )
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(sparkJobDF).add(validateRules.take(2)),
-//      tableName, sparkJobKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(sparkJobDF.where("db_job_id is not NULL")).add(validateRules(2)),
-//      tableName, sparkJobKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//  }
-//
-//  private[overwatch] def validateSqlQueryHist(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//
-//    val tableName = sqlQueryHistTable
-//
-//    val validateRules = Seq[Rule](
-//      validateNotNull("Warehouse_ID_Should_Not_be_NULL", "warehouse_id"),
-//      validateNotNull("Query_ID_Should_Not_be_NULL", "query_id")
-//    )
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(sqlQueryHistDF).add(validateRules),
-//      tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//  }
-//
-//  private[overwatch] def validateJobRun(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//
-//    val tableName = jobRunTable
-//
-//    val validateRules = Seq[Rule](
-//      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
-//      validateNotNull("Run_ID_Should_Not_be_NULL", "run_id"),
-//      validateNotNull("Job_Run_ID_Should_Not_be_NULL", "job_run_id"),
-//      validateNotNull("Task_Run_ID_Should_Not_be_NULL", "task_run_id"),
-//      validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
-//    )
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jobRunDF).add(validateRules.take(4)),
-//      tableName, jobRunKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jobRunDF.filter(!'task_type.isin("sqlalert","sqldashboard","pipeline"))).add(validateRules(4)),
-//      tableName, jobRunKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//  }
-//
-//  private[overwatch] def validateJob(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//
-//    val tableName = jobTable
-//
-//    val validateRules = Seq[Rule](
-//      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
-//      checkColumnInValues("Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl", "action"
-//        , Array("snapimpute", "create", "reset", "update", "delete", "resetJobAcl", "changeJobAcl"))
-//    )
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jobDF).add(validateRules.head),
-//      tableName, jobKey, validationStatus, quarantineStatus, "validate_not_null")
-//
-//    (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-//      RuleSet(jobDF).add(validateRules(1)),
-//      tableName, jobKey, validationStatus, quarantineStatus, "validate_values_in_between")
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//  }
-//
+  private[overwatch] def validateJRCP(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val tableName = jrcpTable
+    val key = jrcpKey
+
+    val validateRules = Seq[Rule](
+      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
+      validateNotNull("Driver_Node_Type_ID_Should_Not_be_NULL", "driver_node_type_id"),
+      validateLEQOne("Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One", "Job_run_cluster_util"),
+      checkRunningDays("Check_Whether_Any_Job_is_Running_For_Multiple_Days", "days_in_running")
+    )
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID =>{
+      val jrcp_df = jrcpDF.filter('Overwatch_RunID === Overwatch_RunID).withColumn("days_in_running", size(col("running_days")))
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(jrcp_df).add(validateRules.take(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(jrcp_df).add(validateRules(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_leq_one",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(jrcp_df).add(validateRules(3)),
+        tableName, key, validationStatus, quarantineStatus,"",Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
+  private[overwatch] def validateCluster(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val tableName = clusterTable
+    val key = clusterKey
+
+    val validateRules = Seq[Rule](
+      validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
+      validateNotNull("Driver_Node_Type_ID_Should_Not_be_NULL", "driver_node_type"),
+      validateNotNull("Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster", "node_type"),
+      checkColumnInValues("Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency", "cluster_type"
+        , Array("Serverless", "SQL Analytics", "Single Node", "Standard", "High-Concurrency"))
+    )
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID =>{
+      val cluster_df = clusterDF.filter('Overwatch_RunID === Overwatch_RunID)
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(cluster_df).add(validateRules.take(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(cluster_df.where("num_workers != 0")).add(validateRules(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(cluster_df).add(validateRules(3)),
+        tableName, key, validationStatus, quarantineStatus, "validate_values_in_between",Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
+  private[overwatch] def validateSparkJob(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val tableName = sparkJobTable
+    val key = sparkJobKey
+
+    val validateRules = Seq[Rule](
+      validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
+      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
+      validateNotNull("db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL", "db_id_in_job")
+    )
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID => {
+      val sparkJob_df = sparkJobDF.filter('Overwatch_RunID === Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(sparkJob_df).add(validateRules.take(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(sparkJob_df.where("db_job_id is not NULL")).add(validateRules(2)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
+  private[overwatch] def validateSqlQueryHist(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val tableName = sqlQueryHistTable
+
+    val validateRules = Seq[Rule](
+      validateNotNull("Warehouse_ID_Should_Not_be_NULL", "warehouse_id"),
+      validateNotNull("Query_ID_Should_Not_be_NULL", "query_id")
+    )
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID => {
+      val sqlQueryHist_df = sqlQueryHistDF.filter('Overwatch_RunID === Overwatch_RunID)
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(sqlQueryHist_df).add(validateRules),
+        tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
+  private[overwatch] def validateJobRun(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val tableName = jobRunTable
+    val key = jobRunKey
+
+    val validateRules = Seq[Rule](
+      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
+      validateNotNull("Run_ID_Should_Not_be_NULL", "run_id"),
+      validateNotNull("Job_Run_ID_Should_Not_be_NULL", "job_run_id"),
+      validateNotNull("Task_Run_ID_Should_Not_be_NULL", "task_run_id"),
+      validateNotNull("Cluster_ID_Should_Not_be_NULL", "cluster_id"),
+    )
+    Overwatch_RunIDs.foreach(Overwatch_RunID => {
+      val jobRun_df = jobRunDF.filter('Overwatch_RunID === Overwatch_RunID)
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(jobRun_df).add(validateRules.take(4)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(jobRun_df.filter(!'task_type.isin("sqlalert","sqldashboard","pipeline"))).add(validateRules(4)),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
+  private[overwatch] def validateJob(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val tableName = jobTable
+    val key = jobKey
+
+    val validateRules = Seq[Rule](
+      validateNotNull("Job_ID_Should_Not_be_NULL", "job_id"),
+      checkColumnInValues("Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl", "action"
+        , Array("snapimpute", "create", "reset", "update", "delete", "resetJobAcl", "changeJobAcl"))
+    )
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID => {
+      val job_df = jobDF.filter('Overwatch_RunID === Overwatch_RunID)
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(job_df).add(validateRules.head),
+        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+
+      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+        RuleSet(job_df).add(validateRules(1)),
+        tableName, key, validationStatus, quarantineStatus, "validate_values_in_between",Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
 //  private[overwatch] def validateCrossTable(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
 //
 //    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
