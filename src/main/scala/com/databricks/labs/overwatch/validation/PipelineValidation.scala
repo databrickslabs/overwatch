@@ -38,9 +38,7 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
     val processingStartTime = System.currentTimeMillis()
 
       if (tableArray.length == 0) {
-//        println(s"By Default Single Table Validation has been configured for ${clsfTable},${jrcpTable},${clusterTable},${sparkJobTable},${sqlQueryHistTable},${jobRunTable},${jobTable}")
-        println(s"By Default Single Table Validation has been configured for all tables")
-
+        println(s"By Default Single Table Validation has been configured for ${clsfTable},${jrcpTable},${clusterTable},${sparkJobTable},${sqlQueryHistTable},${jobRunTable},${jobTable}")
       } else {
         println(s"Single Table Validation has been configured for ${tableArray.mkString(",")}")
       }
@@ -55,31 +53,30 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
 
       tableArray.length match {
         case 0 =>
-          print(s"Overwatch_RunIDs: ${Overwatch_RunIDs.mkString(",")}")
           (validations, quarantine) == handleValidation(clsfTable, clsfDF, validateCLSF, validations, quarantine)
-//          (validations, quarantine) == handleValidation(jrcpTable, jrcpDF, validateJRCP, validations, quarantine)
-//          (validations, quarantine) == handleValidation(clusterTable, clusterDF, validateCluster, validations, quarantine)
-//          (validations, quarantine) == handleValidation(sparkJobTable, sparkJobDF, validateSparkJob, validations, quarantine)
-//          (validations, quarantine) == handleValidation(sqlQueryHistTable, sqlQueryHistDF, validateSqlQueryHist, validations, quarantine)
-//          (validations, quarantine) == handleValidation(jobRunTable, jobRunDF, validateJobRun, validations, quarantine)
-//          (validations, quarantine) == handleValidation(jobTable, jobDF, validateJob, validations, quarantine)
+          (validations, quarantine) == handleValidation(jrcpTable, jrcpDF, validateJRCP, validations, quarantine)
+          (validations, quarantine) == handleValidation(clusterTable, clusterDF, validateCluster, validations, quarantine)
+          (validations, quarantine) == handleValidation(sparkJobTable, sparkJobDF, validateSparkJob, validations, quarantine)
+          (validations, quarantine) == handleValidation(sqlQueryHistTable, sqlQueryHistDF, validateSqlQueryHist, validations, quarantine)
+          (validations, quarantine) == handleValidation(jobRunTable, jobRunDF, validateJobRun, validations, quarantine)
+          (validations, quarantine) == handleValidation(jobTable, jobDF, validateJob, validations, quarantine)
 
         case _ =>
           tableArray.map(_.toLowerCase).foreach {
             case tableName@"clusterstatefact_gold" =>
               (validations, quarantine) == handleValidation(clsfTable, clsfDF, validateCLSF, validations, quarantine)
-//            case tableName@"jobruncostpotentialfact_gold" =>
-//              (validations, quarantine) == handleValidation(jrcpTable, jrcpDF, validateJRCP, validations, quarantine)
-//            case tableName@"cluster_gold" =>
-//              (validations, quarantine) == handleValidation(clusterTable, clusterDF, validateCluster, validations, quarantine)
-//            case tableName@"sparkjob_gold" =>
-//              (validations, quarantine) == handleValidation(sparkJobTable, sparkJobDF, validateSparkJob, validations, quarantine)
-//            case tableName@"sql_query_history_gold" =>
-//              (validations, quarantine) == handleValidation(sqlQueryHistTable, sqlQueryHistDF, validateSqlQueryHist, validations, quarantine)
-//            case tableName@"jobrun_gold" =>
-//              (validations, quarantine) == handleValidation(jobRunTable, jobRunDF, validateJobRun, validations, quarantine)
-//            case tableName@"job_gold" =>
-//              (validations, quarantine) == handleValidation(jobTable, jobDF, validateJob, validations, quarantine)
+            case tableName@"jobruncostpotentialfact_gold" =>
+              (validations, quarantine) == handleValidation(jrcpTable, jrcpDF, validateJRCP, validations, quarantine)
+            case tableName@"cluster_gold" =>
+              (validations, quarantine) == handleValidation(clusterTable, clusterDF, validateCluster, validations, quarantine)
+            case tableName@"sparkjob_gold" =>
+              (validations, quarantine) == handleValidation(sparkJobTable, sparkJobDF, validateSparkJob, validations, quarantine)
+            case tableName@"sql_query_history_gold" =>
+              (validations, quarantine) == handleValidation(sqlQueryHistTable, sqlQueryHistDF, validateSqlQueryHist, validations, quarantine)
+            case tableName@"jobrun_gold" =>
+              (validations, quarantine) == handleValidation(jobRunTable, jobRunDF, validateJobRun, validations, quarantine)
+            case tableName@"job_gold" =>
+              (validations, quarantine) == handleValidation(jobTable, jobDF, validateJob, validations, quarantine)
             case tableName => println(s"Table $tableName is not recognized or not supported.")
           }
       }
