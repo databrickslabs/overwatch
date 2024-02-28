@@ -207,59 +207,59 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
    * @param quarantineStatus : Quarantine Status Array for Quarantine Report
    * @return
    */
-//  def validateColumnBetweenMultipleTable(
-//                                          source: PipelineTable,
-//                                          target: PipelineTable,
-//                                          sourceDF: DataFrame,
-//                                          targetDF: DataFrame,
-//                                          column: String,
-//                                          key: Array[String],
-//                                          validationStatus: ArrayBuffer[HealthCheckReport],
-//                                          quarantineStatus: ArrayBuffer[QuarantineReport]
-//                                        ): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//
-//    val vStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    val qStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//    val sourceTable = source.name
-//    val targetTable = target.name
-//
-//    if (spark.catalog.tableExists(s"$etlDB.$sourceTable") &&  spark.catalog.tableExists(s"$etlDB.$targetTable")){
-//      if (sourceDF.count() == 0 || targetDF.count() == 0) {
-//        val msg = s"Cross table validation between source $sourceTable and target $targetTable is not possible as either of them doesn't contain any data"
-//        println(msg)
-//        logger.log(Level.WARN,msg)
-//        return (validationStatus, quarantineStatus)
-//      }
-//      // In Case of NotebookCommands Table we should only consider the workspaces where verbose auditlog is enabled
-//      val joinedDF = if (source.name == nbcmdTable || target.name == nbcmdTable){
-//        val organizationID_list : Array[String] = spark.sql(s"select distinct organization_id from $etlDB.$nbcmdTable").collect().map(_.getString(0))
-////        val organizationID_list : Array[String]= sourceDF.select("organization_id").join(targetDF.select("organization_id"),Seq("organization_id"),"inner").distinct().collect().map(_.getString(0))
-//        sourceDF.filter('organization_id.isin(organizationID_list:_*)).join(targetDF.filter('organization_id.isin(organizationID_list:_*)), Seq(column), "anti").select(key.map(col): _*)
-//      }else{
-//        sourceDF.join(targetDF, Seq(column), "anti").select(key.map(col): _*)
-//      }
-//      val joinedDFCount = joinedDF.count()
-//
-//      val ruleName = s"${column.toUpperCase()}_Present_In_${sourceTable}_But_Not_In_$targetTable"
-//
-//      if (joinedDFCount == 0) {
-//        val healthCheckMsg = s"HealthCheck Success: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
-//        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunIDs))
-//      } else {
-//        val healthCheckMsg = s"HealthCheck Warning: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
-//        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunIDs))
-//        joinedDF.toJSON.collect().foreach(jsonString => {
-//          qStatus.append(QuarantineReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", "Warning", jsonString))
-//        })
-//      }
-//      (validationStatus ++= vStatus, quarantineStatus ++= qStatus)
-//    }else{
-//      val msg = s"Cross table validation between source $sourceTable and target $targetTable is not possible as either of them doesn't exist in the database"
-//      println(msg)
-//      logger.log(Level.WARN,msg)
-//      (validationStatus, quarantineStatus)
-//    }
-//  }
+  def validateColumnBetweenMultipleTable(
+                                          source: PipelineTable,
+                                          target: PipelineTable,
+                                          sourceDF: DataFrame,
+                                          targetDF: DataFrame,
+                                          column: String,
+                                          key: Array[String],
+                                          validationStatus: ArrayBuffer[HealthCheckReport],
+                                          quarantineStatus: ArrayBuffer[QuarantineReport],
+                                          Overwatch_RunID:String
+                                        ): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+
+    val vStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    val qStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+    val sourceTable = source.name
+    val targetTable = target.name
+
+    if (spark.catalog.tableExists(s"$etlDB.$sourceTable") &&  spark.catalog.tableExists(s"$etlDB.$targetTable")){
+      if (sourceDF.count() == 0 || targetDF.count() == 0) {
+        val msg = s"Cross table validation between source $sourceTable and target $targetTable is not possible for Overwatch_RunID $Overwatch_RunID as either of them doesn't contain any data"
+        println(msg)
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
+      // In Case of NotebookCommands Table we should only consider the workspaces where verbose auditlog is enabled
+      val joinedDF = if (source.name == nbcmdTable || target.name == nbcmdTable){
+        val organizationID_list : Array[String] = spark.sql(s"select distinct organization_id from $etlDB.$nbcmdTable").collect().map(_.getString(0))
+        sourceDF.filter('organization_id.isin(organizationID_list:_*)).join(targetDF.filter('organization_id.isin(organizationID_list:_*)), Seq(column), "anti").select(key.map(col): _*)
+      }else{
+        sourceDF.join(targetDF, Seq(column), "anti").select(key.map(col): _*)
+      }
+      val joinedDFCount = joinedDF.count()
+
+      val ruleName = s"${column.toUpperCase()}_Present_In_${sourceTable}_But_Not_In_$targetTable"
+
+      if (joinedDFCount == 0) {
+        val healthCheckMsg = s"HealthCheck Success: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
+        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
+      } else {
+        val healthCheckMsg = s"HealthCheck Warning: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
+        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
+        joinedDF.toJSON.collect().foreach(jsonString => {
+          qStatus.append(QuarantineReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", "Warning", jsonString))
+        })
+      }
+      (validationStatus ++= vStatus, quarantineStatus ++= qStatus)
+    }else{
+      val msg = s"Cross table validation between source $sourceTable and target $targetTable is not possible as either of them doesn't exist in the database"
+      println(msg)
+      logger.log(Level.WARN,msg)
+      (validationStatus, quarantineStatus)
+    }
+  }
 
   private[overwatch] def validateCLSF(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
 
@@ -280,6 +280,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
 
     Overwatch_RunIDs.foreach(Overwatch_RunID =>{
       val clsf_df : DataFrame= clsfDF.filter('Overwatch_RunID === Overwatch_RunID)
+      if (clsf_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(clsf_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -318,7 +323,13 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     )
 
     Overwatch_RunIDs.foreach(Overwatch_RunID =>{
-      val jrcp_df = jrcpDF.filter('Overwatch_RunID === Overwatch_RunID).withColumn("days_in_running", size(col("running_days")))
+      val jrcp_df = jrcpDF.filter('Overwatch_RunID === Overwatch_RunID)
+        .withColumn("days_in_running", size(col("running_days")))
+      if (jrcp_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(jrcp_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -351,6 +362,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
 
     Overwatch_RunIDs.foreach(Overwatch_RunID =>{
       val cluster_df = clusterDF.filter('Overwatch_RunID === Overwatch_RunID)
+      if (cluster_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(cluster_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -381,6 +397,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
 
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val sparkJob_df = sparkJobDF.filter('Overwatch_RunID === Overwatch_RunID)
+      if (sparkJob_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
 
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(sparkJob_df).add(validateRules.take(2)),
@@ -406,6 +427,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
 
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val sqlQueryHist_df = sqlQueryHistDF.filter('Overwatch_RunID === Overwatch_RunID)
+      if (sqlQueryHist_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(sqlQueryHist_df).add(validateRules),
         tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -429,6 +455,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     )
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val jobRun_df = jobRunDF.filter('Overwatch_RunID === Overwatch_RunID)
+      if (jobRun_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(jobRun_df).add(validateRules.take(4)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -455,6 +486,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
 
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val job_df = jobDF.filter('Overwatch_RunID === Overwatch_RunID)
+      if (job_df.count() == 0) {
+        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        logger.log(Level.WARN,msg)
+        return (validationStatus, quarantineStatus)
+      }
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(job_df).add(validateRules.head),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -466,54 +502,64 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
 
-//  private[overwatch] def validateCrossTable(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
-//
-//    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
-//    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-//
-//    //Job_ID_Present_In_JobRun_Gold_But_Not_In_JobRunCostPotentialFact_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunTarget, goldTargets.jobRunCostPotentialFactTarget,
-//      jobRunDF, jrcpDF, "job_id", jobRunKey, validationStatus, quarantineStatus)
-//
-//    //Job_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_JobRun_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.jobRunTarget,
-//      jrcpDF, jobRunDF, "job_id", jrcpKey, validationStatus, quarantineStatus)
-//
-//    //Cluster_ID_Present_In_JobRun_Gold_But_Not_In_JobRunCostPotentialFact_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunTarget, goldTargets.jobRunCostPotentialFactTarget,
-//      jobRunDF, jrcpDF, "cluster_id", jobRunKey, validationStatus, quarantineStatus)
-//
-//    //Cluster_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_JobRun_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.jobRunTarget,
-//      jrcpDF, jobRunDF, "cluster_id", jrcpKey, validationStatus, quarantineStatus)
-//
-//    //Notebook_Id_Present_In_Notebook_gold_But_Not_In_NotebookCommands_gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.notebookTarget, goldTargets.notebookCommandsTarget,
-//      nbDF, nbcmdDF, "notebook_id", nbkey, validationStatus, quarantineStatus)
-//
-//    //Notebook_Id_Present_In_NotebookCommands_Gold_But_Not_In_Notebook_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.notebookCommandsTarget, goldTargets.notebookTarget,
-//      nbcmdDF, nbDF, "notebook_id", nbcmdkey, validationStatus, quarantineStatus)
-//
-//    //Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_JobRunCostPotentialFact_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterStateFactTarget, goldTargets.jobRunCostPotentialFactTarget,
-//      clsfDF, jrcpDF, "cluster_id", clsfKey, validationStatus, quarantineStatus)
-//
-//    //Cluster_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_ClusterStateFact_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.clusterStateFactTarget,
-//      jrcpDF, clsfDF, "cluster_id", jrcpKey, validationStatus, quarantineStatus)
-//
-//    //Cluster_ID_Present_In_Cluster_Gold_But_Not_In_ClusterStateFact_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterTarget, goldTargets.clusterStateFactTarget,
-//      clusterDF, clsfDF, "cluster_id", clusterKey, validationStatus, quarantineStatus)
-//
-//    //Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_Cluster_Gold
-//    (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterStateFactTarget, goldTargets.clusterTarget,
-//      clsfDF, clusterDF, "cluster_id", clsfKey, validationStatus, quarantineStatus)
-//
-//    (validations ++= validationStatus, quarantine ++= quarantineStatus)
-//
-//  }
+  private[overwatch] def validateCrossTable(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
+
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID => {
+      val jobRun_df = if (jobRunDF.count == 0)spark.emptyDataFrame else jobRunDF.filter('Overwatch_RunID === Overwatch_RunID)
+      val jrcp_df = if (jrcpDF.count == 0)spark.emptyDataFrame else jrcpDF.filter('Overwatch_RunID === Overwatch_RunID)
+      val nb_df = if (nbDF.count == 0)spark.emptyDataFrame else nbDF.filter('Overwatch_RunID === Overwatch_RunID)
+      val nbcmd_df = if (nbcmdDF.count == 0)spark.emptyDataFrame else nbcmdDF.filter('Overwatch_RunID === Overwatch_RunID)
+      val clsf_df = if (clsfDF.count == 0)spark.emptyDataFrame else clsfDF.filter('Overwatch_RunID === Overwatch_RunID)
+      val cluster_df = if (clusterDF.count == 0)spark.emptyDataFrame else clusterDF.filter('Overwatch_RunID === Overwatch_RunID)
+
+      //Job_ID_Present_In_JobRun_Gold_But_Not_In_JobRunCostPotentialFact_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunTarget, goldTargets.jobRunCostPotentialFactTarget,
+        jobRun_df, jrcp_df, "job_id", jobRunKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Job_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_JobRun_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.jobRunTarget,
+        jrcp_df, jobRun_df, "job_id", jrcpKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Cluster_ID_Present_In_JobRun_Gold_But_Not_In_JobRunCostPotentialFact_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunTarget, goldTargets.jobRunCostPotentialFactTarget,
+        jobRun_df, jrcp_df, "cluster_id", jobRunKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Cluster_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_JobRun_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.jobRunTarget,
+        jrcp_df, jobRun_df, "cluster_id", jrcpKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Notebook_Id_Present_In_Notebook_gold_But_Not_In_NotebookCommands_gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.notebookTarget, goldTargets.notebookCommandsTarget,
+        nb_df, nbcmd_df, "notebook_id", nbkey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Notebook_Id_Present_In_NotebookCommands_Gold_But_Not_In_Notebook_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.notebookCommandsTarget, goldTargets.notebookTarget,
+        nbcmd_df, nb_df, "notebook_id", nbcmdkey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_JobRunCostPotentialFact_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterStateFactTarget, goldTargets.jobRunCostPotentialFactTarget,
+        clsf_df, jrcp_df, "cluster_id", clsfKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Cluster_ID_Present_In_JobRunCostPotentialFact_Gold_But_Not_In_ClusterStateFact_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.jobRunCostPotentialFactTarget, goldTargets.clusterStateFactTarget,
+        jrcp_df, clsf_df, "cluster_id", jrcpKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Cluster_ID_Present_In_Cluster_Gold_But_Not_In_ClusterStateFact_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterTarget, goldTargets.clusterStateFactTarget,
+        cluster_df, clsf_df, "cluster_id", clusterKey, validationStatus, quarantineStatus,Overwatch_RunID)
+
+      //Cluster_ID_Present_In_ClusterStateFact_Gold_But_Not_In_Cluster_Gold
+      (validationStatus, quarantineStatus) == validateColumnBetweenMultipleTable(goldTargets.clusterStateFactTarget, goldTargets.clusterTarget,
+        clsf_df, cluster_df, "cluster_id", clsfKey, validationStatus, quarantineStatus,Overwatch_RunID)
+    })
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+
+  }
 
   private[overwatch] def snapShotHealthCheck(validationArray: Array[HealthCheckReport], healthCheckReportPath: String): Unit = {
 
