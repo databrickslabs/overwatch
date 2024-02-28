@@ -43,13 +43,13 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
         println(s"Single Table Validation has been configured for ${tableArray.mkString(",")}")
       }
 
-//      if (crossTableValidation) {
-//        println("Cross Table Validation has been Configured")
-//        (validations, quarantine) == validateCrossTable()
-//      } else {
-//        println("Cross Table Validation has not been Configured")
-//        logger.log(Level.INFO, "Cross Table Validation is Disabled")
-//      }
+      if (crossTableValidation) {
+        println("Cross Table Validation has been Configured")
+        (validations, quarantine) == validateCrossTable()
+      } else {
+        println("Cross Table Validation has not been Configured")
+        logger.log(Level.INFO, "Cross Table Validation is Disabled")
+      }
 
       tableArray.length match {
         case 0 =>
