@@ -35,13 +35,10 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
 
   def process(tableArray: Array[String] = Array(), crossTableValidation: Boolean = true): Unit = {
 
-    val processingStartTime = System.currentTimeMillis()
+      val processingStartTime = System.currentTimeMillis()
 
-      if (tableArray.length == 0) {
-        println(s"By Default Single Table Validation has been configured for ${clsfTable},${jrcpTable},${clusterTable},${sparkJobTable},${sqlQueryHistTable},${jobRunTable},${jobTable}")
-      } else {
-        println(s"Single Table Validation has been configured for ${tableArray.mkString(",")}")
-      }
+      println("By Default Pipeline_Report would be Validated")
+      (validations, quarantine) == validatePipelineTable()
 
       if (crossTableValidation) {
         println("Cross Table Validation has been Configured")
@@ -53,6 +50,8 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
 
       tableArray.length match {
         case 0 =>
+          println(s"By Default Single Table Validation has been configured for ${clsfTable},${jrcpTable},${clusterTable},${sparkJobTable}," +
+            s"${sqlQueryHistTable},${jobRunTable},${jobTable}")
           (validations, quarantine) == handleValidation(clsfTable, clsfDF, validateCLSF, validations, quarantine)
           (validations, quarantine) == handleValidation(jrcpTable, jrcpDF, validateJRCP, validations, quarantine)
           (validations, quarantine) == handleValidation(clusterTable, clusterDF, validateCluster, validations, quarantine)
@@ -62,6 +61,7 @@ class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlD
           (validations, quarantine) == handleValidation(jobTable, jobDF, validateJob, validations, quarantine)
 
         case _ =>
+          println(s"Single Table Validation has been configured for ${tableArray.mkString(",")}")
           tableArray.map(_.toLowerCase).foreach {
             case tableName@"clusterstatefact_gold" =>
               (validations, quarantine) == handleValidation(clsfTable, clsfDF, validateCLSF, validations, quarantine)
