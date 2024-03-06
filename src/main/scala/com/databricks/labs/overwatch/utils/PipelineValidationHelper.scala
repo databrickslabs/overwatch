@@ -1,13 +1,13 @@
 package com.databricks.labs.overwatch.utils
 
 import com.databricks.labs.overwatch.pipeline.Pipeline
-
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.functions._
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.validation._
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.expressions.Window
 
 import java.time.LocalDateTime
 import scala.collection.mutable.ArrayBuffer
@@ -100,8 +100,6 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
   val sqlQueryHistTable: String = goldTargets.sqlQueryHistoryTarget.name
   val jobTable: String = goldTargets.jobTarget.name
 
-
-  println("Overwatch_RunIDs: "+Overwatch_RunIDs.mkString(","))
   val filterCondition = 'Overwatch_RunID.isin(Overwatch_RunIDs:_*)
   val jrcpDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jrcpTable")) spark.read.table(s"$etlDB.$jrcpTable").filter(filterCondition) else spark.emptyDataFrame
   val clsfDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clsfTable")) spark.read.table(s"$etlDB.$clsfTable").filter(filterCondition) else spark.emptyDataFrame
@@ -502,12 +500,69 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
 
+  def checkPipelineModules (
+                           resultDF: DataFrame,
+                           table_name: String,
+                           validationStatus: ArrayBuffer[HealthCheckReport],
+                           quarantineStatus: ArrayBuffer[QuarantineReport],
+                           Overwatch_RunID: String,
+                           status: String
+                         ) = {
+
+    val vStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    val qStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    val healthCheckRuleColumn = f"Check If Any Module is ${status}"
+
+    val dfWithNegativeValidation = resultDF.filter('status.startsWith(status))
+    val countOfNegativeValidation = dfWithNegativeValidation.count()
+    if (countOfNegativeValidation == 0) {
+      val healthCheckMsg = "Success"
+      vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn, "Pipeline_Report_Validation", Some(healthCheckMsg), Overwatch_RunID))
+    }else{
+      val healthCheckMsg = s"HealthCheck Warning: got $countOfNegativeValidation ${status} Module"
+      vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn, "Pipeline_Report_Validation", Some(healthCheckMsg), Overwatch_RunID))
+      dfWithNegativeValidation.toJSON.collect().foreach(jsonString => {
+        qStatus.append(QuarantineReport(etlDB, table_name, healthCheckRuleColumn, "Pipeline_Report_Validation", "Warning", jsonString))
+      })
+    }
+    validationStatus ++= vStatus
+    quarantineStatus ++= qStatus
+
+    (validationStatus, quarantineStatus)
+  }
+
+  private[overwatch] def validatePipelineTable(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) ={
+    var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
+    var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
+
+    Overwatch_RunIDs.foreach(Overwatch_RunID => {
+      val pipeline_df = spark.table("ow_etl_07204.pipeline_report").filter('Overwatch_RunID === Overwatch_RunID)
+      val windowSpec = Window.partitionBy("organization_id","moduleID","Overwatch_RunID").orderBy('Pipeline_SnapTS.desc)
+      val resultDF = pipeline_df.select(
+        col("organization_id"),
+        col("workspace_name"),
+        col("moduleID"),
+        col("moduleName"),
+        col("fromTS"),
+        col("untilTS"),
+        col("Overwatch_RunID"),
+        substring(col("status"), 0, 200).alias("status"),
+        col("Pipeline_SnapTS"),
+        rank().over(windowSpec).alias("rank1")
+      )
+
+      (validationStatus, quarantineStatus) == checkPipelineModules(resultDF,"pipeline_report",validationStatus,quarantineStatus,Overwatch_RunID,"EMPTY")
+      (validationStatus, quarantineStatus) == checkPipelineModules(resultDF,"pipeline_report",validationStatus,quarantineStatus,Overwatch_RunID,"FAILED")
+    })
+
+    (validations ++= validationStatus, quarantine ++= quarantineStatus)
+  }
+
   private[overwatch] def validateCrossTable(): (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
 
     var validationStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
     var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
-
-
 
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val jobRun_df = if (jobRunDF.count == 0)spark.emptyDataFrame else jobRunDF.filter('Overwatch_RunID === Overwatch_RunID)
