@@ -62,7 +62,7 @@ object DbsqlTransforms extends SparkSessionWrapper {
                                 bronzeWarehouseSnapUntilCurrent: DataFrame,
                                 warehouseSpecSilver: PipelineTable)
                                 (warehouseBaseWMetaDF: DataFrame): DataFrame = {
-   val result =  if (isFirstRun || warehouseSpecSilver.exists(dataValidation = true)) {
+   val result =  if (isFirstRun || !warehouseSpecSilver.exists(dataValidation = true)) {
       val firstRunMsg = "Silver_WarehouseSpec -- First run detected, will impute warehouse state from bronze to derive " +
         "current initial state for all existing warehouses."
       logger.log(Level.INFO, firstRunMsg)
