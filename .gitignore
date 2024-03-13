@@ -30,3 +30,7 @@ terraform.tfstate*
 .bsp
 .metals
 .idea
+scala-doc/
+src/.scala-build
+project/metals.sbt
+.vscode/

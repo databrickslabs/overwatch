@@ -136,6 +136,8 @@ object Schema extends SparkSessionWrapper {
         StructField("name", StringType, nullable = true),
         StructField("timeout_seconds", LongType, nullable = true),
         StructField("max_concurrent_runs", LongType, nullable = true),
+        StructField("queue", StringType, nullable = true),
+        StructField("all_queued_runs", BooleanType, nullable = true),
         StructField("max_retries", LongType, nullable = true),
         StructField("retry_on_timeout", BooleanType, nullable = true),
         StructField("min_retry_interval_millis", LongType, nullable = true),
@@ -501,20 +503,21 @@ object Schema extends SparkSessionWrapper {
   )))
 
   // minimum new jobs settings struct
-  val minimumNewSettingsSchema: StructType = StructType(Seq(
-    StructField("existing_cluster_id", StringType, nullable = true),
-    StructField("max_concurrent_runs", LongType, nullable = true),
-    StructField("name", StringType, nullable = true),
-    StructField("new_cluster", minimumNewClusterSchema, nullable = true),
-    StructField("timeout_seconds", LongType, nullable = true),
-    StructField("notebook_task", minimumNotebookTaskSchema, nullable = true),
-    StructField("spark_python_task", minimumSparkPythonTaskSchema, nullable = true),
-    StructField("python_wheel_task", minimumPythonWheelTaskSchema, nullable = true),
-    StructField("spark_jar_task", minimumSparkJarTaskSchema, nullable = true),
-    StructField("spark_submit_task", minimumSparkSubmitTaskSchema, nullable = true),
-    StructField("shell_command_task", minimumShellCommandTaskSchema, nullable = true),
-    StructField("pipeline_task", minimumPipelineTaskSchema, nullable = true),
-  ))
+  // (not used)
+  // val minimumNewSettingsSchema: StructType = StructType(Seq(
+  //   StructField("existing_cluster_id", StringType, nullable = true),
+  //   StructField("max_concurrent_runs", LongType, nullable = true),
+  //   StructField("name", StringType, nullable = true),
+  //   StructField("new_cluster", minimumNewClusterSchema, nullable = true),
+  //   StructField("timeout_seconds", LongType, nullable = true),
+  //   StructField("notebook_task", minimumNotebookTaskSchema, nullable = true),
+  //   StructField("spark_python_task", minimumSparkPythonTaskSchema, nullable = true),
+  //   StructField("python_wheel_task", minimumPythonWheelTaskSchema, nullable = true),
+  //   StructField("spark_jar_task", minimumSparkJarTaskSchema, nullable = true),
+  //   StructField("spark_submit_task", minimumSparkSubmitTaskSchema, nullable = true),
+  //   StructField("shell_command_task", minimumShellCommandTaskSchema, nullable = true),
+  //   StructField("pipeline_task", minimumPipelineTaskSchema, nullable = true),
+  // ))
 
   val minimumJobStatusSilverMetaLookupSchema: StructType = StructType(Seq(
     StructField("organization_id", StringType, nullable = false),
@@ -534,23 +537,24 @@ object Schema extends SparkSessionWrapper {
   ))
 
   // simplified new settings struct
-  private[overwatch] val simplifiedNewSettingsSchema = StructType(Seq(
-    StructField("email_notifications", minimumEmailNotificationsSchema, nullable = true),
-    StructField("existing_cluster_id", StringType, nullable = true),
-    StructField("max_concurrent_runs", LongType, nullable = true),
-    StructField("name", StringType, nullable = true),
-    StructField("new_cluster", minimumNewClusterSchema, nullable = true),
-    StructField("notebook_task", minimumNotebookTaskSchema, nullable = true),
-    StructField("schedule", minimumScheduleSchema, nullable = true),
-    StructField("notebook_task",minimumNotebookTaskSchema, nullable = true),
-    StructField("spark_python_task",minimumSparkPythonTaskSchema, nullable = true),
-    StructField("python_wheel_task", minimumPythonWheelTaskSchema, nullable = true),
-    StructField("spark_jar_task",minimumSparkJarTaskSchema, nullable = true),
-    StructField("spark_submit_task", minimumSparkSubmitTaskSchema, nullable = true),
-    StructField("shell_command_task",minimumShellCommandTaskSchema, nullable = true),
-    StructField("pipeline_task", minimumPipelineTaskSchema, nullable = true),
-    StructField("timeout_seconds", LongType, nullable = true)
-  ))
+  // (not used)
+  // private[overwatch] val simplifiedNewSettingsSchema = StructType(Seq(
+  //   StructField("email_notifications", minimumEmailNotificationsSchema, nullable = true),
+  //   StructField("existing_cluster_id", StringType, nullable = true),
+  //   StructField("max_concurrent_runs", LongType, nullable = true),
+  //   StructField("name", StringType, nullable = true),
+  //   StructField("new_cluster", minimumNewClusterSchema, nullable = true),
+  //   StructField("notebook_task", minimumNotebookTaskSchema, nullable = true),
+  //   StructField("schedule", minimumScheduleSchema, nullable = true),
+  //   StructField("notebook_task",minimumNotebookTaskSchema, nullable = true),
+  //   StructField("spark_python_task",minimumSparkPythonTaskSchema, nullable = true),
+  //   StructField("python_wheel_task", minimumPythonWheelTaskSchema, nullable = true),
+  //   StructField("spark_jar_task",minimumSparkJarTaskSchema, nullable = true),
+  //   StructField("spark_submit_task", minimumSparkSubmitTaskSchema, nullable = true),
+  //   StructField("shell_command_task",minimumShellCommandTaskSchema, nullable = true),
+  //   StructField("pipeline_task", minimumPipelineTaskSchema, nullable = true),
+  //   StructField("timeout_seconds", LongType, nullable = true)
+  // ))
 
   val streamingGoldMinimumSchema: StructType = StructType(Seq(
     StructField("cluster_id", StringType, nullable = false),
@@ -701,6 +705,9 @@ object Schema extends SparkSessionWrapper {
       )), nullable = true)
   ))
 
+  val minimumQueueSchema: StructType = StructType(Seq(
+    StructField("enabled", BooleanType, nullable = true)))
+
   // commented fields have been removed as of 2.1
   // todo - update for v2.1
   val jobSnapMinimumSchema: StructType = StructType(Seq(
@@ -716,6 +723,7 @@ object Schema extends SparkSessionWrapper {
       StructField("libraries", minimumLibrariesSchema, nullable = true),
       StructField("git_source", minimumGitSourceSchema, nullable = true),
       StructField("max_concurrent_runs", LongType, nullable = true),
+      StructField("queue", minimumQueueSchema, nullable = true),
       StructField("max_retries", LongType, nullable = true),
       StructField("timeout_seconds", LongType, nullable = true),
       StructField("retry_on_timeout", BooleanType, nullable = true),
@@ -845,6 +853,7 @@ object Schema extends SparkSessionWrapper {
       StructField("git_source", minimumGitSourceSchema, nullable = true),
       StructField("timeout_seconds", LongType, nullable = true),
       StructField("max_concurrent_runs", LongType, nullable = true),
+      StructField("queue", minimumQueueSchema, nullable = true),
       StructField("max_retries", LongType, nullable = true),
       StructField("retry_on_timeout", BooleanType, nullable = true),
       StructField("min_retry_interval_millis", LongType, nullable = true),
@@ -907,6 +916,7 @@ object Schema extends SparkSessionWrapper {
       StructField("max_retries", LongType, nullable = true),
       StructField("min_retry_interval_millis", LongType, nullable = true),
       StructField("max_concurrent_runs", LongType, nullable = true),
+      StructField("queue", minimumQueueSchema, nullable = true),
       StructField("run_as_user_name", StringType, nullable = true),
       StructField("workflow_context", StringType, nullable = true),
       StructField("task_detail_legacy", minimumTaskDetailSchema, nullable = true),
