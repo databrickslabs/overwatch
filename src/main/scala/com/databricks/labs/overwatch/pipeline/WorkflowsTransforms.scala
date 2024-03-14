@@ -312,6 +312,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         jobStatusBuildLookupLogic("git_source", lastJobStatus, rawDFSchema, Some("lookup_settings")),
         fillForward("is_from_dlt", lastJobStatus),
         jobStatusBuildLookupLogic("max_concurrent_runs", lastJobStatus, rawDFSchema, Some("lookup_settings")).cast("long"),
+        jobStatusBuildLookupLogic("queue", lastJobStatus, rawDFSchema, Some("lookup_settings")),
         jobStatusBuildLookupLogic("max_retries", lastJobStatus, rawDFSchema, Some("lookup_settings")).cast("long"),
         jobStatusBuildLookupLogic("timeout_seconds", lastJobStatus, rawDFSchema, Some("lookup_settings")).cast("long"),
         jobStatusBuildLookupLogic("retry_on_timeout", lastJobStatus, rawDFSchema, Some("lookup_settings")).cast("boolean"),
@@ -388,6 +389,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         lit("snapImpute").alias("actionName"),
         lit("-1").alias("requestId"),
         $"settings.name".alias("jobName"),
+        $"settings.queue".alias("queue"),
         $"settings.tags".alias("tags"),
         $"settings.email_notifications".alias("email_notifications"),
         $"settings.existing_cluster_id".alias("existing_cluster_id"),
@@ -765,6 +767,28 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .drop("rnk", "rn", "timestamp")
       .groupBy('organization_id, 'runId, 'repairId)
       .agg(collect_list('repair_details).alias("repair_details"))
+  }
+  
+  def jobRunsDeriveCancelAllRunsEvents(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
+    df
+      .filter('actionName.isin("cancelAllRuns"))
+      .select(
+        'organization_id,
+        'timestamp,
+        // 'run_id.cast("long").alias("runId"), // lowest level -- could be taskRunId or jobRunId
+        'requestId.alias("cancellationRequestId"),
+        'response.alias("cancellationResponse"),
+        'sessionId.alias("cancellationSessionId"),
+        'sourceIPAddress.alias("cancellationSourceIP"),
+        'timestamp.alias("cancellationTime"),
+        'userAgent.alias("cancelledUserAgent"),
+        'userIdentity.alias("cancelledBy")
+      )
+      // .filter('runId.isNotNull)
+      .withColumn("rnk", rank().over(firstRunSemanticsW))
+      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .filter('rnk === 1 && 'rn === 1)
+      .drop("rnk", "rn", "timestamp")
   }
 
   def jobRunsDeriveRunsBase(df: DataFrame, etlUntilTime: TimeTypes): DataFrame = {

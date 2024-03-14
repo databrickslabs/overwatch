@@ -1302,7 +1302,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
     val jobRunActions = Array(
-      "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "repairRun"
+      "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "cancelAllRuns", "repairRun"
     )
     val optimalCacheParts = Math.min(daysToProcess * getTotalCores * 2, 1000)
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
@@ -1335,6 +1335,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         to_json('tags).alias("tags"),
         'schedule,
         'max_concurrent_runs,
+        'queue,
         'run_as_user_name,
         'timeout_seconds,
         'created_by,

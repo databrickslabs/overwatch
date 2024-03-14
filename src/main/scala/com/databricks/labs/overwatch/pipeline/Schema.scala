@@ -529,6 +529,7 @@ object Schema extends SparkSessionWrapper {
     StructField("tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("schedule", minimumScheduleSchema, nullable = true),
     StructField("max_concurrent_runs", LongType, nullable = true),
+    StructField("queue", minimumQueueSchema, nullable = true),
     StructField("run_as_user_name", StringType, nullable = true),
     StructField("timeout_seconds", LongType, nullable = true),
     StructField("created_by", StringType, nullable = true),
