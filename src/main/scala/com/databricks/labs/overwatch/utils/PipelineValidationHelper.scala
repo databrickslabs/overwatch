@@ -507,7 +507,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
                            quarantineStatus: ArrayBuffer[QuarantineReport],
                            Overwatch_RunID: String,
                            status: String
-                         ) = {
+                         ) : (ArrayBuffer[HealthCheckReport], ArrayBuffer[QuarantineReport]) = {
 
     val vStatus: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
     val qStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
@@ -537,7 +537,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     var quarantineStatus: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
 
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
-      val pipeline_df = spark.table("ow_etl_07204.pipeline_report").filter('Overwatch_RunID === Overwatch_RunID)
+      val pipeline_df = spark.table(s"$etlDB.pipeline_report").filter('Overwatch_RunID === Overwatch_RunID)
       val windowSpec = Window.partitionBy("organization_id","moduleID","Overwatch_RunID").orderBy('Pipeline_SnapTS.desc)
       val resultDF = pipeline_df.select(
         col("organization_id"),
