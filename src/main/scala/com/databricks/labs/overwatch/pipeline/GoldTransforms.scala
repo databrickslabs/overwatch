@@ -970,7 +970,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val jobViewColumnMapping: String =
     """
       |organization_id, workspace_name, job_id, action, date, timestamp, job_name, tags, tasks, job_clusters,
-      |libraries, timeout_seconds, max_concurrent_runs, max_retries, retry_on_timeout, min_retry_interval_millis,
+      |libraries, timeout_seconds, max_concurrent_runs, queue, max_retries, retry_on_timeout, min_retry_interval_millis,
       |schedule, existing_cluster_id, new_cluster, git_source, task_detail_legacy, is_from_dlt, aclPermissionSet,
       |targetUserId, session_id, request_id, user_agent, response, source_ip_address, created_by, created_ts,
       |deleted_by, deleted_ts, last_edited_by, last_edited_ts

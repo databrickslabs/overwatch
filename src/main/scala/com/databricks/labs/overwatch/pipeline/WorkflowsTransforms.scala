@@ -399,6 +399,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         $"settings.libraries".alias("libraries"),
         $"settings.git_source".alias("git_source"),
         $"settings.max_concurrent_runs".alias("max_concurrent_runs"),
+        $"settings.queue".alias("queue"),
         $"settings.max_retries".alias("max_retries"),
         $"settings.retry_on_timeout".alias("retry_on_timeout"),
         $"settings.min_retry_interval_millis".alias("min_retry_interval_millis"),
@@ -460,12 +461,14 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     dfc.count()
     val dfCols = dfc.columns
     val colsToRebuild = Array(
+      "queue",
       "email_notifications", "tags", "schedule", "libraries", "job_clusters", "tasks", "new_cluster",
       "git_source", "access_control_list", "grants", "notebook_task", "spark_python_task", "spark_jar_task",
       "python_wheel_task", "spark_submit_task", "pipeline_task", "shell_command_task"
     ).map(_.toLowerCase)
     val baseSelects = dfCols.filterNot(cName => colsToRebuild.contains(cName.toLowerCase)) map col
     val structifiedCols: Array[Column] = Array(
+      structFromJson(spark, dfc, "queue", allNullMinimumSchema = Schema.minimumQueueSchema),
       structFromJson(spark, dfc, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema),
       structFromJson(spark, dfc, "email_notifications", allNullMinimumSchema = Schema.minimumEmailNotificationsSchema),
       structFromJson(spark, dfc, "tags"),
