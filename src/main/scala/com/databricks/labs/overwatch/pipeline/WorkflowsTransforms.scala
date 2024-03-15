@@ -1470,7 +1470,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
           .otherwise(lit(1.0))
       ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
-      .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
+      .withColumn("overlapping_run_states", when('cluster_type === "interactive" || 'cluster_type === "automated"
+        , 'overlapping_run_states).otherwise(lit(0)))
       .withColumn("running_days", sequence($"task_runtime.startTS".cast("date"), $"task_runtime.endTS".cast("date")))
       .withColumn("total_dbus", 'total_dbus * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
