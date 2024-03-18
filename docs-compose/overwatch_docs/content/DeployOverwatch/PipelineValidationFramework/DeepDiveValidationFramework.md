@@ -165,7 +165,7 @@ Execution would be started upon calling `PipelineValidation()` function. Below a
 | Param                | Type    | Optional | Default Value | Description                                                                 |
 |----------------------|---------|----------|---------------|-----------------------------------------------------------------------------|
 | etlDB                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
-| tableArray           | String  | Yes      | Array()       | Array  of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
+| tableArray           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
 | crossTableValidation | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
 
 Here are the screenshots of Validation Framework run with default setting and with custom configuration using input arguments:
