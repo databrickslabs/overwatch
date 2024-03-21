@@ -155,7 +155,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0)
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(30))
   lazy private val appendClusterEventLogsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
