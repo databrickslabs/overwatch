@@ -283,6 +283,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(clsf_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -328,6 +329,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(jrcp_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -365,6 +367,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(cluster_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -400,7 +403,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
-
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(sparkJob_df).add(validateRules.take(2)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -430,6 +433,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(sqlQueryHist_df).add(validateRules),
         tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -458,6 +462,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(jobRun_df).add(validateRules.take(4)),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
@@ -489,6 +494,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
       }
+      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
       (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
         RuleSet(job_df).add(validateRules.head),
         tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
