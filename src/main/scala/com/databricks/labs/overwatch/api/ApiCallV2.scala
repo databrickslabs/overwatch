@@ -343,9 +343,9 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       execute()
     } else {
       if(writeTraceApiFlag()){
-        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response.body,response.code,jsonQuery,queryMap))
       }
-      throw new ApiCallFailure(response, buildGenericErrorMessage, debugFlag = false)
+      throw new ApiCallFailure(response, buildGenericErrorMessage, responseWithMeta = apiMeta.enrichAPIResponse(jsonQueryToApiErrorDetail(response.body),response.code, jsonQuery, queryMap) , debugFlag = false)
     }
 
   }
@@ -553,13 +553,13 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
 
 
-  private def jsonQueryToApiErrorDetail(e: ApiCallFailure): String = {
+  private def jsonQueryToApiErrorDetail(msg: String): String = {
     val mapper = new ObjectMapper()
     val jsonObject = mapper.readTree(jsonQuery);
     val clusterId = jsonObject.get("cluster_id").toString.replace("\"", "")
     val start_time = jsonObject.get("start_time").asLong()
     val end_time = jsonObject.get("end_time").asLong()
-    val errorObj = mapper.readTree(e.getMessage);
+    val errorObj = mapper.readTree(msg);
     val newJsonObject = new JSONObject();
     newJsonObject.put("cluster_id", clusterId)
     newJsonObject.put("from_epoch", start_time)
@@ -603,7 +603,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))//for GET request we have to convert queryMap to Json
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response.body,response.code,jsonQuery,queryMap))//for GET request we have to convert queryMap to Json
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         accumulator.add(1)
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
@@ -634,7 +634,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
           throw e
         }
         logger.log(Level.ERROR, excMsg, e)
-        throw new ApiCallFailureV2(jsonQueryToApiErrorDetail(e))
+        throw e
       }
       case e: Throwable => {
         val excMsg = "Got the exception while performing get request "
@@ -655,7 +655,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
     @tailrec def executeHelper(): this.type = {
       val response = getResponse
       responseCodeHandler(response)
-      _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))
+      _apiResponseArray.add(apiMeta.enrichAPIResponse(response.body,response.code,jsonQuery,queryMap))
       if (apiMeta.batchPersist && successTempPath.nonEmpty) {
         if (apiEnv.successBatchSize <= _apiResponseArray.size()) { //Checking if its right time to write the batches into persistent storage
           val responseFlag = PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, _apiResponseArray.toString)
@@ -771,18 +771,19 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
         case Success(_) =>
           apiResponseCounter.add(1)
 
-        case Failure(e) =>
-          if (e.isInstanceOf[ApiCallFailureV2]) {
+        case Failure(e:ApiCallFailure) =>
             synchronized {
-              apiErrorArray.add(e.getMessage)
+              apiErrorArray.add(e.responseMeta)
               if (apiErrorArray.size() >= config.apiEnv.errorBatchSize) {
                 PipelineFunctions.writeMicroBatchToTempLocation(tmpErrorPath, apiErrorArray.toString)
                 apiErrorArray = Collections.synchronizedList(new util.ArrayList[String]())
               }
+              apiResponseCounter.add(1)
             }
             logger.log(Level.ERROR, "Future failure message: " + e.getMessage, e)
-          }
-          apiResponseCounter.add(1)
+        case Failure(_) =>
+            apiResponseCounter.add(1)
+
       }
       startValue = startValue + incrementCounter
     }
