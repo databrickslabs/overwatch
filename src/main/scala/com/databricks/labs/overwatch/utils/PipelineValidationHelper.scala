@@ -165,7 +165,11 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
       val dfWithNegativeValidation = completeReportDF.filter((col(s"$healthCheckRuleColumn.passed") === false) ||
         col(s"$healthCheckRuleColumn.passed").isNull).select(keys.map(col): _*)
       val countOfNegativeValidation = dfWithNegativeValidation.count()
-      if (countOfNegativeValidation == 0) {
+      if (validationType.toLowerCase() == "validate_not_required"){
+        val healthCheckMsg = s"Validation is not required for ${table_name} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
+        vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
+      }
+      else if (countOfNegativeValidation == 0) {
         val healthCheckMsg = "Success"
         vStatus.append(HealthCheckReport(etlDB, table_name, healthCheckRuleColumn,"Single_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
       } else {
@@ -279,30 +283,31 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     Overwatch_RunIDs.foreach(Overwatch_RunID =>{
       val clsf_df : DataFrame= clsfDF.filter('Overwatch_RunID === Overwatch_RunID)
       if (clsf_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(clsf_df).add(validateRules),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      }else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(clsf_df).add(validateRules.take(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(clsf_df.where("target_num_workers != 0")).add(validateRules(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(clsf_df.where("runtime_engine IN ('STANDARD','PHOTON')")).add(validateRules(3)),
+          tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(clsf_df.where("databricks_billable is true")).add(validateRules(4)),
+          tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(clsf_df).add(validateRules(5)),
+          tableName, key, validationStatus, quarantineStatus, "", Overwatch_RunID)
       }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsf_df).add(validateRules.take(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsf_df.where("target_num_workers != 0")).add(validateRules(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsf_df.where("runtime_engine IN ('STANDARD','PHOTON')")).add(validateRules(3)),
-        tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsf_df.where("databricks_billable is true")).add(validateRules(4)),
-        tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(clsf_df).add(validateRules(5)),
-        tableName, key, validationStatus, quarantineStatus,"",Overwatch_RunID)
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -325,22 +330,23 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
       val jrcp_df = jrcpDF.filter('Overwatch_RunID === Overwatch_RunID)
         .withColumn("days_in_running", size(col("running_days")))
       if (jrcp_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jrcp_df).add(validateRules),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      }else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jrcp_df).add(validateRules.take(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jrcp_df).add(validateRules(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_leq_one", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jrcp_df).add(validateRules(3)),
+          tableName, key, validationStatus, quarantineStatus, "", Overwatch_RunID)
       }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(jrcp_df).add(validateRules.take(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(jrcp_df).add(validateRules(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_leq_one",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(jrcp_df).add(validateRules(3)),
-        tableName, key, validationStatus, quarantineStatus,"",Overwatch_RunID)
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -363,22 +369,23 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     Overwatch_RunIDs.foreach(Overwatch_RunID =>{
       val cluster_df = clusterDF.filter('Overwatch_RunID === Overwatch_RunID)
       if (cluster_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(cluster_df).add(validateRules),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      } else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(cluster_df).add(validateRules.take(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(cluster_df.where("num_workers != 0")).add(validateRules(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(cluster_df).add(validateRules(3)),
+          tableName, key, validationStatus, quarantineStatus, "validate_values_in_between", Overwatch_RunID)
       }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(cluster_df).add(validateRules.take(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(cluster_df.where("num_workers != 0")).add(validateRules(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
-
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(cluster_df).add(validateRules(3)),
-        tableName, key, validationStatus, quarantineStatus, "validate_values_in_between",Overwatch_RunID)
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -399,18 +406,19 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val sparkJob_df = sparkJobDF.filter('Overwatch_RunID === Overwatch_RunID)
       if (sparkJob_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
-      }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(sparkJob_df).add(validateRules.take(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(sparkJob_df).add(validateRules),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      } else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(sparkJob_df).add(validateRules.take(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
 
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(sparkJob_df.where("db_job_id is not NULL")).add(validateRules(2)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(sparkJob_df.where("db_job_id is not NULL")).add(validateRules(2)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+      }
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -429,14 +437,15 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val sqlQueryHist_df = sqlQueryHistDF.filter('Overwatch_RunID === Overwatch_RunID)
       if (sqlQueryHist_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(sqlQueryHist_df).add(validateRules),
+          tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      } else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(sqlQueryHist_df).add(validateRules),
+          tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
       }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(sqlQueryHist_df).add(validateRules),
-        tableName, sqlQueryHistKey, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -458,18 +467,19 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val jobRun_df = jobRunDF.filter('Overwatch_RunID === Overwatch_RunID)
       if (jobRun_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
-      }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(jobRun_df).add(validateRules.take(4)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jobRun_df).add(validateRules),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      } else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jobRun_df).add(validateRules.take(4)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
 
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(jobRun_df.filter(!'task_type.isin("sqlalert","sqldashboard","pipeline"))).add(validateRules(4)),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(jobRun_df.filter(!'task_type.isin("sqlalert", "sqldashboard", "pipeline"))).add(validateRules(4)),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
+      }
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
@@ -490,18 +500,19 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     Overwatch_RunIDs.foreach(Overwatch_RunID => {
       val job_df = jobDF.filter('Overwatch_RunID === Overwatch_RunID)
       if (job_df.count() == 0) {
-        val msg = s"Validation is not required for ${tableName} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
-        logger.log(Level.WARN,msg)
-        return (validationStatus, quarantineStatus)
-      }
-      println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(job_df).add(validateRules.head),
-        tableName, key, validationStatus, quarantineStatus, "validate_not_null",Overwatch_RunID)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(job_df).add(validateRules),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_required", Overwatch_RunID)
+      } else {
+        println(s"${tableName} is getting validated for Overwatch_RunID ${Overwatch_RunID}")
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(job_df).add(validateRules.head),
+          tableName, key, validationStatus, quarantineStatus, "validate_not_null", Overwatch_RunID)
 
-      (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-        RuleSet(job_df).add(validateRules(1)),
-        tableName, key, validationStatus, quarantineStatus, "validate_values_in_between",Overwatch_RunID)
+        (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
+          RuleSet(job_df).add(validateRules(1)),
+          tableName, key, validationStatus, quarantineStatus, "validate_values_in_between", Overwatch_RunID)
+      }
     })
     (validations ++= validationStatus, quarantine ++= quarantineStatus)
   }
