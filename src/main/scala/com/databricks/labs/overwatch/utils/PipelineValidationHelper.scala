@@ -227,12 +227,13 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
     val targetTable = target.name
 
     if (spark.catalog.tableExists(s"$etlDB.$sourceTable") &&  spark.catalog.tableExists(s"$etlDB.$targetTable")){
+      val ruleName = s"${column.toUpperCase()}_Present_In_${sourceTable}_But_Not_In_$targetTable"
       if (sourceDF.count() == 0 || targetDF.count() == 0) {
         val msg = s"Cross table validation between source $sourceTable and target $targetTable is not possible for Overwatch_RunID $Overwatch_RunID as either of them doesn't contain any data"
-        println(msg)
+        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(msg), Overwatch_RunID))
         logger.log(Level.WARN,msg)
         return (validationStatus, quarantineStatus)
-      }
+      }else{
       // In Case of NotebookCommands Table we should only consider the workspaces where verbose auditlog is enabled
       val joinedDF = if (source.name == nbcmdTable || target.name == nbcmdTable){
         val organizationID_list : Array[String] = spark.sql(s"select distinct organization_id from $etlDB.$nbcmdTable").collect().map(_.getString(0))
@@ -241,18 +242,16 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
         sourceDF.join(targetDF, Seq(column), "anti").select(key.map(col): _*)
       }
       val joinedDFCount = joinedDF.count()
-
-      val ruleName = s"${column.toUpperCase()}_Present_In_${sourceTable}_But_Not_In_$targetTable"
-
       if (joinedDFCount == 0) {
         val healthCheckMsg = s"HealthCheck Success: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
         vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
       } else {
         val healthCheckMsg = s"HealthCheck Warning: There are $joinedDFCount ${column}s that are present in $sourceTable but not in $targetTable"
-        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
+        vStatus.append(HealthCheckReport(etlDB, targetTable, ruleName, "Cross_Table_Validation", Some(healthCheckMsg), Overwatch_RunID))
         joinedDF.toJSON.collect().foreach(jsonString => {
-          qStatus.append(QuarantineReport(etlDB, targetTable, ruleName,"Cross_Table_Validation", "Warning", jsonString))
-        })
+          qStatus.append(QuarantineReport(etlDB, targetTable, ruleName, "Cross_Table_Validation", "Warning", jsonString))
+          })
+        }
       }
       (validationStatus ++= vStatus, quarantineStatus ++= qStatus)
     }else{
