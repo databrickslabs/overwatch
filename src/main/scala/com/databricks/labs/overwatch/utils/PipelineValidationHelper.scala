@@ -300,7 +300,7 @@ abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWra
           tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero", Overwatch_RunID)
 
         (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-          RuleSet(clsf_df.where("databricks_billable is true")).add(validateRules(4)),
+          RuleSet(clsf_df.where("cluster_name is not null").where("databricks_billable is true")).add(validateRules(4)),
           tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero", Overwatch_RunID)
 
         (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
