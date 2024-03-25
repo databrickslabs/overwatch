@@ -19,7 +19,7 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 //  Perhaps add the strategy into the Rule definition in the Rules Engine
 case class PipelineTable(
                           name: String,
-                          private val _keys: Array[String],
+                          private[overwatch] val _keys: Array[String],
                           config: Config,
                           incrementalColumns: Array[String] = Array(),
                           format: String = "delta", // TODO -- Convert to Enum
