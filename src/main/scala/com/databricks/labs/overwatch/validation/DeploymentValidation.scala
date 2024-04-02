@@ -238,6 +238,68 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
+   * This function retrieves the source of a given path.
+   * If the path is a mount point, it returns the source of the mount point.
+   * If the path is not a mount point, it returns the path itself.
+   *
+   * @param path The path for which the source is to be retrieved.
+   * @return The source of the path if it's a mount point, otherwise the path itself.
+   */
+  private def getSource(path: String): String = {
+    val mounts = dbutils.fs.mounts
+    val storagePath = if (mounts.exists(_.mountPoint == path)) //check whether its a mount point
+    {
+      mounts.find(_.mountPoint == path).head.source
+    } else {
+      path
+    }
+    storagePath
+  }
+
+  /**
+   * This function validates the storage path for the Azure Blob Storage (WASBS).
+   * It checks if the storage path starts with "wasbs" and if it does, it returns a DeploymentValidationReport with a failure status.
+   * Overwatch does not support "wasbs" in the path.
+   *
+   * @param conf The configuration object of type MultiWorkspaceConfig which contains the storage_prefix.
+   * @return A DeploymentValidationReport object which contains the status of the validation (true if the validation passed, false otherwise),
+   *         a human-readable message for the validation, details about the test, a message about the validation result, and the workspace ID.
+   * @throws Exception if there is an error while checking the storage prefix for the wasbs path.
+   */
+
+  private def validateWasbs(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+    val testDetails = "Wasbs path check"
+    val storagePath = getSource(conf.storage_prefix)
+    try {
+      if (storagePath.startsWith("wasbs")) {
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Wasbs"),
+          testDetails,
+          Some("Overwatch doesn't support wasbs in path" + storagePath),
+          Some(conf.workspace_id)
+        )
+      } else {
+        DeploymentValidationReport(true,
+          getSimpleMsg("Validate_Wasbs"),
+          testDetails,
+          Some("SUCCESS"),
+          Some(conf.workspace_id)
+        )
+      }
+    } catch {
+      case e: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, s"""Exception while checking the storage prefix for wasbs path:${conf.auditlogprefix_source_path.get}""")
+        logger.log(Level.ERROR, fullMsg)
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Wasbs"),
+          testDetails,
+          Some(fullMsg),
+          Some(conf.workspace_id)
+        )
+    }
+  }
+
+  /**
    * Performs clusters/list api call to check the access to the workspace
    * @param conf
    * @return
@@ -710,6 +772,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Storage_Access" => "ETL_STORAGE_PREFIX should have read,write and create access"
       case "Validate_Mount" => "Number of mount points in the workspace should not exceed 50"
       case "Validate_SystemTablesAudit" => "System table name should be system.access.audit"
+      case "Validate_Wasbs" => "Wasbs path should not be provided"
     }
   }
 
@@ -782,7 +845,7 @@ object DeploymentValidation extends SparkSessionWrapper {
         configToValidate.map(validateMountCount(_,currentOrgID))
     //Access validation for etl_storage_prefix
     validationStatus.append(storagePrefixAccessValidation(configToValidate.head)) //Check read/write/create/list access for etl_storage_prefix
-
+    validationStatus.append(validateWasbs(configToValidate.head))
     configDF.unpersist()
     validationStatus.toArray
   }
