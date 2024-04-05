@@ -5,6 +5,14 @@ import com.databricks.labs.overwatch.utils.SparkSessionWrapper
 import com.databricks.labs.overwatch.utils.PipelineValidationHelper
 import org.apache.spark.sql.DataFrame
 
+/**
+ * The Purpose of this object is to validate the health of the tables in the overwatch database.
+ * @param ETLDB                 ETL Database for on which validation need to be done(Mandatory)
+ * @param table                 Table for which validation need to be done(Optional). If not provided all tables
+ *                              which are in scope of validation framework would be validated
+ * @param crossTableValidation  Cross Table Validation need to be done(Optional). Default value is True. If it is false then only
+ *                              single table validation would be performed.
+ */
 object PipelineValidation extends SparkSessionWrapper {
 
   def apply(etlDB : String) :Unit = {
