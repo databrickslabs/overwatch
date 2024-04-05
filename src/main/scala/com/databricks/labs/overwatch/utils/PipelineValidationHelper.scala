@@ -12,7 +12,11 @@ import org.apache.spark.sql.expressions.Window
 import java.time.LocalDateTime
 import scala.collection.mutable.ArrayBuffer
 
-abstract class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
+/**
+ * This class contains the utility functions for PipelineValidation.scala.
+ */
+
+class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
 
   import spark.implicits._
 
