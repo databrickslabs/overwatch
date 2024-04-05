@@ -465,6 +465,9 @@ object Schema extends SparkSessionWrapper {
     StructField("timezone_id", StringType, true)
   ))
 
+  val minimumQueueSchema: StructType = StructType(Seq(
+    StructField("enabled", BooleanType, nullable = true)))
+
   val minimumEmailNotificationsSchema: StructType = StructType(Seq(
     StructField("no_alert_for_skipped_runs", BooleanType, nullable = true),
     StructField("on_failure", ArrayType(StringType, containsNull = true), nullable = true)
@@ -705,9 +708,6 @@ object Schema extends SparkSessionWrapper {
         StructField("driver_state_message", StringType, nullable = true)
       )), nullable = true)
   ))
-
-  val minimumQueueSchema: StructType = StructType(Seq(
-    StructField("enabled", BooleanType, nullable = true)))
 
   // commented fields have been removed as of 2.1
   // todo - update for v2.1

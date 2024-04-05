@@ -34,3 +34,6 @@ scala-doc/
 src/.scala-build
 project/metals.sbt
 .vscode/
+.ammonite/
+.semanticgraphs/
+out/

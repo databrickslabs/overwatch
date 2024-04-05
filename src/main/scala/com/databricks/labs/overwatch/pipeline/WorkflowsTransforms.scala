@@ -389,7 +389,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         lit("snapImpute").alias("actionName"),
         lit("-1").alias("requestId"),
         $"settings.name".alias("jobName"),
-        $"settings.queue".alias("queue"),
         $"settings.tags".alias("tags"),
         $"settings.email_notifications".alias("email_notifications"),
         $"settings.existing_cluster_id".alias("existing_cluster_id"),
@@ -772,12 +771,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .agg(collect_list('repair_details).alias("repair_details"))
   }
   
-  def jobRunsDeriveCancelAllRunsEvents(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
+  def jobRunsDeriveCancelAllRunsEvents(df: DataFrame): DataFrame = {
     df
       .filter('actionName.isin("cancelAllRuns"))
       .select(
         'organization_id,
         'timestamp,
+        'job_id.cast("long").alias("jobId"),
         // 'run_id.cast("long").alias("runId"), // lowest level -- could be taskRunId or jobRunId
         'requestId.alias("cancellationRequestId"),
         'response.alias("cancellationResponse"),
@@ -788,10 +788,12 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'userIdentity.alias("cancelledBy")
       )
       // .filter('runId.isNotNull)
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
-      .filter('rnk === 1 && 'rn === 1)
-      .drop("rnk", "rn", "timestamp")
+      // .withColumn("rnk", rank().over(firstRunSemanticsW))
+      // .withColumn("rn", row_number().over(firstRunSemanticsW))
+      // .filter('rnk === 1 && 'rn === 1)
+      .drop(
+        // "rnk", "rn", 
+        "timestamp")
   }
 
   def jobRunsDeriveRunsBase(df: DataFrame, etlUntilTime: TimeTypes): DataFrame = {
