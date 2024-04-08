@@ -6,7 +6,7 @@ import org.apache.spark.sql.functions._
 import com.databricks.labs.overwatch.pipeline._
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.validation._
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.expressions.Window
 
 import java.time.LocalDateTime
@@ -83,15 +83,15 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
   private val goldTargets = gold.GoldTargets
 
 
-  val jrcpKey: Array[String] = goldTargets.jobRunCostPotentialFactTarget._keys ++ goldTargets.jobRunCostPotentialFactTarget.partitionBy
-  val clsfKey: Array[String] = goldTargets.clusterStateFactTarget._keys ++ goldTargets.clusterStateFactTarget.partitionBy
-  val jobRunKey: Array[String] = goldTargets.jobRunTarget._keys ++ goldTargets.jobRunTarget.partitionBy
-  val nbkey: Array[String] = goldTargets.notebookTarget._keys ++ goldTargets.notebookTarget.partitionBy
-  val nbcmdkey: Array[String] = goldTargets.notebookCommandsTarget._keys ++ goldTargets.notebookCommandsTarget.partitionBy
-  val clusterKey: Array[String] = goldTargets.clusterTarget._keys ++ goldTargets.clusterTarget.partitionBy
-  val sparkJobKey: Array[String] = goldTargets.sparkJobTarget._keys ++ goldTargets.sparkJobTarget.partitionBy
-  val sqlQueryHistKey: Array[String] = goldTargets.sqlQueryHistoryTarget._keys ++ goldTargets.sqlQueryHistoryTarget.partitionBy
-  val jobKey: Array[String] = goldTargets.jobTarget._keys ++ goldTargets.jobTarget.partitionBy
+  val jrcpKey: Array[String] = getKeysAndPartitionBy(goldTargets.jobRunCostPotentialFactTarget)
+  val clsfKey: Array[String] = getKeysAndPartitionBy(goldTargets.clusterStateFactTarget)
+  val jobRunKey: Array[String] = getKeysAndPartitionBy(goldTargets.jobRunTarget)
+  val nbkey: Array[String] = getKeysAndPartitionBy(goldTargets.notebookTarget)
+  val nbcmdkey: Array[String] = getKeysAndPartitionBy(goldTargets.notebookCommandsTarget)
+  val clusterKey: Array[String] = getKeysAndPartitionBy(goldTargets.clusterTarget)
+  val sparkJobKey: Array[String] = getKeysAndPartitionBy(goldTargets.sparkJobTarget)
+  val sqlQueryHistKey: Array[String] = getKeysAndPartitionBy(goldTargets.sqlQueryHistoryTarget)
+  val jobKey: Array[String] = getKeysAndPartitionBy(goldTargets.jobTarget)
 
 
   val jrcpTable: String = goldTargets.jobRunCostPotentialFactTarget.name
@@ -105,16 +105,15 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
   val jobTable: String = goldTargets.jobTarget.name
 
   val filterCondition = 'Overwatch_RunID.isin(Overwatch_RunIDs:_*)
-  val jrcpDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jrcpTable")) spark.read.table(s"$etlDB.$jrcpTable").filter(filterCondition) else spark.emptyDataFrame
-  val clsfDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clsfTable")) spark.read.table(s"$etlDB.$clsfTable").filter(filterCondition) else spark.emptyDataFrame
-  val jobRunDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jobRunTable")) spark.read.table(s"$etlDB.$jobRunTable").filter(filterCondition) else spark.emptyDataFrame
-  val nbDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$nbTable")) spark.read.table(s"$etlDB.$nbTable").filter(filterCondition) else spark.emptyDataFrame
-  val nbcmdDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$nbcmdTable")) spark.read.table(s"$etlDB.$nbcmdTable").filter(filterCondition) else spark.emptyDataFrame
-  val clusterDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$clusterTable")) spark.read.table(s"$etlDB.$clusterTable").filter(filterCondition) else spark.emptyDataFrame
-  val sparkJobDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$sparkJobTable")) spark.read.table(s"$etlDB.$sparkJobTable").filter(filterCondition) else spark.emptyDataFrame
-  val sqlQueryHistDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$sqlQueryHistTable")) spark.read.table(s"$etlDB.$sqlQueryHistTable").filter(filterCondition) else spark.emptyDataFrame
-  val jobDF: DataFrame = if (spark.catalog.tableExists(s"$etlDB.$jobTable")) spark.read.table(s"$etlDB.$jobTable").filter(filterCondition) else spark.emptyDataFrame
-
+  val jrcpDF: DataFrame = getTableDF(etlDB, jrcpTable, filterCondition)
+  val clsfDF: DataFrame = getTableDF(etlDB, clsfTable, filterCondition)
+  val jobRunDF: DataFrame = getTableDF(etlDB, jobRunTable, filterCondition)
+  val nbDF: DataFrame = getTableDF(etlDB, nbTable, filterCondition)
+  val nbcmdDF: DataFrame = getTableDF(etlDB, nbcmdTable, filterCondition)
+  val clusterDF: DataFrame = getTableDF(etlDB, clusterTable, filterCondition)
+  val sparkJobDF: DataFrame = getTableDF(etlDB, sparkJobTable, filterCondition)
+  val sqlQueryHistDF: DataFrame = getTableDF(etlDB, sqlQueryHistTable, filterCondition)
+  val jobDF: DataFrame = getTableDF(etlDB, jobTable, filterCondition)
 
   private[overwatch] def pipelineSnapTime: TimeTypes = {
     Pipeline.createTimeDetail(_pipelineSnapTime)
@@ -144,6 +143,18 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
 
   def checkColumnInValues(ruleName: String, configColumns: String, value: Array[String]): Rule = {
     Rule(ruleName, col(configColumns).isin(value: _*))
+  }
+
+  def getKeysAndPartitionBy(pipelineTable: PipelineTable): Array[String] = {
+    pipelineTable._keys ++ pipelineTable.partitionBy
+  }
+
+  def getTableDF(etlDB: String, tableName: String, filterCondition: Column): DataFrame = {
+    if (spark.catalog.tableExists(s"$etlDB.$tableName")) {
+      spark.read.table(s"$etlDB.$tableName").filter(filterCondition)
+    } else {
+      spark.emptyDataFrame
+    }
   }
 
   def validateRuleAndUpdateStatus(
