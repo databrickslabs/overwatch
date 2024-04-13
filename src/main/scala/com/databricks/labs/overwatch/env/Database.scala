@@ -272,7 +272,7 @@ class Database(config: Config) extends SparkSessionWrapper {
     val explicitDatePartitionCondition = if (datePartitionFields.nonEmpty & maxMergeScanDates.nonEmpty) {
       s" AND target.${datePartitionFields.get} in (${maxMergeScanDates.mkString("'", "', '", "'")})"
     } else ""
-    val mergeCondition: String = immutableColumns.map(k => s"updates.$k = target.$k").mkString(" AND ") + " " +
+    val mergeCondition: String = immutableColumns.map(k => s"updates.$k <=> target.$k").mkString(" AND ") + " " +
       s"AND target.organization_id = '${config.organizationId}'" + // force partition filter for concurrent merge
       explicitDatePartitionCondition // force right side scan to only scan relevant dates
 

@@ -1230,6 +1230,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       NamedColumn("tasks", lit(null).cast(Schema.minimumTasksSchema)),
       NamedColumn("job_clusters", lit(null).cast(Schema.minimumJobClustersSchema)),
       NamedColumn("libraries", lit(null).cast(Schema.minimumLibrariesSchema)),
+      NamedColumn("queue", lit(null).cast(Schema.minimumQueueSchema)),
       NamedColumn("access_control_list", lit(null).cast(Schema.minimumAccessControlListSchema)),
       NamedColumn("grants", lit(null).cast(Schema.minimumGrantsSchema)),
     )
@@ -1335,7 +1336,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         to_json('tags).alias("tags"),
         'schedule,
         'max_concurrent_runs,
-        'queue,
+        to_json('queue).alias("queue"),
         'run_as_user_name,
         'timeout_seconds,
         'created_by,
@@ -1362,10 +1363,13 @@ trait SilverTransforms extends SparkSessionWrapper {
       (jobsSnapshot, jobSnapNameLookup)
     )
 
+    val cancelAllQueuedRunsIntervals = jobRunsDeriveCancelAllQueuedRunsIntervals( jobRunsLag30D)
+
     // caching before structifying
-    jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
+    jobRunsDeriveRunsBase(jobRunsLag30D)  // , etlUntilTime) // unused?
       .transform(jobRunsAppendClusterName(jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))
+      .transform(jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals)) //, etlStartTime)) // needed at all?
       .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
       .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))

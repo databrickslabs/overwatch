@@ -610,7 +610,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   /**
    * Primarily necessary to get runId from response and capture the submission time
    */
-  def jobRunsDeriveRunsLaunched(df: DataFrame, firstRunSemanticsW: WindowSpec, arrayStringSchema: ArrayType): DataFrame = {
+  def jobRunsDeriveRunsLaunched(df: DataFrame, w: WindowSpec, arrayStringSchema: ArrayType): DataFrame = {
     df
       .filter('actionName.isin("runNow"))
       .select(
@@ -619,6 +619,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'job_id.cast("long").alias("submissionJobId"),
         get_json_object($"response.result", "$.run_id").cast("long").alias("jobRunId"),
         'timestamp.alias("submissionTime"),
+        'queue,
         lit("manual").alias("jobTriggerType_runNow"),
         'workflow_context.alias("workflow_context_runNow"),
         struct(
@@ -639,8 +640,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'userIdentity.alias("submittedBy")
       )
       .filter('jobRunId.isNotNull)
-      .withColumn("rnk", rank().over(firstRunSemanticsW))
-      .withColumn("rn", row_number().over(firstRunSemanticsW))
+      .withColumn("rnk", rank().over( w))
+      .withColumn("rn", row_number().over( w))
       .filter('rnk === 1 && 'rn === 1)
       .drop("rnk", "rn", "timestamp")
   }
@@ -771,32 +772,61 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .agg(collect_list('repair_details).alias("repair_details"))
   }
   
-  def jobRunsDeriveCancelAllRunsEvents(df: DataFrame): DataFrame = {
-    df
-      .filter('actionName.isin("cancelAllRuns"))
-      .select(
-        'organization_id,
-        'timestamp,
-        'job_id.cast("long").alias("jobId"),
-        // 'run_id.cast("long").alias("runId"), // lowest level -- could be taskRunId or jobRunId
-        'requestId.alias("cancellationRequestId"),
-        'response.alias("cancellationResponse"),
-        'sessionId.alias("cancellationSessionId"),
-        'sourceIPAddress.alias("cancellationSourceIP"),
-        'timestamp.alias("cancellationTime"),
-        'userAgent.alias("cancelledUserAgent"),
-        'userIdentity.alias("cancelledBy")
-      )
-      // .filter('runId.isNotNull)
-      // .withColumn("rnk", rank().over(firstRunSemanticsW))
-      // .withColumn("rn", row_number().over(firstRunSemanticsW))
-      // .filter('rnk === 1 && 'rn === 1)
-      .drop(
-        // "rnk", "rn", 
-        "timestamp")
-  }
+  def jobRunsDeriveCancelAllQueuedRunsIntervals( df: DataFrame): DataFrame = {
 
-  def jobRunsDeriveRunsBase(df: DataFrame, etlUntilTime: TimeTypes): DataFrame = {
+    // `'jobId` can be null; it means that all queued runs in the
+    // workspace are cancelled (by ACL?).
+
+    // Cancellations of runs that have started produce `'runFailed'`
+    // actions, so this logic only considers actions where
+    // `'all_queued_runs` is `true`.
+
+    // Queued runs are automatically cancelled by the control place
+    // after 48 hours, so any of these actions only apply to runs
+    // submitted up to 48 hours prior to their submission time.
+
+    val maxQueueDurationMS = lit( 48 * 60 * 60 * 1000)
+
+    val requestWindow = Window
+      .partitionBy( 'organization_id, 'requestId)
+      .orderBy( 'timestamp)
+
+    val intervalWindow = Window
+      .partitionBy( 'organization_id, 'jobId)
+      .orderBy( 'timestamp)
+
+    { df filter(
+      'actionName isin "cancelAllRuns"
+        and 'all_queued_runs
+        and $"response.statusCode" === 200
+        and 'timestamp === first('timestamp) over requestWindow)
+      select(
+        'organization_id,
+        'job_id cast "long"
+          alias "jobId",
+        greatest(
+          lag( 'timestamp, default= 0) over w,
+          'timestamp - maxQueueDurationMS)
+           alias "from",
+        'timestamp
+          alias "until",
+        'requestId
+          alias "cancellationRequestId",
+        'response
+          alias "cancellationResponse",
+        'sessionId
+          alias "cancellationSessionId",
+        'sourceIPAddress
+          alias "cancellationSourceIP",
+        'timestamp
+          alias "cancellationTime",
+        'userAgent
+          alias "cancelledUserAgent",
+        'userIdentity
+          alias "cancelledBy")}}
+
+  def jobRunsDeriveRunsBase(df: DataFrame): DataFrame = {
+    // , etlUntilTime: TimeTypes  // unused arg?
 
     val arrayStringSchema = ArrayType(StringType, containsNull = true)
     val firstTaskRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId, 'taskRunId).orderBy('timestamp)
@@ -861,8 +891,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         coalesce('multitaskParentRunId_Started, 'multitaskParentRunId_Completed).cast("long").alias("multitaskParentRunId"),
         coalesce('parentRunId_Started, 'parentRunId_Completed).cast("long").alias("parentRunId"),
         coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
+        'queue,
         TransformFunctions.subtractTime(
-          'startTime,
+          'submissionTime,
           array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
         ).alias("TaskRunTime"), // run launch time until terminal event
         TransformFunctions.subtractTime(
@@ -929,9 +960,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           ).alias("startRequest")
         ).alias("requestDetails")
       )
-      .withColumn("timestamp", $"TaskRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
-      .withColumn("startEpochMS", $"TaskRunTime.startEpochMS") // set launch time as TS key
-//      .scrubSchema
+      .withColumn( "timestamp", coalesce(
+        // TS lookup key added for next steps (launch time)
+        $"TaskRunTime.startEpochMS",
+        // (fall through for canceled, queued runs that never started)
+        $"timeDetails.submissionTime"))
+      .withColumn( "startEpochMS", $"timestamp")
+      // .scrubSchema
   }
 
   def jobRunsStructifyLookupMeta(cacheParts: Int)(df: DataFrame): DataFrame = {
@@ -940,6 +975,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     val colsToOverride = Array("tasks", "job_clusters", "tags").toSet
     val dfOrigCols = (dfc.columns.toSet -- colsToOverride).toArray map col
     val colsToAppend: Array[Column] = Array(
+      structFromJson(spark, dfc, "queue", allNullMinimumSchema = Schema.minimumQueueSchema).alias("queue"),
       structFromJson(spark, dfc, "tasks", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumTasksSchema).alias("tasks"),
       structFromJson(spark, dfc, "job_clusters", isArrayWrapped = true, allNullMinimumSchema = Schema.minimumJobClustersSchema).alias("job_clusters"),
       struct(
@@ -1055,7 +1091,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
           lookups("job_status_silver")
-            .toTSDF("timestamp", "organization_id", "jobId")
+            .toTSDF("timestamp", "organization_id", "jobId"),
+          rightPrefix= "status"
         ).df
     } else df
 
@@ -1064,12 +1101,14 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
           lookups("jobs_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "jobId")
+            .toTSDF("timestamp", "organization_id", "jobId"),
+          rightPrefix= "snapshot"
         ).df
     } else df
 
     runsWithJobName2
-      .withColumn("jobName", coalesce('jobName, 'run_name))
+      .withColumn("jobName", coalesce('jobName, 'run_name, 'status_jobName, $"snapshot_settings.name"))
+      .withColumn( "queue", coalesce( 'queue, $"status_queue", $"snapshot_queue")
       .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
       .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
 
