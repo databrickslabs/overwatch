@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
-import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
@@ -22,10 +22,12 @@ import org.apache.spark.util.SerializableConfiguration
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.sql.Timestamp
-import java.util.concurrent.Executors
+import scala.util.{Try, Success, Failure}
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
 
 trait BronzeTransforms extends SparkSessionWrapper {
 
@@ -312,6 +314,40 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
       .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
       .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
+  }
+
+  def getClusterSnapshotBronze(
+                                workspace: Workspace,
+                                apiEndpointTempDir: String,
+                                pipelineSnapTS: TimeTypes,
+                              )
+                              (auditDF: DataFrame): DataFrame = {
+    val newClustersIDs = auditDF
+      .select(cluster_idFromAudit.alias("cluster_id"))
+      .filter(col("cluster_id").isNotNull)
+      .distinct()
+      .select("cluster_id").distinct().collect().map(x => x(0).toString)
+
+    val config = workspace.getConfig
+
+    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+
+    val futureResults = newClustersIDs.map(workspace.fetchClusterDetails(_,tmpClusterEventsSuccessPath))
+
+    // Convert Array[Future[Try[DataFrame]]] to Seq[Future[Try[DataFrame]]] for Future.sequence
+    val futureResultsSeq: Seq[Future[Try[org.apache.spark.sql.DataFrame]]] = futureResults.toSeq
+
+    // Await the completion of all futures
+    val results = Await.result(Future.sequence(futureResultsSeq), 10.minutes)
+
+//    results.collect {
+//      case Success(df) => {
+//        print(df.show(5,false))
+//        df.write.format("delta").mode("append").option("overwriteSchema", true).save(tmpClusterEventsSuccessPath)
+//      }
+//    }
+
+    spark.read.format("delta").load(tmpClusterEventsSuccessPath)
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {

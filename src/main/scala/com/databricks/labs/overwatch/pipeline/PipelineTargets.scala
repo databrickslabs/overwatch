@@ -62,6 +62,17 @@ abstract class PipelineTargets(config: Config) {
       masterSchema = Some(Schema.clusterSnapMinimumSchema)
     )
 
+    lazy private[overwatch] val clustersSnapshotTargetNew: PipelineTable = PipelineTable(
+      name = "clusters_snapshot_new_bronze",
+      _keys = Array("cluster_id", "Overwatch_RunID"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      statsColumns = ("organization_id, cluster_id, driver_node_type_id, instance_pool_id, node_type_id, " +
+        "start_time, terminated_time, Overwatch_RunID").split(", "),
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.clusterSnapMinimumSchema)
+    )
+
     lazy private[overwatch] val poolsSnapshotTarget: PipelineTable = PipelineTable(
       name = "pools_snapshot_bronze",
       _keys = Array("instance_pool_id", "Overwatch_RunID"),

@@ -19,6 +19,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     Array(
       BronzeTargets.jobsSnapshotTarget,
       BronzeTargets.clustersSnapshotTarget,
+      BronzeTargets.clustersSnapshotTargetNew,
       BronzeTargets.poolsSnapshotTarget,
       BronzeTargets.auditLogsTarget,
       BronzeTargets.auditLogAzureLandRaw,
@@ -42,6 +43,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     config.overwatchScope.flatMap {
       case OverwatchScope.audit => Array(auditLogsModule)
       case OverwatchScope.clusters => Array(clustersSnapshotModule)
+      case OverwatchScope.clusters => Array(clustersSnapshotModule_new)
       case OverwatchScope.clusterEvents => Array(clusterEventLogsModule)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
@@ -123,6 +125,22 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,clustersSnapshotModule.moduleName,pipelineSnapTime)),
         Seq(cleanseRawClusterSnapDF),
         append(BronzeTargets.clustersSnapshotTarget)
+      )
+  }
+
+  lazy private[overwatch] val clustersSnapshotModule_new = Module(1014, "Bronze_Clusters_Snapshot_New", this,Array(1004))
+  lazy private val appendClustersAPIProcessNew: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records,
+//        workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir, clustersSnapshotModule_new.moduleName, pipelineSnapTime)),
+        Seq(getClusterSnapshotBronze(
+          workspace,
+          clustersSnapshotModule_new.moduleName,
+          pipelineSnapTime
+        )
+        ),
+        append(BronzeTargets.clustersSnapshotTargetNew)
       )
   }
 
@@ -286,6 +304,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
+
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {
 
@@ -315,6 +334,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         auditLogsModule.execute(appendAuditLogsProcess)
       case OverwatchScope.clusters =>
         clustersSnapshotModule.execute(appendClustersAPIProcess)
+        clustersSnapshotModule_new.execute(appendClustersAPIProcessNew)
         libsSnapshotModule.execute(appendLibsProcess)
         policiesSnapshotModule.execute(appendPoliciesProcess)
         if (config.cloudProvider == "aws") {
