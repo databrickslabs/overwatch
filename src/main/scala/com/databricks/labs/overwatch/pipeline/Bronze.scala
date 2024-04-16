@@ -44,6 +44,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.audit => Array(auditLogsModule)
       case OverwatchScope.clusters => Array(clustersSnapshotModule)
       case OverwatchScope.clusters => Array(clustersSnapshotModule_new)
+      case OverwatchScope.clusters => Array(clustersSnapshotModule_new1)
       case OverwatchScope.clusterEvents => Array(clusterEventLogsModule)
       case OverwatchScope.jobs => Array(jobsSnapshotModule)
       case OverwatchScope.pools => Array(poolsSnapshotModule)
@@ -128,21 +129,39 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val clustersSnapshotModule_new = Module(1014, "Bronze_Clusters_Snapshot_New", this,Array(1004))
+  lazy private[overwatch] val clustersSnapshotModule_new = Module(1014, "Bronze_Clusters_Snapshot_New", this, Array(1004))
   lazy private val appendClustersAPIProcessNew: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records,
-//        workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir, clustersSnapshotModule_new.moduleName, pipelineSnapTime)),
-        Seq(getClusterSnapshotBronze(
-          workspace,
-          clustersSnapshotModule_new.moduleName,
-          pipelineSnapTime
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clustersSnapshotModule_new, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records,
+        Seq(prepClusterSnapshot(
+          clustersSnapshotModule_new.fromTime,
+          clustersSnapshotModule_new.untilTime,
+          pipelineSnapTime,
+          config.apiEnv,
+          config,
+          clustersSnapshotModule_new.moduleName
         )
         ),
         append(BronzeTargets.clustersSnapshotTargetNew)
       )
   }
+
+  lazy private[overwatch] val clustersSnapshotModule_new1 = Module(1015, "Bronze_Clusters_Snapshot_New1", this, Array(1004))
+  lazy private val appendClustersAPIProcessNew1: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clustersSnapshotModule_new1, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records,
+        Seq(getClusterSnapshotBronze(
+          workspace,
+          clustersSnapshotModule_new1.moduleName,
+          pipelineSnapTime
+        )
+        ),
+        append(BronzeTargets.clustersSnapshotTargetNew1)
+      )
+  }
+
 
   lazy private[overwatch] val poolsSnapshotModule = Module(1003, "Bronze_Pools_Snapshot", this)
   lazy private val appendPoolsProcess: () => ETLDefinition = {
@@ -335,6 +354,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.clusters =>
         clustersSnapshotModule.execute(appendClustersAPIProcess)
         clustersSnapshotModule_new.execute(appendClustersAPIProcessNew)
+        clustersSnapshotModule_new.execute(appendClustersAPIProcessNew1)
         libsSnapshotModule.execute(appendLibsProcess)
         policiesSnapshotModule.execute(appendPoliciesProcess)
         if (config.cloudProvider == "aws") {

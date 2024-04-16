@@ -678,35 +678,146 @@ object Schema extends SparkSessionWrapper {
     StructField("autoscale",
       StructType(Seq(
         StructField("max_workers", LongType, nullable = true),
-        StructField("min_workers", LongType, nullable = true)
+        StructField("min_workers", LongType, nullable = true),
+        StructField("target_workers", LongType, nullable = true) // Added target_workers
       )), nullable = true),
     StructField("autotermination_minutes", LongType, nullable = true),
+    StructField("aws_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("cluster_id", StringType, nullable = true),
-    StructField("cluster_log_conf", logConfSchema, nullable = true),
+    StructField("cluster_log_conf",
+      StructType(Seq(
+        StructField("dbfs",
+          StructType(Seq(
+            StructField("destination", StringType, nullable = true)
+          )), nullable = true),
+        StructField("s3",
+          StructType(Seq(
+            StructField("canned_acl", StringType, nullable = true),
+            StructField("destination", StringType, nullable = true),
+            StructField("enable_encryption", BooleanType, nullable = true),
+            StructField("region", StringType, nullable = true)
+          )), nullable = true)
+      )), nullable = true),
+    StructField("cluster_log_status",
+      StructType(Seq(
+        StructField("last_attempted", LongType, nullable = true)
+      )), nullable = true),
+    StructField("cluster_memory_mb", LongType, nullable = true),
     StructField("cluster_name", StringType, nullable = true),
     StructField("cluster_source", StringType, nullable = true),
     StructField("creator_user_name", StringType, nullable = true),
+    StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("data_security_mode", StringType, nullable = true),
+    StructField("default_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("disk_spec",
+      StructType(Seq(
+        StructField("disk_count", LongType, nullable = true),
+        StructField("disk_size", LongType, nullable = true),
+        StructField("disk_type",
+          StructType(Seq(
+            StructField("ebs_volume_type", StringType, nullable = true)
+          )), nullable = true)
+      )), nullable = true),
+    StructField("driver",
+      StructType(Seq(
+        StructField("host_private_ip", StringType, nullable = true),
+        StructField("instance_id", StringType, nullable = true),
+        StructField("node_attributes",
+          StructType(Seq(
+            StructField("is_spot", BooleanType, nullable = true)
+          )), nullable = true),
+        StructField("node_aws_attributes",
+          StructType(Seq(
+            StructField("is_spot", BooleanType, nullable = true)
+          )), nullable = true),
+        StructField("node_id", StringType, nullable = true),
+        StructField("private_ip", StringType, nullable = true),
+        StructField("start_timestamp", LongType, nullable = true)
+      )), nullable = true),
+    StructField("driver_healthy", BooleanType, nullable = true),
     StructField("driver_instance_pool_id", StringType, nullable = true),
+    StructField("driver_instance_source",
+      StructType(Seq(
+        StructField("instance_pool_id", StringType, nullable = true),
+        StructField("node_type_id", StringType, nullable = true)
+      )), nullable = true),
     StructField("driver_node_type_id", StringType, nullable = true),
+    StructField("effective_spark_version", StringType, nullable = true),
     StructField("enable_elastic_disk", BooleanType, nullable = true),
     StructField("enable_local_disk_encryption", BooleanType, nullable = true),
+    StructField("executors",
+      ArrayType(
+        StructType(Seq(
+          StructField("host_private_ip", StringType, nullable = true),
+          StructField("instance_id", StringType, nullable = true),
+          StructField("node_attributes",
+            StructType(Seq(
+              StructField("is_spot", BooleanType, nullable = true)
+            )), nullable = true),
+          StructField("node_aws_attributes",
+            StructType(Seq(
+              StructField("is_spot", BooleanType, nullable = true)
+            )), nullable = true),
+          StructField("node_id", StringType, nullable = true),
+          StructField("private_ip", StringType, nullable = true),
+          StructField("start_timestamp", LongType, nullable = true)
+        )), containsNull = true), nullable = true),
+    StructField("init_scripts",
+      ArrayType(
+        StructType(Seq(
+          StructField("dbfs",
+            StructType(Seq(
+              StructField("destination", StringType, nullable = true)
+            )), nullable = true),
+          StructField("volumes",
+            StructType(Seq(
+              StructField("destination", StringType, nullable = true)
+            )), nullable = true),
+          StructField("workspace",
+            StructType(Seq(
+              StructField("destination", StringType, nullable = true)
+            )), nullable = true)
+        )), containsNull = true), nullable = true),
+    StructField("init_scripts_safe_mode", BooleanType, nullable = true),
     StructField("instance_pool_id", StringType, nullable = true),
-    StructField("init_scripts", ArrayType(StructType(Seq(
-      StructField("dbfs", StructType(Seq(
-        StructField("destination", StringType, nullable = true)
-      )), nullable = true)
-    )), containsNull = true), nullable = true),
+    StructField("instance_source",
+      StructType(Seq(
+        StructField("instance_pool_id", StringType, nullable = true),
+        StructField("node_type_id", StringType, nullable = true)
+      )), nullable = true),
+    StructField("jdbc_port", LongType, nullable = true),
+    StructField("last_activity_time", LongType, nullable = true),
+    StructField("last_restarted_time", LongType, nullable = true),
+    StructField("last_state_loss_time", LongType, nullable = true),
     StructField("node_type_id", StringType, nullable = true),
     StructField("num_workers", LongType, nullable = true),
-    StructField("single_user_name", StringType, nullable = true),
-    StructField("spark_version", StringType, nullable = true),
+    StructField("pinned_by_user_name", StringType, nullable = true),
+    StructField("policy_id", StringType, nullable = true),
     StructField("runtime_engine", StringType, nullable = true),
-    StructField("state", StringType, nullable = true),
-    StructField("default_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
-    StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("single_user_name", StringType, nullable = true),
+    StructField("spark_conf", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("spark_context_id", LongType, nullable = true),
+    StructField("spark_env_vars", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("spark_version", StringType, nullable = true),
+    StructField("ssh_public_keys", ArrayType(StringType, containsNull = true), nullable = true),
     StructField("start_time", LongType, nullable = true),
+    StructField("state", StringType, nullable = true),
+    StructField("state_message", StringType, nullable = true),
     StructField("terminated_time", LongType, nullable = true),
+    StructField("termination_reason",
+      StructType(Seq(
+        StructField("code", StringType, nullable = true),
+        StructField("parameters",
+          StructType(Seq(
+            StructField("databricks_error_message", StringType, nullable = true),
+            StructField("inactivity_duration_min", StringType, nullable = true),
+            StructField("username", StringType, nullable = true)
+          )), nullable = true),
+        StructField("type", StringType, nullable = true)
+      )), nullable = true),
     StructField("organization_id", StringType, nullable = false),
+    StructField("azure_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
+    StructField("gcp_attributes", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("Pipeline_SnapTS", TimestampType, nullable = true),
     StructField("Overwatch_RunID", StringType, nullable = true),
     StructField("workspace_name", StringType, nullable = true)

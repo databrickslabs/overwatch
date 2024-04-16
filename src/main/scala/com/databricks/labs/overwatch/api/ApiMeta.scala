@@ -204,6 +204,7 @@ class ApiMetaFactory {
     val meta = _apiName match {
       case "jobs/list" => new JobListApi
       case "clusters/list" => new ClusterListApi
+      case "clusters/get" => new ClusterGetApi
       case "clusters/events" => new ClusterEventsApi
       case "dbfs/list" => new DbfsListApi
       case "instance-pools/list" => new InstancePoolsListApi
@@ -314,6 +315,29 @@ class DbfsListApi extends ApiMeta {
 class ClusterListApi extends ApiMeta {
   setDataframeColumn("clusters")
   setApiCallType("GET")
+}
+
+class ClusterGetApi extends ApiMeta {
+  setDataframeColumn("clusters")
+  setApiCallType("GET")
+  setDataframeColumn("snap")
+
+  private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
+    val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
+
+    Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}"""
+    )
+  }
+
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    Map(
+      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
+      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
+      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
+      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
+    )
+  }
+
 }
 
 

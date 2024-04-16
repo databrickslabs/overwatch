@@ -4,6 +4,7 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
+import com.databricks.labs.overwatch.pipeline.Schema.clusterSnapSchema
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
@@ -22,7 +23,7 @@ import org.apache.spark.util.SerializableConfiguration
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import scala.concurrent.{Await, Future}
@@ -520,6 +521,101 @@ trait BronzeTransforms extends SparkSessionWrapper {
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
         s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
     }
+  }
+
+  def prepClusterSnapshot(
+                           startTime: TimeTypes,
+                           endTime: TimeTypes,
+                           pipelineSnapTS: TimeTypes,
+                           apiEnv: ApiEnv,
+                           config: Config,
+                           apiEndpointTempDir: String
+                         )(auditDF: DataFrame) : DataFrame = {
+
+    val clusterIDs = auditDF
+      .select(cluster_idFromAudit.alias("cluster_id"))
+      .filter(col("cluster_id").isNotNull)
+      .distinct()
+      .select("cluster_id").distinct().collect().map(x => x(0).toString)
+
+    if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
+      s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
+      s"properly. Skipping!", Level.ERROR)
+
+    logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
+
+      val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+      val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
+
+    val tmpClusterSnapshotSuccessPath= landClusterSnapshot(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
+      tmpClusterEventsErrorPath, config)
+    logger.log(Level.INFO, " cluster snapshot landing completed")
+
+    if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
+      try {
+        val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
+        if (rawDF.columns.contains("snap")) {
+          val result = rawDF.select(explode(col("snap")).alias("snap")).select(col("snap" + ".*"))
+            .withColumn("organization_id", lit(config.organizationId))
+          val outputDF = SchemaScrubber.scrubSchema(result)
+          val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
+            .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+            .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
+            .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
+            .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
+            .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
+            .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
+            .verifyMinimumSchema(clusterSnapSchema)
+            .select(Schema.clusterSnapSchema.fieldNames.map(col): _*)
+          finalDF
+
+        } else {
+          logger.log(Level.INFO, s"No Data is present for cluster snapshot")
+          spark.emptyDataFrame
+        }
+      } catch {
+        case e: Throwable =>
+          throw new Exception(e)
+      }
+    } else {
+      println(s"No Data is present for cluster snapshot")
+      logger.log(Level.INFO, s"No Data is present for cluster snapshot")
+      spark.emptyDataFrame
+    }
+
+    auditDF
+  }
+
+  private def landClusterSnapshot(clusterIDs: Array[String],
+                                startTime: TimeTypes,
+                                endTime: TimeTypes,
+                                pipelineSnapTime: Long,
+                                tmpClusterSnapSuccessPath: String,
+                                tmpClusterSnapErrorPath: String,
+                                config: Config) : String = {
+    val finalResponseCount = clusterIDs.length
+    val clusterEventsEndpoint = "clusters/get"
+
+    val lagTime = 600000 //10 minutes
+    val lagStartTime = startTime.asUnixTimeMilli - lagTime
+    // creating Json input for parallel API calls
+    val jsonInput = Map(
+      "start_value" -> "0",
+      "end_value" -> s"${finalResponseCount}",
+      "increment_counter" -> "1",
+      "final_response_count" -> s"${finalResponseCount}",
+      "cluster_ids" -> s"${clusterIDs.mkString(",")}",
+      "start_time" -> s"${lagStartTime}",
+      "end_time" -> s"${endTime.asUnixTimeMilli}",
+      "tmp_success_path" -> tmpClusterSnapSuccessPath,
+      "tmp_error_path" -> tmpClusterSnapErrorPath
+    )
+
+    println(jsonInput)
+
+    // calling function to make parallel API calls
+    val apiCallV2Obj = new ApiCallV2(config.apiEnv)
+    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, pipelineSnapTime, config)
   }
 
   protected def prepClusterEventLogs(
