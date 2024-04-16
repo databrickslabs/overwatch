@@ -331,9 +331,9 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val config = workspace.getConfig
 
-    val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+    val tmpClusterSnapSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
 
-    val futureResults = newClustersIDs.map(workspace.fetchClusterDetails(_,tmpClusterEventsSuccessPath))
+    val futureResults = newClustersIDs.map(workspace.fetchClusterDetails(_,tmpClusterSnapSuccessPath))
 
     // Convert Array[Future[Try[DataFrame]]] to Seq[Future[Try[DataFrame]]] for Future.sequence
     val futureResultsSeq: Seq[Future[Try[org.apache.spark.sql.DataFrame]]] = futureResults.toSeq
@@ -348,7 +348,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 //      }
 //    }
 
-    spark.read.format("delta").load(tmpClusterEventsSuccessPath)
+    spark.read.format("delta").load(tmpClusterSnapSuccessPath)
   }
 
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
