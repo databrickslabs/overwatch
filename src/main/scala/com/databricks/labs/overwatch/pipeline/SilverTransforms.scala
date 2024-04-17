@@ -1363,13 +1363,14 @@ trait SilverTransforms extends SparkSessionWrapper {
       (jobsSnapshot, jobSnapNameLookup)
     )
 
-    val cancelAllQueuedRunsIntervals = jobRunsDeriveCancelAllQueuedRunsIntervals( jobRunsLag30D)
+    val cancelAllQueuedRunsIntervals =
+      jobRunsLag30D transform jobRunsDeriveCancelAllQueuedRunsIntervals
 
     // caching before structifying
     jobRunsDeriveRunsBase(jobRunsLag30D)  // , etlUntilTime) // unused?
       .transform(jobRunsAppendClusterName(jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals)) //, etlStartTime)) // needed at all?
+      .transform(jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
       .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
       .transform(jobRunsAppendTaskAndClusterDetails)
       .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))

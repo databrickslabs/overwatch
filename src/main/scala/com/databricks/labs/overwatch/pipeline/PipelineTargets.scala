@@ -299,7 +299,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
       name = "jobrun_silver",
-      _keys = Array("runId", "startEpochMS"),
+      _keys = Array("runId", "startEpochMS", "submissionEpochMS"),
       config,
       _mode = WriteMode.merge,
       incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated

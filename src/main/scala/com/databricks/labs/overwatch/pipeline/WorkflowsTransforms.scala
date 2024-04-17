@@ -814,6 +814,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           alias "fromMS",
         'timestamp
           alias "untilMS",
+        lit( "Cancelled")
+          alias "terminalState",
         'requestId
           alias "cancellationRequestId",
         'response
@@ -830,89 +832,111 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           alias "cancelledBy")
   }
 
-  def jobRunsCancelAllQueuedRuns( intervals: DataFrame)(df: DataFrame): DataFrame = {
 
-    val df_runs_columns = df.columns.map( c => col( s"runs.$c"))
+  def jobRunsCancelAllQueuedRuns( intervals: DataFrame)( runsBaseWithMeta: DataFrame): DataFrame = {
 
-    df.withColumn( "queue_enabled",
+    val rangeJoinBinSize = 60 * 60 * 1000  // 1 hour in milliseconds
+
+    def joinByJobId( intervals: DataFrame)( df: DataFrame): DataFrame = {
+      df.hint( "range_join", rangeJoinBinSize)
+        .join(
+          intervals alias "intervals_by_job",
+          $"runs.organization_id" === $"intervals_by_job.organization_id"
+            and $"runs.jobId" === $"intervals_by_job.jobId"
+            and $"runs.submissionEpochMS".between(
+              $"intervals_by_job.fromMS",
+              $"intervals_by_job.untilMS"),
+          "left")
+    }
+
+    def joinNullJobId( intervals: DataFrame)( df: DataFrame): DataFrame = {
+      df.hint( "range_join", rangeJoinBinSize)
+        .join(
+          intervals alias "intervals_null_job",
+          $"runs.organization_id" === $"intervals_null_job.organization_id"
+            and $"runs.submissionEpochMS".between(
+              $"intervals_null_job.fromMS",
+              $"intervals_null_job.untilMS"),
+          "left")
+    }
+
+
+    val withIntervalField = ( c: Column, field: String) => {
+      c withField( field,
+        coalesce(
+          col( s"intervals_by_job.$field"),
+          col( s"intervals_null_job.$field")))
+    }
+
+    def populateTimeDetails( df: DataFrame): DataFrame = {
+      df withColumn( "timeDetails",
+        when( ! $"runs.queue_enabled", $"runs.timeDetails")
+          otherwise withIntervalField( $"runs.timeDetails", "cancellationTime"))
+    //         $"runs.timeDetails" withField(
+    //           "cancellationTime",
+    //           coalesce(
+    //             $"intervals_by_job.cancellationTime",
+    //             $"intervals_null_job.cancellationTime"))))
+    }
+
+    def populateRequestDetails( df: DataFrame): DataFrame = {
+
+      val cancellatioRequestFieldNames = Seq(
+        "cancellationRequestId",
+        "cancellationResponse",
+        "cancellationSessionId",
+        "cancellationSourceIp",
+        "cancelledUserAgent",
+        "cancelledBy")
+
+      val cr = col( "runs.requestDetails.cancellationRequest")
+
+      df withColumn( "requestDetails",
+        when( ! $"runs.queue_enabled",
+          $"runs.requestDetails")
+          otherwise( $"runs.requestDetails"
+            withField( "cancellationRequest",
+              cancellatioRequestFieldNames
+                .foldLeft( cr)( withIntervalField))))
+    }
+
+    def populateTerminalState( df: DataFrame): DataFrame = {
+      df withColumn( "terminalState",
+        coalesce(
+          $"runs.terminalState",
+          $"intervals_by_job.terminalState",
+          $"intervals_null_job.terminalState"))
+    }
+
+
+    // avoid bad column references after modification
+
+    def matchModifiedColumn( c: String): Column = {
+      val modifiedColumns = Set(
+        "requestDetails",
+        "timeDetails",
+        "terminalState")
+      c match {
+        case c if modifiedColumns.contains(c) => col( c)
+        case c => col( s"runs.$c")
+      }
+    }
+
+    runsBaseWithMeta
+      .withColumn( "queue_enabled",
         get_json_object('queue, "$.enabled")
           cast BooleanType)
-      .alias( "runs")
-      .join(
-        intervals
-          where( $"jobId" isNotNull)
-          hint( "range_join", 60 * 60 * 1000)  // 1 hour in millis
-          alias "intervals_by_job",
-        $"runs.organization_id" === $"intervals_by_job.organization_id"
-          and $"runs.jobId" === $"intervals_by_job.jobId"
-          and $"runs.submissionEpochMS".between(
-            $"intervals_by_job.fromMS",
-            $"intervals_by_job.untilMS"),
-        "left")
-      .join(
-        intervals
-          where($"jobId" isNull)
-          hint( "range_join", 60 * 60 * 1000)  // 1 hour in millis
-          alias "intervals_any_job",
-        $"runs.organization_id" === $"intervals_any_job.organization_id"
-          and $"runs.submissionEpochMS".between(
-            $"intervals_any_job.fromMS",
-            $"intervals_any_job.untilMS"),
-        "left")
-      .withColumn( "timeDetails",
-        when(
-          ! $"runs.queue_enabled",
-          $"runs.timeDetails")
-        otherwise $"runs.timeDetails"
-            withField( "cancellationTime",
-              coalesce(
-                $"intervals_by_job.cancellationTime",
-                $"intervals_any_job.cancellationTime")))
-      .withColumn( "requestDetails",
-        when(
-          ! $"runs.queue_enabled",
-          $"runs.requestDetails")
-        otherwise $"runs.requestDetails"
-          withField( "cancellationRequest",
-            $"runs.requestDetails.cancellationRequest"
-              withField( "cancellationRequestId",
-                coalesce(
-                    $"intervals_by_job.cancellationRequestId",
-                    $"intervals_any_job.cancellationRequestId"))
-              withField( "cancellationResponse",
-                coalesce(
-                  $"intervals_by_job.cancellationResponse",
-                  $"intervals_any_job.cancellationResponse"))
-              withField( "cancellationSessionId",
-                coalesce(
-                  $"intervals_by_job.cancellationSessionId",
-                  $"intervals_any_job.cancellationSessionId"))
-              withField( "cancellationSourceIp",
-                coalesce(
-                  $"intervals_by_job.cancellationSourceIp",
-                  $"intervals_any_job.cancellationSourceIp"))
-              withField( "cancellationTime",
-                coalesce(
-                  $"intervals_by_job.cancellationTime",
-                  $"intervals_any_job.cancellationTime"))
-              withField( "cancelledUserAgent",
-                coalesce(
-                  $"intervals_by_job.cancelledUserAgent",
-                  $"intervals_any_job.cancelledUserAgent"))
-              withField( "cancelledBy",
-                coalesce(
-                  $"intervals_by_job.cancelledBy",
-                  $"intervals_any_job.cancelledBy"))))
-      .withColumn( "terminalState",
-        when(
-          $"requestDetails"
-            getField "cancellationRequest"
-            getField "cancellationRequestId"
-            isNotNull,
-          "Cancelled")
-        otherwise( $"runs.terminalState"))
-      // .select( df_runs_columns:_*)
-    }
+      .alias( "runs") // runs
+      .transform( joinByJobId(
+        intervals where $"jobId".isNotNull))
+      .transform( joinNullJobId(
+        intervals where $"jobId".isNull))
+      .transform( populateTimeDetails)
+      .transform( populateRequestDetails)
+      .transform( populateTerminalState)
+      .select( runsBaseWithMeta.columns.map( matchModifiedColumn):_*)
+
+  }
 
 
   def jobRunsDeriveRunsBase(df: DataFrame): DataFrame = {
