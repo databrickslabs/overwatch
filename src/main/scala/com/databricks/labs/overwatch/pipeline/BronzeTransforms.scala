@@ -582,8 +582,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       logger.log(Level.INFO, s"No Data is present for cluster snapshot")
       spark.emptyDataFrame
     }
-
-    auditDF
   }
 
   private def landClusterSnapshot(clusterIDs: Array[String],
@@ -605,13 +603,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "increment_counter" -> "1",
       "final_response_count" -> s"${finalResponseCount}",
       "cluster_ids" -> s"${clusterIDs.mkString(",")}",
-      "start_time" -> s"${lagStartTime}",
-      "end_time" -> s"${endTime.asUnixTimeMilli}",
+//      "start_time" -> s"${lagStartTime}",
+//      "end_time" -> s"${endTime.asUnixTimeMilli}",
       "tmp_success_path" -> tmpClusterSnapSuccessPath,
       "tmp_error_path" -> tmpClusterSnapErrorPath
     )
-
-    println(jsonInput)
 
     // calling function to make parallel API calls
     val apiCallV2Obj = new ApiCallV2(config.apiEnv)

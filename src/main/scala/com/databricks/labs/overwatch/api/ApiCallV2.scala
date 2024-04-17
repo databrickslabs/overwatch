@@ -601,7 +601,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
    */
   def executeMultiThread(accumulator: LongAccumulator): util.ArrayList[String] = {
     @tailrec def executeThreadedHelper(): util.ArrayList[String] = {
-      println(f"queryMap in multiuThred = ${queryMap}")
       val response = getResponse
       responseCodeHandler(response)
       _apiResponseArray.add(apiMeta.enrichAPIResponse(response,jsonQuery,queryMap))//for GET request we have to convert queryMap to Json
@@ -746,7 +745,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
 
     while (startValue < endValue){
       val jsonQuery = apiMetaFactoryObj.getAPIJsonQuery(startValue, endValue, jsonInput)
-      println(f"jsonQuery = ${jsonQuery}")
 
       //call future
       val future = Future {
@@ -764,6 +762,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
             }
           )
           if (apiResponseArray.size() >= config.apiEnv.successBatchSize) {
+            println(s"apiErrorArray = ${apiResponseArray.size()}")
             PipelineFunctions.writeMicroBatchToTempLocation(tmpSuccessPath, apiResponseArray.toString)
             apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
           }
