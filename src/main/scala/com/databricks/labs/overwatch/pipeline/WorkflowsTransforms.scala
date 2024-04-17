@@ -781,7 +781,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     // actions, so this logic only considers actions where
     // `'all_queued_runs` is `true`.
 
-    // Queued runs are automatically cancelled by the control place
+    // Queued runs are automatically cancelled by the control plane
     // after 48 hours, so any of these actions only apply to runs
     // submitted up to 48 hours prior to their submission time.
 
@@ -795,21 +795,25 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .partitionBy( 'organization_id, 'jobId)
       .orderBy( 'timestamp)
 
-    { df filter(
-      'actionName isin "cancelAllRuns"
-        and 'all_queued_runs
-        and $"response.statusCode" === 200
-        and 'timestamp === first('timestamp) over requestWindow)
-      select(
+    df.filter(
+        'actionName isin "cancelAllRuns"
+          and 'all_queued_runs
+          and $"response.statusCode" === 200)
+      .withColumn(
+        "is_distinct_request",
+        row_number().over( requestWindow) === lit(1))
+      .filter( 'is_distinct_request)
+      .select(
         'organization_id,
         'job_id cast "long"
           alias "jobId",
         greatest(
-          lag( 'timestamp, default= 0) over w,
+          lag( $"timestamp", offset= 1, defaultValue= 0)
+            over intervalWindow,
           'timestamp - maxQueueDurationMS)
-           alias "from",
+          alias "fromMS",
         'timestamp
-          alias "until",
+          alias "untilMS",
         'requestId
           alias "cancellationRequestId",
         'response
@@ -823,7 +827,93 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'userAgent
           alias "cancelledUserAgent",
         'userIdentity
-          alias "cancelledBy")}}
+          alias "cancelledBy")
+  }
+
+  def jobRunsCancelAllQueuedRuns( intervals: DataFrame)(df: DataFrame): DataFrame = {
+
+    val df_runs_columns = df.columns.map( c => col( s"runs.$c"))
+
+    df.withColumn( "queue_enabled",
+        get_json_object('queue, "$.enabled")
+          cast BooleanType)
+      .alias( "runs")
+      .join(
+        intervals
+          where( $"jobId" isNotNull)
+          hint( "range_join", 60 * 60 * 1000)  // 1 hour in millis
+          alias "intervals_by_job",
+        $"runs.organization_id" === $"intervals_by_job.organization_id"
+          and $"runs.jobId" === $"intervals_by_job.jobId"
+          and $"runs.submissionEpochMS".between(
+            $"intervals_by_job.fromMS",
+            $"intervals_by_job.untilMS"),
+        "left")
+      .join(
+        intervals
+          where($"jobId" isNull)
+          hint( "range_join", 60 * 60 * 1000)  // 1 hour in millis
+          alias "intervals_any_job",
+        $"runs.organization_id" === $"intervals_any_job.organization_id"
+          and $"runs.submissionEpochMS".between(
+            $"intervals_any_job.fromMS",
+            $"intervals_any_job.untilMS"),
+        "left")
+      .withColumn( "timeDetails",
+        when(
+          ! $"runs.queue_enabled",
+          $"runs.timeDetails")
+        otherwise $"runs.timeDetails"
+            withField( "cancellationTime",
+              coalesce(
+                $"intervals_by_job.cancellationTime",
+                $"intervals_any_job.cancellationTime")))
+      .withColumn( "requestDetails",
+        when(
+          ! $"runs.queue_enabled",
+          $"runs.requestDetails")
+        otherwise $"runs.requestDetails"
+          withField( "cancellationRequest",
+            $"runs.requestDetails.cancellationRequest"
+              withField( "cancellationRequestId",
+                coalesce(
+                    $"intervals_by_job.cancellationRequestId",
+                    $"intervals_any_job.cancellationRequestId"))
+              withField( "cancellationResponse",
+                coalesce(
+                  $"intervals_by_job.cancellationResponse",
+                  $"intervals_any_job.cancellationResponse"))
+              withField( "cancellationSessionId",
+                coalesce(
+                  $"intervals_by_job.cancellationSessionId",
+                  $"intervals_any_job.cancellationSessionId"))
+              withField( "cancellationSourceIp",
+                coalesce(
+                  $"intervals_by_job.cancellationSourceIp",
+                  $"intervals_any_job.cancellationSourceIp"))
+              withField( "cancellationTime",
+                coalesce(
+                  $"intervals_by_job.cancellationTime",
+                  $"intervals_any_job.cancellationTime"))
+              withField( "cancelledUserAgent",
+                coalesce(
+                  $"intervals_by_job.cancelledUserAgent",
+                  $"intervals_any_job.cancelledUserAgent"))
+              withField( "cancelledBy",
+                coalesce(
+                  $"intervals_by_job.cancelledBy",
+                  $"intervals_any_job.cancelledBy"))))
+      .withColumn( "terminalState",
+        when(
+          $"requestDetails"
+            getField "cancellationRequest"
+            getField "cancellationRequestId"
+            isNotNull,
+          "Cancelled")
+        otherwise( $"runs.terminalState"))
+      // .select( df_runs_columns:_*)
+    }
+
 
   def jobRunsDeriveRunsBase(df: DataFrame): DataFrame = {
     // , etlUntilTime: TimeTypes  // unused arg?
@@ -960,12 +1050,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           ).alias("startRequest")
         ).alias("requestDetails")
       )
-      .withColumn( "timestamp", coalesce(
-        // TS lookup key added for next steps (launch time)
-        $"TaskRunTime.startEpochMS",
-        // (fall through for canceled, queued runs that never started)
-        $"timeDetails.submissionTime"))
-      .withColumn( "startEpochMS", $"timestamp")
+     // TS lookup key added for next steps (launch time)
+      .withColumn( "timestamp",
+        $"TaskRunTime.startEpochMS") // === timeDetails.submissionTime
+      .withColumn( "startEpochMS",
+        $"TaskExecutionRunTime.startEpochMS") // <=> timeDetails.startTime
+      .withColumn( "submissionEpochMS",
+        $"TaskRunTime.startEpochMS")          // === timeDetails.submissionTime
       // .scrubSchema
   }
 
@@ -1108,7 +1199,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     runsWithJobName2
       .withColumn("jobName", coalesce('jobName, 'run_name, 'status_jobName, $"snapshot_settings.name"))
-      .withColumn( "queue", coalesce( 'queue, $"status_queue", $"snapshot_queue")
+      .withColumn( "queue", coalesce( 'queue, $"status_queue", $"snapshot_queue"))
       .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
       .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
 
