@@ -317,40 +317,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
   }
 
-  def getClusterSnapshotBronze(
-                                workspace: Workspace,
-                                apiEndpointTempDir: String,
-                                pipelineSnapTS: TimeTypes,
-                              )
-                              (auditDF: DataFrame): DataFrame = {
-    val newClustersIDs = auditDF
-      .select(cluster_idFromAudit.alias("cluster_id"))
-      .filter(col("cluster_id").isNotNull)
-      .distinct()
-      .select("cluster_id").distinct().collect().map(x => x(0).toString)
-
-    val config = workspace.getConfig
-
-    val tmpClusterSnapSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
-
-    val futureResults = newClustersIDs.map(workspace.fetchClusterDetails(_,tmpClusterSnapSuccessPath))
-
-    // Convert Array[Future[Try[DataFrame]]] to Seq[Future[Try[DataFrame]]] for Future.sequence
-    val futureResultsSeq: Seq[Future[Try[org.apache.spark.sql.DataFrame]]] = futureResults.toSeq
-
-    // Await the completion of all futures
-    val results = Await.result(Future.sequence(futureResultsSeq), 10.minutes)
-
-//    results.collect {
-//      case Success(df) => {
-//        print(df.show(5,false))
-//        df.write.format("delta").mode("append").option("overwriteSchema", true).save(tmpClusterEventsSuccessPath)
-//      }
-//    }
-
-    spark.read.format("delta").load(tmpClusterSnapSuccessPath)
-  }
-
   protected def cleanseRawPoolsDF()(df: DataFrame): DataFrame = {
     val outputDF = SchemaScrubber.scrubSchema(df)
     outputDF
@@ -551,13 +517,14 @@ trait BronzeTransforms extends SparkSessionWrapper {
       tmpClusterEventsErrorPath, config)
     logger.log(Level.INFO, " cluster snapshot landing completed")
 
+    println(s"tmpClusterSnapshotSuccessPath is ${tmpClusterSnapshotSuccessPath}")
+    println(s"tmpClusterEventsErrorPath is ${tmpClusterEventsErrorPath}")
+
     if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
       try {
         val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
-        if (rawDF.columns.contains("snap")) {
-          val result = rawDF.select(explode(col("snap")).alias("snap")).select(col("snap" + ".*"))
-            .withColumn("organization_id", lit(config.organizationId))
-          val outputDF = SchemaScrubber.scrubSchema(result)
+        if (rawDF.columns.contains("cluster_id")) {
+          val outputDF = SchemaScrubber.scrubSchema(rawDF)
           val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
             .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
             .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
@@ -565,6 +532,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
             .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
             .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
+            .withColumn("organization_id", lit(config.organizationId))
             .verifyMinimumSchema(clusterSnapSchema)
             .select(Schema.clusterSnapSchema.fieldNames.map(col): _*)
           finalDF
