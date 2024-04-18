@@ -576,7 +576,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val clusterEventsEndpoint = "clusters/get"
 
     val lagTime = 600000 //10 minutes
-    val lagStartTime = startTime.asUnixTimeMilli - lagTime
+
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> "0",
@@ -584,8 +584,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       "increment_counter" -> "1",
       "final_response_count" -> s"${finalResponseCount}",
       "cluster_ids" -> s"${clusterIDs.mkString(",")}",
-//      "start_time" -> s"${lagStartTime}",
-//      "end_time" -> s"${endTime.asUnixTimeMilli}",
       "tmp_success_path" -> tmpClusterSnapSuccessPath,
       "tmp_error_path" -> tmpClusterSnapErrorPath
     )

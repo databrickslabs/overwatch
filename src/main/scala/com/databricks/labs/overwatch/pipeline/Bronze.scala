@@ -132,7 +132,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
           clustersSnapshotModule.moduleName
         )
         ),
-        append(BronzeTargets.clustersSnapshotTargetNew)
+        append(BronzeTargets.clustersSnapshotTarget)
       )
   }
 

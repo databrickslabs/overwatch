@@ -320,14 +320,11 @@ class ClusterListApi extends ApiMeta {
 class ClusterGetApi extends ApiMeta {
   setDataframeColumn("cluster_id")
   setApiCallType("GET")
-
   private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
     val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
-
     Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}"""
     )
   }
-
   private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
     Map(
       "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
@@ -336,9 +333,7 @@ class ClusterGetApi extends ApiMeta {
       "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
     )
   }
-
 }
-
 
 class JobListApi extends ApiMeta {
   setDataframeColumn("jobs")
