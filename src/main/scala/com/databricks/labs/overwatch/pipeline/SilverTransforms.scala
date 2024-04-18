@@ -1366,16 +1366,17 @@ trait SilverTransforms extends SparkSessionWrapper {
     val cancelAllQueuedRunsIntervals =
       jobRunsLag30D transform jobRunsDeriveCancelAllQueuedRunsIntervals
 
-    // caching before structifying
-    jobRunsDeriveRunsBase(jobRunsLag30D)  // , etlUntilTime) // unused?
-      .transform(jobRunsAppendClusterName(jobRunsLookups))
-      .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
-      .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
-      .transform(jobRunsAppendTaskAndClusterDetails)
-      .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
-      //      .transform(jobRunsRollupWorkflowsAndChildren)
-      .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
+    jobRunsDeriveRunsBase( jobRunsLag30D)
+      .transform( jobRunsAppendClusterName( jobRunsLookups))
+      .transform( jobRunsAppendJobMeta( jobRunsLookups))
+      .transform( jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
+      .transform( jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transform( jobRunsAppendTaskAndClusterDetails)
+      .transform( jobRunsCleanseCreatedNestedStructures( targetKeys))
+      .drop( "timestamp")
+
+    // `timestamp` could be duplicated to enable `asOf` lookups; dropping to clean up
+
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {

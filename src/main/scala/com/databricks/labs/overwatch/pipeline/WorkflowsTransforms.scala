@@ -771,19 +771,24 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .groupBy('organization_id, 'runId, 'repairId)
       .agg(collect_list('repair_details).alias("repair_details"))
   }
-  
+
+  /**
+    * `'jobId` can be null; it means that all queued runs in the
+    * workspace are cancelled (by ACL?).
+    * 
+    * Cancellations of runs that have started produce `'runFailed'`
+    * actions, so this logic only considers actions where
+    * `'all_queued_runs` is `true`.
+    * 
+    * Queued runs are automatically cancelled by the control plane
+    * after 48 hours, so any of these actions only apply to runs
+    * submitted up to 48 hours prior to their submission time.
+    *
+    * @param df         should be `jobRunsLag30D`
+    * @return
+   */
+
   def jobRunsDeriveCancelAllQueuedRunsIntervals( df: DataFrame): DataFrame = {
-
-    // `'jobId` can be null; it means that all queued runs in the
-    // workspace are cancelled (by ACL?).
-
-    // Cancellations of runs that have started produce `'runFailed'`
-    // actions, so this logic only considers actions where
-    // `'all_queued_runs` is `true`.
-
-    // Queued runs are automatically cancelled by the control plane
-    // after 48 hours, so any of these actions only apply to runs
-    // submitted up to 48 hours prior to their submission time.
 
     val maxQueueDurationMS = lit( 48 * 60 * 60 * 1000)
 
@@ -799,9 +804,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'actionName isin "cancelAllRuns"
           and 'all_queued_runs
           and $"response.statusCode" === 200)
-      .withColumn(
-        "is_distinct_request",
-        row_number().over( requestWindow) === lit(1))
+      .withColumn( "is_distinct_request",
+        row_number.over( requestWindow) === lit( 1))
       .filter( 'is_distinct_request)
       .select(
         'organization_id,
@@ -815,7 +819,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'timestamp
           alias "untilMS",
         lit( "Cancelled")
-          alias "terminalState",
+          alias "cancelled",
         'requestId
           alias "cancellationRequestId",
         'response
@@ -860,6 +864,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           "left")
     }
 
+    def populateTerminalState( df: DataFrame): DataFrame = {
+      df withColumn( "terminalState",
+        coalesce(
+          $"runs.terminalState",
+          $"intervals_by_job.cancelled",
+          $"intervals_null_job.cancelled"))
+    }
 
     val withIntervalField = ( c: Column, field: String) => {
       c withField( field,
@@ -900,27 +911,21 @@ object WorkflowsTransforms extends SparkSessionWrapper {
                 .foldLeft( cr)( withIntervalField))))
     }
 
-    def populateTerminalState( df: DataFrame): DataFrame = {
-      df withColumn( "terminalState",
-        coalesce(
-          $"runs.terminalState",
-          $"intervals_by_job.terminalState",
-          $"intervals_null_job.terminalState"))
-    }
-
 
     // avoid bad column references after modification
 
-    def matchModifiedColumn( c: String): Column = {
-      val modifiedColumns = Set(
-        "requestDetails",
-        "timeDetails",
-        "terminalState")
-      c match {
-        case c if modifiedColumns.contains(c) => col( c)
-        case c => col( s"runs.$c")
-      }
+    // def matchModifiedColumn( c: String): Column =
+
+    val modifiedColumns = Set(
+      "requestDetails",
+      "timeDetails",
+      "terminalState")
+
+    val selectColumns = runsBaseWithMeta.columns map {
+      case c if modifiedColumns.contains(c) => col( c)
+      case c => col( s"runs.$c")
     }
+
 
     runsBaseWithMeta
       .withColumn( "queue_enabled",
@@ -934,8 +939,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .transform( populateTimeDetails)
       .transform( populateRequestDetails)
       .transform( populateTerminalState)
-      .select( runsBaseWithMeta.columns.map( matchModifiedColumn):_*)
-
+      .select(
+        // runsBaseWithMeta.columns.map( matchModifiedColumn):_*)
+        selectColumns:_*)
   }
 
 
@@ -1007,7 +1013,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
         'queue,
         TransformFunctions.subtractTime(
-          'submissionTime,
+          'submissionTime,                                     // was `'startTime` through 0.8.1.0
           array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
         ).alias("TaskRunTime"), // run launch time until terminal event
         TransformFunctions.subtractTime(
@@ -1076,11 +1082,11 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       )
      // TS lookup key added for next steps (launch time)
       .withColumn( "timestamp",
-        $"TaskRunTime.startEpochMS") // === timeDetails.submissionTime
+        $"TaskRunTime.startEpochMS")           // was 'startTime; now 'submissionTime
       .withColumn( "startEpochMS",
-        $"TaskExecutionRunTime.startEpochMS") // <=> timeDetails.startTime
-      .withColumn( "submissionEpochMS",
-        $"TaskRunTime.startEpochMS")          // === timeDetails.submissionTime
+        $"TaskRunTime.startEpochMS")           // was 'startTime; now 'submissionTime
+      // .withColumn( "startTaskEpochMS",
+      //   $"TaskExecutionRunTime.startEpochMS")  // <=> timeDetails.startTime (using source column directly as merge key?)
       // .scrubSchema
   }
 
@@ -1299,6 +1305,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     } else df // tasks not present in schema
   }
 
+
+  // TODO reuse comments in following block elsewhere and clean up here
+
   /**
    * It's imperative that all nested runs be nested within the jobRun record to ensure cost accuracy downstream in
    * jrcp -- without it jrcp will double count costs as both the parent and the child will have an associated cost
@@ -1321,46 +1330,16 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    * without a workflow child but the reverse is not true. This can be reviewed with customer to determine if this
    * is a valid assumption and these can be coalesced, but for now, for safety, they are being kept separate until
    * all scenarios can be identified
+
+
+    // reference removed in PRs #602 & #608.  see issue #598
+
+    def jobRunsRollupWorkflowsAndChildren(df: DataFrame): DataFrame = {
+
+
+    }
+
    */
-  def jobRunsRollupWorkflowsAndChildren(df: DataFrame): DataFrame = {
-
-    // identify root level task runs
-    val rootTaskRuns = df
-      .filter('parentRunId.isNull && get_json_object('workflow_context, "$.root_run_id").isNull)
-
-    // pull only workflow children as defined by having a workflow_context.root_run_id
-    val workflowChildren = df
-      .filter(get_json_object('workflow_context, "$.root_run_id").isNotNull)
-
-    // prepare the nesting by getting keys and the entire record as a nested record
-    val workflowChildrenForNesting = workflowChildren
-      .withColumn("parentRunId", get_json_object('workflow_context, "$.root_run_id").cast("long"))
-      .withColumn("workflowChild", struct(workflowChildren.schema.fieldNames map col: _*))
-      .groupBy('organization_id, 'parentRunId)
-      .agg(collect_list('workflowChild).alias("workflow_children"))
-
-    // get all the children identified as having a parentRunId as they need to be rolled up
-    val children = df
-      .filter('parentRunId.isNotNull)
-      .join(workflowChildrenForNesting, Seq("organization_id", "parentRunId"), "left")
-
-    // prepare the nesting by getting keys and the entire record as a nested record
-    val childrenForNesting = children
-      .withColumn("child", struct(children.schema.fieldNames map col: _*))
-      .groupBy('organization_id, 'parentRunId)
-      .agg(collect_list('child).alias("children"))
-      .withColumnRenamed("parentRunId", "taskRunId") // for simple joining
-
-    // deliver root task runs with workflows and children nested within the root
-    rootTaskRuns
-      .join(childrenForNesting, Seq("organization_id", "taskRunId"), "left") // workflows in mtjs
-      .join(
-        workflowChildrenForNesting.withColumnRenamed("parentRunId", "taskRunId"), // for simple joining
-        Seq("organization_id", "taskRunId"),
-        "left"
-      )
-
-  }
 
   /**
    * BEGIN JRCP Transforms
