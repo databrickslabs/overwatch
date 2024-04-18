@@ -512,19 +512,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
 
-      val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
-      val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
+    val tmpClusterSnapshotSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+    val tmpClusterSnapshotErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
 
-    val tmpClusterSnapshotSuccessPath= landClusterSnapshot(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
-      tmpClusterEventsErrorPath, config)
+    landClusterSnapshot(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
+      tmpClusterSnapshotErrorPath, config)
     logger.log(Level.INFO, " cluster snapshot landing completed")
 
     println(s"tmpClusterSnapshotSuccessPath is ${tmpClusterSnapshotSuccessPath}")
-    println(s"tmpClusterEventsErrorPath is ${tmpClusterEventsErrorPath}")
+    println(s"tmpClusterEventsErrorPath is ${tmpClusterSnapshotErrorPath}")
 
-    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+    if (Helpers.pathExists(tmpClusterSnapshotErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterEventsErrorPath)
+        spark.read.json(tmpClusterSnapshotErrorPath)
           .withColumn("from_ts", toTS(col("from_epoch")))
           .withColumn("until_ts", toTS(col("until_epoch"))),
         database,
