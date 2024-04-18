@@ -494,6 +494,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
                            endTime: TimeTypes,
                            pipelineSnapTS: TimeTypes,
                            apiEnv: ApiEnv,
+                           database: Database,
+                           clusterSnapshotErrorsTarget: PipelineTable,
                            config: Config,
                            apiEndpointTempDir: String
                          )(auditDF: DataFrame) : DataFrame = {
@@ -519,6 +521,19 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     println(s"tmpClusterSnapshotSuccessPath is ${tmpClusterSnapshotSuccessPath}")
     println(s"tmpClusterEventsErrorPath is ${tmpClusterEventsErrorPath}")
+
+    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+      persistErrors(
+        spark.read.json(tmpClusterEventsErrorPath)
+          .withColumn("from_ts", toTS(col("from_epoch")))
+          .withColumn("until_ts", toTS(col("until_epoch"))),
+        database,
+        clusterSnapshotErrorsTarget,
+        pipelineSnapTS,
+        config.organizationId
+      )
+      logger.log(Level.INFO, "Persist error completed")
+    }
 
     if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
       try {

@@ -138,6 +138,8 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
           clustersSnapshotModule_new.untilTime,
           pipelineSnapTime,
           config.apiEnv,
+          database,
+          BronzeTargets.clusterSnapshotErrorsTarget,
           config,
           clustersSnapshotModule_new.moduleName
         )
