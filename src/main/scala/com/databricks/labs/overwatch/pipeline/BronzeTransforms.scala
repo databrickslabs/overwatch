@@ -517,6 +517,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     landClusterSnapshot(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
       tmpClusterSnapshotErrorPath, config)
+
     logger.log(Level.INFO, " cluster snapshot landing completed")
 
     if (Helpers.pathExists(tmpClusterSnapshotErrorPath)) {
