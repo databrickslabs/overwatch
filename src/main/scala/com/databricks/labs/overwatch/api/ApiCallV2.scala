@@ -762,7 +762,6 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
             }
           )
           if (apiResponseArray.size() >= config.apiEnv.successBatchSize) {
-            println(s"apiErrorArray = ${apiResponseArray.size()}")
             PipelineFunctions.writeMicroBatchToTempLocation(tmpSuccessPath, apiResponseArray.toString)
             apiResponseArray = Collections.synchronizedList(new util.ArrayList[String]())
           }
