@@ -90,27 +90,6 @@ class Workspace(config: Config) extends SparkSessionWrapper {
       .withColumn("organization_id", lit(config.organizationId))
   }
 
-  def fetchClusterDetails(clusterId: String,tmpClusterEventsSuccessPath : String): Future[Try[org.apache.spark.sql.DataFrame]] = Future {
-    val endpoint = "clusters/get"
-    Try {
-      val query = Map("cluster_id" -> clusterId)
-      val result = ApiCallV2(config.apiEnv, endpoint, query).execute().asDF()
-        .withColumn("organization_id", lit("4110809171315443"))
-      val outputDF = SchemaScrubber.scrubSchema(result)
-      val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
-        .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
-        .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
-        .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
-        .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
-        .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
-        .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
-        .verifyMinimumSchema(clusterSnapSchema)
-        .select(Schema.clusterSnapSchema.fieldNames.map(col): _*)
-      finalDF.write.format("delta").mode("append").option("overwriteSchema", true).save(tmpClusterEventsSuccessPath)
-      finalDF
-    }
-  }
-
   /**
    * For future development
    *
