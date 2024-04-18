@@ -519,9 +519,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
       tmpClusterSnapshotErrorPath, config)
     logger.log(Level.INFO, " cluster snapshot landing completed")
 
-    println(s"tmpClusterSnapshotSuccessPath is ${tmpClusterSnapshotSuccessPath}")
-    println(s"tmpClusterEventsErrorPath is ${tmpClusterSnapshotErrorPath}")
-
     if (Helpers.pathExists(tmpClusterSnapshotErrorPath)) {
       persistErrors(
         spark.read.json(tmpClusterSnapshotErrorPath)
