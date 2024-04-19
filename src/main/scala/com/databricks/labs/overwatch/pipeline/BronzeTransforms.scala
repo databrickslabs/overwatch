@@ -522,9 +522,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     if (Helpers.pathExists(tmpClusterSnapshotErrorPath)) {
       persistErrors(
-        spark.read.json(tmpClusterSnapshotErrorPath)
-          .withColumn("from_ts", toTS(col("from_epoch")))
-          .withColumn("until_ts", toTS(col("until_epoch"))),
+        spark.read.json(tmpClusterSnapshotErrorPath),
         database,
         clusterSnapshotErrorsTarget,
         pipelineSnapTS,
