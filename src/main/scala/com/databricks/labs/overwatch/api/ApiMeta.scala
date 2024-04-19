@@ -320,6 +320,7 @@ class ClusterListApi extends ApiMeta {
 class ClusterGetApi extends ApiMeta {
   setDataframeColumn("cluster_name")
   setApiCallType("GET")
+  setBatchPersist(true)
   private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
     val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
     Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}"""
