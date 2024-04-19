@@ -504,7 +504,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .select(cluster_idFromAudit.alias("cluster_id"))
       .filter(col("cluster_id").isNotNull)
       .distinct()
-      .select("cluster_id").distinct().collect().map(x => x(0).toString)
+      .select("cluster_id").distinct().collect().map(x => x(0).toString) ++ Array("0401-180034-21siyrc3")
 
     if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
