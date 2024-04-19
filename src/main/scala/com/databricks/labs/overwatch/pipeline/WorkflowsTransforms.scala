@@ -872,22 +872,23 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           $"intervals_null_job.cancelled"))
     }
 
-    val withIntervalField = ( c: Column, field: String) => {
+    // when intervals intersect, take the field value from the earliest action
+
+    val withFieldOfEarliestInterval = ( c: Column, field: String) => {
       c withField( field,
-        coalesce(
-          col( s"intervals_by_job.$field"),
-          col( s"intervals_null_job.$field")))
+        when(
+          $"intervals_by_job.untilMS" <=> least(
+            $"intervals_by_job.untilMS",
+            $"intervals_null_job.untilMS"),
+          col( s"intervals_by_job.$field"))
+        otherwise
+          col( s"intervals_null_job.$field"))
     }
 
     def populateTimeDetails( df: DataFrame): DataFrame = {
       df withColumn( "timeDetails",
         when( ! $"runs.queue_enabled", $"runs.timeDetails")
-          otherwise withIntervalField( $"runs.timeDetails", "cancellationTime"))
-    //         $"runs.timeDetails" withField(
-    //           "cancellationTime",
-    //           coalesce(
-    //             $"intervals_by_job.cancellationTime",
-    //             $"intervals_null_job.cancellationTime"))))
+          otherwise withFieldOfEarliestInterval( $"runs.timeDetails", "cancellationTime"))
     }
 
     def populateRequestDetails( df: DataFrame): DataFrame = {
@@ -908,7 +909,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           otherwise( $"runs.requestDetails"
             withField( "cancellationRequest",
               cancellatioRequestFieldNames
-                .foldLeft( cr)( withIntervalField))))
+                .foldLeft( cr)( withFieldOfEarliestInterval))))
     }
 
 
@@ -940,7 +941,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .transform( populateRequestDetails)
       .transform( populateTerminalState)
       .select(
-        // runsBaseWithMeta.columns.map( matchModifiedColumn):_*)
         selectColumns:_*)
   }
 
