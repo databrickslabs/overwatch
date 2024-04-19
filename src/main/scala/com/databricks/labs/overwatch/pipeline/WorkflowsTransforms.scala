@@ -657,6 +657,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'timestamp,
         'jobId.cast("long").alias("submissionJobId"),
         'runId.alias("jobRunId"),
+        'queue,
         'timestamp.alias("submissionTime"),
         'jobTriggerType.alias("jobTriggerType_Triggered"),
         'requestId.alias("submitRequestID"),
@@ -678,6 +679,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         'timestamp,
         get_json_object($"response.result", "$.run_id").cast("long").alias("jobRunId"),
         'run_name,
+        'queue,
         'timestamp.alias("submissionTime"),
         'job_clusters, // json array struct string
         'new_cluster, // json struct string
@@ -847,7 +849,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           intervals alias "intervals_by_job",
           $"runs.organization_id" === $"intervals_by_job.organization_id"
             and $"runs.jobId" === $"intervals_by_job.jobId"
-            and $"runs.submissionEpochMS".between(
+            and $"runs.startEpochMS".between(
               $"intervals_by_job.fromMS",
               $"intervals_by_job.untilMS"),
           "left")
@@ -858,7 +860,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         .join(
           intervals alias "intervals_null_job",
           $"runs.organization_id" === $"intervals_null_job.organization_id"
-            and $"runs.submissionEpochMS".between(
+            and $"runs.startEpochMS".between(
               $"intervals_null_job.fromMS",
               $"intervals_null_job.untilMS"),
           "left")
@@ -932,7 +934,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .withColumn( "queue_enabled",
         get_json_object('queue, "$.enabled")
           cast BooleanType)
-      .alias( "runs") // runs
+      .alias( "runs")
       .transform( joinByJobId(
         intervals where $"jobId".isNotNull))
       .transform( joinNullJobId(
@@ -1085,15 +1087,15 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         $"TaskRunTime.startEpochMS")           // was 'startTime; now 'submissionTime
       .withColumn( "startEpochMS",
         $"TaskRunTime.startEpochMS")           // was 'startTime; now 'submissionTime
-      // .withColumn( "startTaskEpochMS",
-      //   $"TaskExecutionRunTime.startEpochMS")  // <=> timeDetails.startTime (using source column directly as merge key?)
+      .withColumn( "startTaskEpochMS",
+        $"TaskExecutionRunTime.startEpochMS")  // <=> timeDetails.startTime
       // .scrubSchema
   }
 
   def jobRunsStructifyLookupMeta(cacheParts: Int)(df: DataFrame): DataFrame = {
     val dfc = df.repartition(cacheParts).cache() // caching to speed up schema inference
     dfc.count()
-    val colsToOverride = Array("tasks", "job_clusters", "tags").toSet
+    val colsToOverride = Array("queue", "tasks", "job_clusters", "tags").toSet
     val dfOrigCols = (dfc.columns.toSet -- colsToOverride).toArray map col
     val colsToAppend: Array[Column] = Array(
       structFromJson(spark, dfc, "queue", allNullMinimumSchema = Schema.minimumQueueSchema).alias("queue"),
@@ -1134,7 +1136,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   def jobRunsCleanseCreatedNestedStructures(keys: Array[String])(df: DataFrame): DataFrame = {
-    val emptyKeysDF = Seq.empty[(String, Long, Long)].toDF("organization_id", "runId", "startEpochMS")
+    val emptyKeysDF = Seq.empty[(String, Long, Long, Long)].toDF("organization_id", "runId", "startEpochMS", "startTaskEpochMS")
 
     val cleansedTasksDF = workflowsCleanseTasks(df, keys, emptyKeysDF, "submitRun_details.tasks")
     val cleansedJobClustersDF = workflowsCleanseJobClusters(df, keys, emptyKeysDF, "submitRun_details.job_clusters")
@@ -1212,8 +1214,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
           lookups("job_status_silver")
-            .toTSDF("timestamp", "organization_id", "jobId"),
-          rightPrefix= "status"
+            .toTSDF("timestamp", "organization_id", "jobId")
         ).df
     } else df
 
@@ -1222,14 +1223,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
           lookups("jobs_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "jobId"),
-          rightPrefix= "snapshot"
+            .toTSDF("timestamp", "organization_id", "jobId")
         ).df
     } else df
 
     runsWithJobName2
-      .withColumn("jobName", coalesce('jobName, 'run_name, 'status_jobName, $"snapshot_settings.name"))
-      .withColumn( "queue", coalesce( 'queue, $"status_queue", $"snapshot_queue"))
+      .withColumn("jobName", coalesce('jobName, 'run_name))
+      .withColumn( "queue", coalesce( 'queue, $"jobStatus_queue"))
       .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
       .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
 

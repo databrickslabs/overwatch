@@ -142,8 +142,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       'max_concurrent_runs,
       'queue,
       'run_as_user_name,
-//      'children,
-//      'workflow_children,
       'workflow_context,
       'task_detail_legacy,
       'submitRun_details,
@@ -151,8 +149,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       'last_edited_by,
       'requestDetails.alias("request_detail"),
       'timeDetails.alias("time_detail"),
-      'startEpochMS
-    )
+      'startEpochMS,
+      'startTaskEpochMS)
+
     jobRunsLag30D
       .select(jobRunCols: _*)
   }

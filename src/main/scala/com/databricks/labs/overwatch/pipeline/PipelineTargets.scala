@@ -301,14 +301,13 @@ abstract class PipelineTargets(config: Config) {
       name = "jobrun_silver",
       _keys = Array(
         "runId",
-        "timeDetails.submissionTime",   // was `"startEpochMS"` through 0.8.1.0
-                                        // which was incorrectly equal to `$"timeDetails.startTime"
-                                        // via incorrect expression for `'TaskRunTime`
-        "timeDetails.startTime"         // complete key for task runs; can be null
+        "startEpochMS",                 // was incorrectly equal to `$"timeDetails.startTime"` through 0.8.1.0
+                                        // via incorrect expression for `'TaskRunTime`; now `$"timeDetails.submissionTime"`
+        "startTaskEpochMS"              // added to make key for task runs complete; can be null
       ),
       config,
       _mode = WriteMode.merge,
-      incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
+      incrementalColumns = Array("startEpochMS"),
       zOrderBy = Array("runId", "jobId"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       persistBeforeWrite = true,

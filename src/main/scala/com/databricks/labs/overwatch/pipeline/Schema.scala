@@ -886,6 +886,7 @@ object Schema extends SparkSessionWrapper {
       StructField("jobId", LongType, nullable = true),
       StructField("runId", LongType, nullable = false),
       StructField("startEpochMS", LongType, nullable = false),
+      StructField("startTaskEpochMS", LongType, nullable = false),
       StructField("jobName", StringType, nullable = true),
       StructField("tags", MapType(StringType, StringType), nullable = true),
       StructField("jobRunId", LongType, nullable = true),
