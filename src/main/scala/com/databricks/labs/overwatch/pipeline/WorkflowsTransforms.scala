@@ -1229,9 +1229,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     runsWithJobName2
       .withColumn("jobName", coalesce('jobName, 'run_name))
-      .withColumn( "queue", coalesce( 'queue, $"jobStatus_queue"))
+      // .withColumn( "queue", coalesce( 'queue, $"jobStatus_queue"))
       .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
       .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
+      // .drop( "jobStatus_queue")
 
   }
 

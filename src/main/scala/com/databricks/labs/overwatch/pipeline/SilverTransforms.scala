@@ -1336,7 +1336,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         to_json('tags).alias("tags"),
         'schedule,
         'max_concurrent_runs,
-        to_json('queue).alias("jobStatus_queue"),
+        to_json('queue) // .alias("jobStatus_queue"),
         'run_as_user_name,
         'timeout_seconds,
         'created_by,
