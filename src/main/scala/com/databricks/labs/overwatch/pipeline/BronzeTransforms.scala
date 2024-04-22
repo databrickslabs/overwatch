@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.Schema.clusterSnapSchema
-import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{getJobsBase, workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -506,7 +506,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .distinct()
       .select("cluster_id").distinct().collect().map(x => x(0).toString)
 
-    if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
+    val jobDF = getJobsBase(auditDF)
+    val jobClusterIDs = jobDF.select("clusterId").distinct().collect().map(x => x(0).toString)
+
+    val allClusterIDs = clusterIDs ++ jobClusterIDs
+
+    if (allClusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
       s"properly. Skipping!", Level.ERROR)
 
@@ -515,7 +520,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterSnapshotSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterSnapshotErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
 
-    landClusterSnapshot(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
+    landClusterSnapshot(allClusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
       tmpClusterSnapshotErrorPath, config)
 
     logger.log(Level.INFO, " cluster snapshot landing completed")
