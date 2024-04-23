@@ -506,8 +506,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .distinct()
       .select("cluster_id").distinct().collect().map(x => x(0).toString)
 
-    val jobDF = getJobsBase(auditDF)
-    val jobClusterIDs = jobDF.select("clusterId").distinct().collect().map(x => x(0).toString)
+    var jobClusterIDs = Array[String]()
+    try {
+      val jobDF = getJobsBase(auditDF)
+      if (!jobDF.isEmpty) {
+        jobClusterIDs = jobDF.select("clusterId").distinct().collect().map(x => x(0).toString)
+      }
+    } catch {
+      case e: Exception => println(s"Exception occurred while processing jobDF: ${e.getMessage}")
+    }
 
     val allClusterIDs = clusterIDs ++ jobClusterIDs
 
