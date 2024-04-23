@@ -124,6 +124,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         Seq(prepClusterSnapshot(
           clustersSnapshotModule.fromTime,
           clustersSnapshotModule.untilTime,
+          workspace,
           pipelineSnapTime,
           config.apiEnv,
           database,

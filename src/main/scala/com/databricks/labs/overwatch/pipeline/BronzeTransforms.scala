@@ -6,7 +6,7 @@ import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.Schema.clusterSnapSchema
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{getJobsBase, workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.{deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -492,6 +492,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   def prepClusterSnapshot(
                            startTime: TimeTypes,
                            endTime: TimeTypes,
+                           workspace: Workspace,
                            pipelineSnapTS: TimeTypes,
                            apiEnv: ApiEnv,
                            database: Database,
@@ -510,13 +511,24 @@ trait BronzeTransforms extends SparkSessionWrapper {
     try {
       val jobDF = getJobsBase(auditDF)
       if (!jobDF.isEmpty) {
-        jobClusterIDs = jobDF.select("clusterId").distinct().collect().map(x => x(0).toString)
+        jobClusterIDs = jobDF.select('clusterId.alias("cluster_id")).distinct().collect().map(x => x(0).toString)
       }
     } catch {
-      case e: Exception => println(s"Exception occurred while processing jobDF: ${e.getMessage}")
+      case e: Exception => println(s"No New records are their for Job Cluster in Audit Log: ${e.getMessage}")
     }
 
-    val allClusterIDs = clusterIDs ++ jobClusterIDs
+    var clusterListIDs = Array[String]()
+
+    try {
+      val clusterListDF = workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,apiEndpointTempDir,pipelineSnapTS))
+      if (!clusterListDF.isEmpty) {
+        clusterListIDs = clusterListDF.select("cluster_id").distinct().collect().map(x => x(0).toString)
+      }
+    } catch {
+      case e: Exception => println(s"No New records are their for cluster/list api: ${e.getMessage}")
+    }
+
+    val allClusterIDs = (clusterIDs ++ jobClusterIDs ++ clusterListIDs).distinct
 
     if (allClusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
