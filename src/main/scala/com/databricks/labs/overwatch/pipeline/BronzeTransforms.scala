@@ -4,7 +4,7 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
-import com.databricks.labs.overwatch.pipeline.Schema.clusterSnapSchema
+import com.databricks.labs.overwatch.pipeline.Schema.{clusterSnapMinimumSchema, clusterSnapSchema}
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{getJobsBase, workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
@@ -568,8 +568,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
             .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
-            .verifyMinimumSchema(clusterSnapSchema)
-            .select(Schema.clusterSnapSchema.fieldNames.map(col): _*)
+            .verifyMinimumSchema(clusterSnapMinimumSchema)
+//            .select(Schema.clusterSnapSchema.fieldNames.map(col): _*)
           finalDF
 
         } else {
