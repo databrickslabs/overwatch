@@ -2,7 +2,6 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.ApiCallV2
-import com.databricks.labs.overwatch.pipeline.Schema.{clusterSnapMinimumSchema, clusterSnapSchema}
 import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.Helpers.deriveRawApiResponseDF
 import com.databricks.labs.overwatch.utils._
