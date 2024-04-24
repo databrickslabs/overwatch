@@ -514,7 +514,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         jobClusterIDs = jobDF.select('clusterId.alias("cluster_id")).distinct().collect().map(x => x(0).toString)
       }
     } catch {
-      case e: Exception => println(s"No New records are their for Job Cluster in Audit Log: ${e.getMessage}")
+      case e: Exception => {
+        val message = s"No New records are their for Job Cluster in Audit Log: ${e.getMessage}"
+        logger.log(Level.WARN, message)
+      }
     }
 
     var clusterListIDs = Array[String]()
@@ -525,7 +528,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
         clusterListIDs = clusterListDF.select("cluster_id").distinct().collect().map(x => x(0).toString)
       }
     } catch {
-      case e: Exception => println(s"No New records are their for cluster/list api: ${e.getMessage}")
+      case e: Exception => {
+        val message = s"No New records are their for cluster/list api: ${e.getMessage}"
+        logger.log(Level.WARN, message)
+      }
     }
 
     val allClusterIDs = (clusterIDs ++ jobClusterIDs ++ clusterListIDs).distinct
