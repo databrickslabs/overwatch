@@ -1250,7 +1250,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .lookupWhen(
         clusterPotentialTerminalState
           .toTSDF("timestamp", "organization_id", "cluster_id"),
-        tsPartitionVal = 4, maxLookback = 0L, maxLookAhead = 1L
+        tsPartitionVal = 4, maxLookback = 0L, maxLookAhead = Window.unboundedFollowing
       ).df
       .drop("timestamp")
       .filter( // cluster state end equal to or after task run and not in initialState (leftanti)
@@ -1407,7 +1407,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       $"lookup.run_state_end_epochMS".between($"obs.run_state_start_epochMS", $"obs.run_state_end_epochMS") // inclusive
 
     val simplifiedJobRunByClusterState = df
-      .filter('cluster_type === "existing") // only relevant for interactive clusters
+      .filter('cluster_type === "existing" || 'cluster_type === "job_cluster") // only relevant for interactive clusters
       .withColumn("run_state_start_epochMS", runStateLastToStart)
       .withColumn("run_state_end_epochMS", runStateFirstToEnd)
       .select(
@@ -1467,10 +1467,11 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       )
       .withColumn("state_utilization_percent", 'runtime_in_cluster_state / 1000 / 3600 / 'uptime_in_state_H) // run runtime as percent of total state time
       .withColumn("run_state_utilization",
-        when('cluster_type === "interactive", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
+        when('cluster_type === "interactive" || 'cluster_type === "automated", least('runtime_in_cluster_state / 'cum_runtime_in_cluster_state, lit(1.0)))
           .otherwise(lit(1.0))
       ) // determine share of cluster when interactive as runtime / all overlapping run runtimes
-      .withColumn("overlapping_run_states", when('cluster_type === "interactive", 'overlapping_run_states).otherwise(lit(0)))
+      .withColumn("overlapping_run_states", when('cluster_type === "interactive" || 'cluster_type === "automated"
+        , 'overlapping_run_states).otherwise(lit(0)))
       .withColumn("running_days", sequence($"task_runtime.startTS".cast("date"), $"task_runtime.endTS".cast("date")))
       .withColumn("total_dbus", 'total_dbus * 'state_utilization_percent * 'run_state_utilization)
       .withColumn("driver_compute_cost", 'driver_compute_cost * 'state_utilization_percent * 'run_state_utilization)
