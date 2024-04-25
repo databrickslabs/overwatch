@@ -122,8 +122,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       ETLDefinition(
         BronzeTargets.auditLogsTarget.asIncrementalDF(clustersSnapshotModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records,
         Seq(prepClusterSnapshot(
-          clustersSnapshotModule.fromTime,
-          clustersSnapshotModule.untilTime,
           workspace,
           pipelineSnapTime,
           config.apiEnv,

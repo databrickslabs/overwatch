@@ -490,8 +490,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   def prepClusterSnapshot(
-                           startTime: TimeTypes,
-                           endTime: TimeTypes,
                            workspace: Workspace,
                            pipelineSnapTS: TimeTypes,
                            apiEnv: ApiEnv,
@@ -534,6 +532,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     }
 
+    val errorMsg = "No Data is present for cluster snapshot"
+
     val allClusterIDs = (clusterIDs ++ jobClusterIDs ++ clusterListIDs).distinct
 
     if (allClusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
@@ -545,7 +545,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterSnapshotSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterSnapshotErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
 
-    landClusterSnapshot(allClusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
+    landClusterSnapshot(allClusterIDs, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
       tmpClusterSnapshotErrorPath, config)
 
     logger.log(Level.INFO, " cluster snapshot landing completed")
@@ -575,11 +575,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
             .verifyMinimumSchema(clusterSnapMinimumSchema)
-//            .select(Schema.clusterSnapSchema.fieldNames.map(col): _*)
           finalDF
 
         } else {
-          logger.log(Level.INFO, s"No Data is present for cluster snapshot")
+          logger.log(Level.INFO, errorMsg)
           spark.emptyDataFrame
         }
       } catch {
@@ -587,15 +586,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
           throw new Exception(e)
       }
     } else {
-      println(s"No Data is present for cluster snapshot")
-      logger.log(Level.INFO, s"No Data is present for cluster snapshot")
+      logger.log(Level.INFO, errorMsg)
       spark.emptyDataFrame
     }
   }
 
   private def landClusterSnapshot(clusterIDs: Array[String],
-                                startTime: TimeTypes,
-                                endTime: TimeTypes,
                                 pipelineSnapTime: Long,
                                 tmpClusterSnapSuccessPath: String,
                                 tmpClusterSnapErrorPath: String,
@@ -603,7 +599,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val finalResponseCount = clusterIDs.length
     val clusterEventsEndpoint = "clusters/get"
 
-    val lagTime = 600000 //10 minutes
 
     // creating Json input for parallel API calls
     val jsonInput = Map(
