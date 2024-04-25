@@ -160,9 +160,18 @@ trait ApiMeta {
     Map[String, String]()
   }
 
-  private[overwatch] def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
-    logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
-    Map[String, String]()
+//  private[overwatch] def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+//    logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
+//    Map[String, String]()
+//  }
+
+  private[overwatch]  def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    Map(
+      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
+      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
+      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
+      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
+    )
   }
 
   /**
@@ -227,17 +236,6 @@ class ApiMetaFactory {
   }
 }
 
-trait CommonApiMethods {
-  def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
-    Map(
-      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
-      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
-      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
-      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
-    )
-  }
-}
-
 class UnregisteredApi extends ApiMeta {
   setApiCallType("GET")
 }
@@ -256,7 +254,7 @@ class ClusterResizeApi extends ApiMeta {
   setApiCallType("POST")
 }
 
-class SqlQueryHistoryApi extends ApiMeta with CommonApiMethods {
+class SqlQueryHistoryApi extends ApiMeta {
   setPaginationKey("has_next_page")
   setPaginationToken("next_page_token")
   setDataframeColumn("res")
@@ -291,6 +289,9 @@ class SqlQueryHistoryApi extends ApiMeta with CommonApiMethods {
       "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
     )
   }
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    super.getParallelAPIParams(jsonInput)
+  }
 }
 
 class WorkspaceListApi extends ApiMeta {
@@ -319,7 +320,7 @@ class ClusterListApi extends ApiMeta {
   setApiCallType("GET")
 }
 
-class ClusterGetApi extends ApiMeta with CommonApiMethods{
+class ClusterGetApi extends ApiMeta {
   setDataframeColumn("cluster_name")
   setApiCallType("GET")
   setBatchPersist(true)
@@ -327,6 +328,10 @@ class ClusterGetApi extends ApiMeta with CommonApiMethods{
     val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
     Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}"""
     )
+  }
+
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    super.getParallelAPIParams(jsonInput)
   }
 }
 
@@ -347,7 +352,7 @@ class JobListApi extends ApiMeta {
   }
 }
 
-class ClusterEventsApi extends ApiMeta with CommonApiMethods{
+class ClusterEventsApi extends ApiMeta{
   setPaginationKey("next_page")
   setPaginationToken("next_page")
   setDataframeColumn("events")
@@ -364,6 +369,9 @@ class ClusterEventsApi extends ApiMeta with CommonApiMethods{
       "end_time" -> s"""${endTime}""",
       "limit" -> "500"
     )
+  }
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    super.getParallelAPIParams(jsonInput)
   }
 }
 
