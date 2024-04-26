@@ -2,10 +2,11 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
-import com.databricks.labs.overwatch.env.Database
+import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
-import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{workflowsCleanseJobClusters, workflowsCleanseTasks}
-import com.databricks.labs.overwatch.utils.Helpers.{deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
+import com.databricks.labs.overwatch.pipeline.Schema.{clusterSnapMinimumSchema}
+import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{getJobsBase, workflowsCleanseJobClusters, workflowsCleanseTasks}
+import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -22,10 +23,12 @@ import org.apache.spark.util.SerializableConfiguration
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.sql.Timestamp
-import java.util.concurrent.Executors
+import scala.util.{Failure, Success, Try}
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
 
 trait BronzeTransforms extends SparkSessionWrapper {
 
@@ -484,6 +487,117 @@ trait BronzeTransforms extends SparkSessionWrapper {
       throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
         s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
     }
+  }
+
+  def prepClusterSnapshot(
+                           workspace: Workspace,
+                           pipelineSnapTS: TimeTypes,
+                           apiEnv: ApiEnv,
+                           database: Database,
+                           clusterSnapshotErrorsTarget: PipelineTable,
+                           config: Config,
+                           apiEndpointTempDir: String
+                         )(auditDF: DataFrame) : DataFrame = {
+
+    val clusterIDs = auditDF
+      .select(getClusterIDsFromAudit.alias("cluster_id"))
+      .filter(col("cluster_id").isNotNull)
+      .distinct()
+      .select("cluster_id").collect().map(x => x(0).toString)
+
+    var clusterListIDs = Array[String]()
+
+    try {
+      val clusterListDF = workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,apiEndpointTempDir,pipelineSnapTS))
+      if (!clusterListDF.isEmpty) {
+        clusterListIDs = clusterListDF.select("cluster_id").distinct().filter(col("cluster_id").isNotNull).collect().map(x => x(0).toString)
+      }
+    } catch {
+      case e: Exception => {
+        val message = s"No new clusters retrieved from the cluster/list API"
+        logger.log(Level.WARN, message)
+      }
+    }
+
+    val msg = s"No clusters could be found with new events. Please " +
+      s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
+      s"properly. Skipping!"
+
+    val allClusterIDs = (clusterIDs ++ clusterListIDs).distinct
+
+    if (allClusterIDs.isEmpty) throw new NoNewDataException(msg, Level.ERROR)
+
+    logger.log(Level.INFO, f"Retrieving cluster information for ${clusterIDs.length} clusters")
+
+    val tmpClusterSnapshotSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
+    val tmpClusterSnapshotErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
+
+    landClusterSnapshot(allClusterIDs, pipelineSnapTS.asUnixTimeMilli, tmpClusterSnapshotSuccessPath,
+      tmpClusterSnapshotErrorPath, config)
+
+    logger.log(Level.INFO, " cluster snapshot landing completed")
+
+    if (Helpers.pathExists(tmpClusterSnapshotErrorPath)) {
+      persistErrors(
+        spark.read.json(tmpClusterSnapshotErrorPath),
+        database,
+        clusterSnapshotErrorsTarget,
+        pipelineSnapTS,
+        config.organizationId
+      )
+    }
+
+    if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
+      try {
+        val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
+        if (rawDF.columns.contains("cluster_id")) {
+          val outputDF = SchemaScrubber.scrubSchema(rawDF)
+          val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
+            .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
+            .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
+            .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
+            .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
+            .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
+            .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
+            .withColumn("organization_id", lit(config.organizationId))
+            .verifyMinimumSchema(clusterSnapMinimumSchema)
+          finalDF
+
+        } else {
+          throw new NoNewDataException(msg, Level.WARN, true)
+        }
+      } catch {
+        case e: Throwable =>
+          throw new Exception(e)
+      }
+    } else {
+      throw new NoNewDataException(msg, Level.WARN, true)
+    }
+  }
+
+  private def landClusterSnapshot(clusterIDs: Array[String],
+                                pipelineSnapTime: Long,
+                                tmpClusterSnapSuccessPath: String,
+                                tmpClusterSnapErrorPath: String,
+                                config: Config) : String = {
+    val finalResponseCount = clusterIDs.length
+    val clusterEventsEndpoint = "clusters/get"
+
+
+    // creating Json input for parallel API calls
+    val jsonInput = Map(
+      "start_value" -> "0",
+      "end_value" -> s"${finalResponseCount}",
+      "increment_counter" -> "1",
+      "final_response_count" -> s"${finalResponseCount}",
+      "cluster_ids" -> s"${clusterIDs.mkString(",")}",
+      "tmp_success_path" -> tmpClusterSnapSuccessPath,
+      "tmp_error_path" -> tmpClusterSnapErrorPath
+    )
+
+    // calling function to make parallel API calls
+    val apiCallV2Obj = new ApiCallV2(config.apiEnv)
+    apiCallV2Obj.makeParallelApiCalls(clusterEventsEndpoint, jsonInput, pipelineSnapTime, config)
   }
 
   protected def prepClusterEventLogs(
