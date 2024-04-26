@@ -500,30 +500,17 @@ trait BronzeTransforms extends SparkSessionWrapper {
                          )(auditDF: DataFrame) : DataFrame = {
 
     val clusterIDs = auditDF
-      .select(cluster_idFromAudit.alias("cluster_id"))
+      .select(getClusterIDsFromAudit.alias("cluster_id"))
       .filter(col("cluster_id").isNotNull)
       .distinct()
       .select("cluster_id").distinct().collect().map(x => x(0).toString)
-
-    var jobClusterIDs = Array[String]()
-    try {
-      val jobDF = getJobsBase(auditDF)
-      if (!jobDF.isEmpty) {
-        jobClusterIDs = jobDF.select('clusterId.alias("cluster_id")).distinct().collect().map(x => x(0).toString)
-      }
-    } catch {
-      case e: Exception => {
-        val message = s"There are no new job clusters in Audit log"
-        logger.log(Level.WARN, message)
-      }
-    }
 
     var clusterListIDs = Array[String]()
 
     try {
       val clusterListDF = workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,apiEndpointTempDir,pipelineSnapTS))
       if (!clusterListDF.isEmpty) {
-        clusterListIDs = clusterListDF.select("cluster_id").distinct().collect().map(x => x(0).toString)
+        clusterListIDs = clusterListDF.select("cluster_id").distinct().filter(col("cluster_id").isNotNull).collect().map(x => x(0).toString)
       }
     } catch {
       case e: Exception => {
