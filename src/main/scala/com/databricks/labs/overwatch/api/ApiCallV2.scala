@@ -143,7 +143,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private var _apiMeta: ApiMeta = null //Metadata for the API call.
   private var _allowUnsafeSSL: Boolean = false //Flag to make the unsafe ssl.
   private val readTimeoutMS = 60000 //Read timeout.
-  private val connTimeoutMS = 10000 //Connection timeout.
+  private val connTimeoutMS = 60000 //Connection timeout.
   private var _printFlag: Boolean = true
   private var _totalSleepTime: Int = 0
   private var _apiSuccessCount: Int = 0
@@ -395,7 +395,7 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
   private def reqOptions: Seq[HttpOptions.HttpOption] = {
     val baseOptions = Seq(
       HttpOptions.connTimeout(connTimeoutMS),
-      HttpOptions.connTimeout(readTimeoutMS)
+      HttpOptions.readTimeout(readTimeoutMS)
     )
     if (_allowUnsafeSSL) baseOptions :+ HttpOptions.allowUnsafeSSL else baseOptions
 
