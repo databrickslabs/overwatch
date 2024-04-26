@@ -564,7 +564,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           finalDF
 
         } else {
-          val msg = "No New Records for Snapshot"
           throw new NoNewDataException(msg, Level.WARN, true)
         }
       } catch {
@@ -572,7 +571,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
           throw new Exception(e)
       }
     } else {
-      val msg = "No New Records for Snapshot"
       throw new NoNewDataException(msg, Level.WARN, true)
     }
   }
