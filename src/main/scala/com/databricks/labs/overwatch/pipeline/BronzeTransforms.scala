@@ -503,7 +503,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .select(getClusterIDsFromAudit.alias("cluster_id"))
       .filter(col("cluster_id").isNotNull)
       .distinct()
-      .select("cluster_id").distinct().collect().map(x => x(0).toString)
+      .select("cluster_id").collect().map(x => x(0).toString)
 
     var clusterListIDs = Array[String]()
 
@@ -519,13 +519,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     }
 
-    val errorMsg = "No Data is present for cluster snapshot"
-
-    val allClusterIDs = (clusterIDs ++ jobClusterIDs ++ clusterListIDs).distinct
-
-    if (allClusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
+    val msg = s"No clusters could be found with new events. Please " +
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
-      s"properly. Skipping!", Level.ERROR)
+      s"properly. Skipping!"
+
+    val allClusterIDs = (clusterIDs ++ clusterListIDs).distinct
+
+    if (allClusterIDs.isEmpty) throw new NoNewDataException(msg, Level.ERROR)
 
     logger.log(Level.INFO, f"Retrieving cluster information for ${clusterIDs.length} clusters")
 
