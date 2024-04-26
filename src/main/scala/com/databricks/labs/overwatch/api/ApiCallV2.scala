@@ -343,7 +343,8 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       execute()
     } else {
       if(writeTraceApiFlag()){
-        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get, apiMeta.enrichAPIResponse(response.body,response.code,jsonQuery,queryMap))
+        val enrichedResponse =  apiMeta.enrichAPIResponse(response.body,response.code,jsonQuery,queryMap)
+        PipelineFunctions.writeMicroBatchToTempLocation(successTempPath.get,enrichedResponse)
       }
       throw new ApiCallFailure(response, buildGenericErrorMessage, responseWithMeta = apiMeta.enrichAPIResponse(jsonQueryToApiErrorDetail(response.body),response.code, jsonQuery, queryMap) , debugFlag = false)
     }
