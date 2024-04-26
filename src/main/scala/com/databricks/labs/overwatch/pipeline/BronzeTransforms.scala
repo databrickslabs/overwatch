@@ -513,7 +513,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     } catch {
       case e: Exception => {
-        val message = s"No New records are their for Job Cluster in Audit Log: ${e.getMessage}"
+        val message = s"There are no new job clusters in Audit log"
         logger.log(Level.WARN, message)
       }
     }
@@ -527,7 +527,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       }
     } catch {
       case e: Exception => {
-        val message = s"No New records are their for cluster/list api: ${e.getMessage}"
+        val message = s"No new clusters retrieved from the cluster/list API"
         logger.log(Level.WARN, message)
       }
     }
@@ -540,7 +540,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
       s"properly. Skipping!", Level.ERROR)
 
-    logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)
+    logger.log(Level.INFO, f"Retrieving cluster information for ${clusterIDs.length} clusters")
 
     val tmpClusterSnapshotSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterSnapshotErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
@@ -558,7 +558,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
         pipelineSnapTS,
         config.organizationId
       )
-      logger.log(Level.INFO, "Persist error completed")
     }
 
     if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
@@ -578,16 +577,16 @@ trait BronzeTransforms extends SparkSessionWrapper {
           finalDF
 
         } else {
-          logger.log(Level.INFO, errorMsg)
-          spark.emptyDataFrame
+          val msg = "No New Records for Snapshot"
+          throw new NoNewDataException(msg, Level.WARN, true)
         }
       } catch {
         case e: Throwable =>
           throw new Exception(e)
       }
     } else {
-      logger.log(Level.INFO, errorMsg)
-      spark.emptyDataFrame
+      val msg = "No New Records for Snapshot"
+      throw new NoNewDataException(msg, Level.WARN, true)
     }
   }
 
