@@ -2,7 +2,7 @@ package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
-import com.databricks.labs.overwatch.utils.{ModuleDisabled, NoNewDataException, SchemaTools, SparkSessionWrapper, TimeTypes}
+import com.databricks.labs.overwatch.utils.{ModuleDisabled, NoNewDataException, NoProgressStreamException, SchemaTools, SparkSessionWrapper, TimeTypes}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -821,7 +821,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     // when there is no input data break out of module, progress timeline and continue with pipeline
     val emptyMsg = s"No new streaming data found."
-    if (streamRawDF.filter('progress.isNotNull).isEmpty) throw new NoNewDataException(emptyMsg, Level.WARN, allowModuleProgression = true)
+    if (streamRawDF.filter('progress.isNotNull).isEmpty) throw new NoProgressStreamException(emptyMsg, Level.WARN, allowModuleProgression = true)
 
     val lastStreamValue = Window.partitionBy('organization_id, 'SparkContextId, 'clusterId, 'stream_id, 'stream_run_id).orderBy('stream_timestamp)
     val onlyOnceEventGuaranteeW = Window.partitionBy(streamTargetKeys map col: _*).orderBy('fileCreateEpochMS.desc)

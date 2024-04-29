@@ -418,6 +418,20 @@ class Module(
         val errMessage = PipelineFunctions.appendStackStrace(e, customMsg)
         logger.log(Level.ERROR, errMessage, e)
         noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
+      case e: NoProgressStreamException =>
+        // EMPTY prefix gets prepended in the errorHandler
+        val customMsg = if (!e.allowModuleProgression) {
+          s"$moduleId-$moduleName Module: SKIPPING\nDownstream modules that depend on this " +
+            s"module will not progress until new data is received by this module.\n " +
+            s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        } else {
+          s"$moduleId-$moduleName Module: No new  streaming data found.. This does not appear to be an error but simply a " +
+            s"lack of in progress streaming data present for the module. Progressing module state.\n " +
+            s"Module Dependencies: ${moduleDependencies.mkString(", ")}"
+        }
+        val errMessage = PipelineFunctions.appendStackStrace(e, customMsg)
+        logger.log(Level.ERROR, errMessage, e)
+        noNewDataHandler(errMessage, e.level, e.allowModuleProgression)
       case e: Throwable =>
         val failMsg = PipelineFunctions.appendStackStrace(e)
         val msg = s"FAILED: $moduleId-$moduleName Module: Failed\n$failMsg"

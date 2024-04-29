@@ -408,6 +408,9 @@ object MergeScope extends Enumeration {
 // Todo Issue_56
 private[overwatch] class NoNewDataException(s: String, val level: Level, val allowModuleProgression: Boolean = false) extends Exception(s) {}
 
+private[overwatch] class NoProgressStreamException(s: String, val level: Level, val allowModuleProgression: Boolean = false) extends Exception(s) {}
+
+
 private[overwatch] class UnhandledException(s: String) extends Exception(s) {}
 
 private[overwatch] class IncompleteFilterException(s: String) extends Exception(s) {}
