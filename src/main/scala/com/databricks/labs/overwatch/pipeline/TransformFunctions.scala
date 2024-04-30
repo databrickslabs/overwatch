@@ -690,6 +690,26 @@ object TransformFunctions {
       .otherwise(col("requestParams.cluster_id"))
   }
 
+  def standardizeFieldInStruct(df: DataFrame, structColName: String, oldFieldName: String, newFieldName: String): DataFrame = {
+
+    if (df.columns.contains(structColName)) {
+      val fields = df.select(structColName + ".*").schema.fields
+
+      val newStructFields = fields.map { field =>
+        val fieldName = field.name
+        if (fieldName.equalsIgnoreCase(oldFieldName)) {
+          col(s"$structColName.$fieldName").alias(newFieldName)
+        } else {
+          col(s"$structColName.$fieldName")
+        }
+      }
+
+      df.withColumn(structColName, struct(newStructFields: _*))
+    } else {
+      df
+    }
+  }
+
   def getClusterIdsWithNewEvents(filteredAuditLogDF: DataFrame,
                                  clusterSnapshotTable: DataFrame
                                 ): DataFrame = {
