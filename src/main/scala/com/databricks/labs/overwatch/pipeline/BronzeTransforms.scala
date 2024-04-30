@@ -581,7 +581,6 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
           combinedDF.columns.foreach { field => {
             if (field.endsWith("_old")) {
-              println(field)
               combinedDF = combinedDF.withColumnRenamed(field, field.stripSuffix("_old"))
             }
           }
