@@ -566,6 +566,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumnRenamed("custom_tags", "custom_tags_old")
             .selectExpr("*", "spec.custom_tags")
 
+          // Renaming KeepAlive if it exist to keepAlive
           val normalizedDf = explodedDF.schema.fields.find(_.name == "custom_tags") match {
             case Some(field) =>
               field.dataType match {
@@ -585,6 +586,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             case None => explodedDF // If custom_tags column doesn't exist, do nothing
           }
 
+          // Replace the custom_tags field inside the spec struct with custom_tags outside of spec column
           val updatedDf = normalizedDf.schema.fields.find(_.name == "spec") match {
             case Some(field) =>
               field.dataType match {
@@ -604,7 +606,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
             case None => normalizedDf // No action if the specified structColName does not exist
           }
 
-          updatedDf
+          updatedDf.drop("custom_tags")
+            .withColumnRenamed("custom_tags_old", "custom_tags")
 
         } else {
           throw new NoNewDataException(msg, Level.WARN, true)
