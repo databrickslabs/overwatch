@@ -552,7 +552,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
         if (rawDF.columns.contains("cluster_id")) {
           val outputDF = SchemaScrubber.scrubSchema(rawDF)
-          var finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
+          val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
             .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
             .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
             .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
