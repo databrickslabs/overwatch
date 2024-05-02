@@ -120,8 +120,17 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendClustersAPIProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getClustersDF(deriveApiTempDir(config.tempWorkingDir,clustersSnapshotModule.moduleName,pipelineSnapTime)),
-        Seq(cleanseRawClusterSnapDF),
+        BronzeTargets.auditLogsTarget.asIncrementalDF(clustersSnapshotModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records,
+        Seq(prepClusterSnapshot(
+          workspace,
+          pipelineSnapTime,
+          config.apiEnv,
+          database,
+          BronzeTargets.clusterSnapshotErrorsTarget,
+          config,
+          clustersSnapshotModule.moduleName
+        )
+        ),
         append(BronzeTargets.clustersSnapshotTarget)
       )
   }
@@ -155,7 +164,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(30))
+  lazy private[overwatch] val clusterEventLogsModule = Module(1005, "Bronze_ClusterEventLogs", this, Array(1004), 0.0, Some(60))
   lazy private val appendClusterEventLogsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
@@ -285,6 +294,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
     append(BronzeTargets.warehousesSnapshotTarget)
     )
   }
+
 
   // TODO -- convert and merge this into audit's ETLDefinition
   private def landAzureAuditEvents(): Unit = {

@@ -666,6 +666,30 @@ object TransformFunctions {
       .otherwise(col("requestParams.cluster_id"))
   }
 
+  def getClusterIDsFromAudit: Column = {
+    //    import spark.implicits._
+    when(
+      col("serviceName") === "clusters" &&
+        col("actionName").like("%Result"),
+      col("requestParams.clusterId")
+    )
+      .when(
+        col("serviceName") === "clusters" &&
+          col("actionName").isin("permanentDelete", "delete", "resize", "edit"),
+        col("requestParams.cluster_id")
+      )
+      .when(
+        col("serviceName") === "clusters" &&
+          col("actionName") === "create",
+        get_json_object(col("response.result"), "$.cluster_id")
+      )
+      .when(
+        col("serviceName") === "jobs",
+        col("requestParams.clusterId")
+      )
+      .otherwise(col("requestParams.cluster_id"))
+  }
+
   def getClusterIdsWithNewEvents(filteredAuditLogDF: DataFrame,
                                  clusterSnapshotTable: DataFrame
                                 ): DataFrame = {
