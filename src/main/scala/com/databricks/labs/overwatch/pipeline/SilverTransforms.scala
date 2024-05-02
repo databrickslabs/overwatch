@@ -1230,6 +1230,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       NamedColumn("tasks", lit(null).cast(Schema.minimumTasksSchema)),
       NamedColumn("job_clusters", lit(null).cast(Schema.minimumJobClustersSchema)),
       NamedColumn("libraries", lit(null).cast(Schema.minimumLibrariesSchema)),
+      NamedColumn("queue", lit(null).cast(Schema.minimumQueueSchema)),
       NamedColumn("access_control_list", lit(null).cast(Schema.minimumAccessControlListSchema)),
       NamedColumn("grants", lit(null).cast(Schema.minimumGrantsSchema)),
     )
@@ -1302,7 +1303,7 @@ trait SilverTransforms extends SparkSessionWrapper {
                                 )(auditLogLag30D: DataFrame): DataFrame = {
 
     val jobRunActions = Array(
-      "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "repairRun"
+      "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "cancelAllRuns", "repairRun"
     )
     val optimalCacheParts = Math.min(daysToProcess * getTotalCores * 2, 1000)
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
@@ -1335,6 +1336,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         to_json('tags).alias("tags"),
         'schedule,
         'max_concurrent_runs,
+        to_json('queue) // .alias("jobStatus_queue"),
         'run_as_user_name,
         'timeout_seconds,
         'created_by,
@@ -1361,15 +1363,20 @@ trait SilverTransforms extends SparkSessionWrapper {
       (jobsSnapshot, jobSnapNameLookup)
     )
 
-    // caching before structifying
-    jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
-      .transform(jobRunsAppendClusterName(jobRunsLookups))
-      .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
-      .transform(jobRunsAppendTaskAndClusterDetails)
-      .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
-      //      .transform(jobRunsRollupWorkflowsAndChildren)
-      .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
+    val cancelAllQueuedRunsIntervals =
+      jobRunsLag30D transform jobRunsDeriveCancelAllQueuedRunsIntervals
+
+    jobRunsDeriveRunsBase( jobRunsLag30D)
+      .transform( jobRunsAppendClusterName( jobRunsLookups))
+      .transform( jobRunsAppendJobMeta( jobRunsLookups))
+      .transform( jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
+      .transform( jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transform( jobRunsAppendTaskAndClusterDetails)
+      .transform( jobRunsCleanseCreatedNestedStructures( targetKeys))
+      .drop( "timestamp")
+
+    // `timestamp` could be duplicated to enable `asOf` lookups; dropping to clean up
+
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
