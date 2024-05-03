@@ -2,9 +2,9 @@ package com.databricks.labs.overwatch
 
 import com.databricks.labs.overwatch.env.Workspace
 import com.databricks.labs.overwatch.pipeline._
-import com.databricks.labs.overwatch.utils.{BadConfigException, JsonUtils, OverwatchParams, SparkSessionWrapper}
+import com.databricks.labs.overwatch.utils.{BadConfigException, DataTarget, Helpers, JsonUtils, OverwatchParams, SparkSessionWrapper}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
@@ -32,21 +32,65 @@ object Optimizer extends SparkSessionWrapper{
   }
 
   /**
+   * This method is used to get the API URL from config table.
+   *
+   * @param orgID      The organization ID as a string.
+   * @param dataTarget The data target object.
+   * @return The API URL as a string.
+   *
+   *         The method works as follows:
+   *         1. It retrieves the ETL storage prefix from the data target and trims any leading or trailing spaces.
+   *         2. It constructs the report location by appending "report/configTable" to the last 12 characters of the ETL storage prefix.
+   *         3. It defines a window function that partitions by workspace_id and orders by snapTS in descending order.
+   *         4. It reads the data from the report location and selects the workspace_id, api_url, and snapTS columns.
+   *         5. It filters the data to only include rows where the workspace_id matches the provided organization ID.
+   *         6. It adds a new column "rnk" which is the rank of each row within its partition, as defined by the window function.
+   *         7. It filters the data to only include rows where "rnk" is 1, i.e., the row with the latest snapTS for each workspace_id.
+   *         8. It returns the api_url of the first row in the resulting DataFrame.
+   */
+  private def getApiURL(orgID: String,dataTarget: DataTarget): String = {
+    val etlStoragePrefix = dataTarget.etlDataPathPrefix.get.trim
+    val reportLocation = etlStoragePrefix.substring(0,etlStoragePrefix.length-12)+"report/configTable" //Removing global prefix and adding report location
+    if(Helpers.pathExists(reportLocation)) { //If the config table is found at the specified location, proceed with legacy optimization.
+      val latestRunWindow = Window.partitionBy('workspace_id).orderBy('snapTS.desc)
+      spark.read.load(reportLocation).select("workspace_id", "api_url", "snapTS")
+        .filter('workspace_id === orgID)
+        .withColumn("rnk", rank.over(latestRunWindow))
+        .filter('rnk === 1)
+        .first().getString(1)
+    } else {  // If the config table is not found at the specified location, throw an exception.
+      throw new BadConfigException(s"Config table not found at $reportLocation")
+    }
+
+  }
+
+
+  /**
    * Derive the workspace from the config supplied in the last run
    * @param overwatchETLDB name of the Overwtch ETL database
    * @return workspace object
    */
   private def getLatestWorkspace(overwatchETLDB: String,orgId: String): Workspace = {
-    val params = getLatestSuccessState(overwatchETLDB,orgId)
-      .selectExpr("inputConfig.*")
-      .as[OverwatchParams]
+
+     val ( orgID: Option[String], params: OverwatchParams) = getLatestSuccessState(overwatchETLDB,orgId)
+      .select("organization_id", "inputConfig")
+      .as[(Option[String], OverwatchParams)]
       .first
 
-    val args = JsonUtils.objToJson(params).compactString
-    val prettyArgs = JsonUtils.objToJson(params).prettyString
-    logger.log(Level.INFO, s"ARGS: Identified config string is: \n$prettyArgs")
-    Initializer(args, debugFlag = true)
-  }
+    val args = JsonUtils.objToJson(params)
+    logger.log(Level.INFO, s"ARGS: Identified config string is: \n${args.prettyString}")
+    try{
+      val apiURL = getApiURL(orgID.get,params.dataTarget.get)
+      logger.log(Level.INFO,"Running optimization for Multiworkspace deployment")
+      Initializer(args.compactString,apiURL=Some(apiURL), organizationID = Some(orgID.get))
+    }catch {
+      case e: Exception => { //Unable to retrive api URL performing legacy Optimization
+        logger.log(Level.INFO,"Running optimization for single workspace deployment")
+        Initializer(args.compactString)
+      }
+    }
+
+   }
 
   /**
    * pass in the overwatch ETL database name to optimize overwatch in parallel
