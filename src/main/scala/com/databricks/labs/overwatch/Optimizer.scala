@@ -71,24 +71,22 @@ object Optimizer extends SparkSessionWrapper{
    * @return workspace object
    */
   private def getLatestWorkspace(overwatchETLDB: String,orgId: String): Workspace = {
-   val latestSuccessState = getLatestSuccessState(overwatchETLDB,orgId).limit(1)
-   val orgID = latestSuccessState.select("organization_id").collect().map(x => x(0).toString)
-    val params = latestSuccessState
-      .selectExpr("inputConfig.*")
-      .as[OverwatchParams]
+
+     val ( orgID: Option[String], params: OverwatchParams) = getLatestSuccessState(overwatchETLDB,orgId)
+      .select("organization_id", "inputConfig")
+      .as[(Option[String], OverwatchParams)]
       .first
 
-    val args = JsonUtils.objToJson(params).compactString
-    val prettyArgs = JsonUtils.objToJson(params).prettyString
-    logger.log(Level.INFO, s"ARGS: Identified config string is: \n$prettyArgs")
+    val args = JsonUtils.objToJson(params)
+    logger.log(Level.INFO, s"ARGS: Identified config string is: \n${args.prettyString}")
     try{
-      val apiURL = getApiURL(orgID(0),params.dataTarget.get)
+      val apiURL = getApiURL(orgID.get,params.dataTarget.get)
       logger.log(Level.INFO,"Running optimization for Multiworkspace deployment")
-      Initializer(args,apiURL=Some(apiURL), organizationID = Some(orgID(0)))
+      Initializer(args.compactString,apiURL=Some(apiURL), organizationID = Some(orgID.get))
     }catch {
       case e: Exception => { //Unable to retrive api URL performing legacy Optimization
         logger.log(Level.INFO,"Running optimization for single workspace deployment")
-        Initializer(args)
+        Initializer(args.compactString)
       }
     }
 
