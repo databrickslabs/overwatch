@@ -561,7 +561,53 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
             .verifyMinimumSchema(clusterSnapMinimumSchema)
-          finalDF
+
+          val explodedDF = finalDF
+            .withColumnRenamed("custom_tags", "custom_tags_old")
+            .selectExpr("*", "spec.custom_tags")
+
+          // Renaming KeepAlive if it exist to keepAlive
+          val normalizedDf = explodedDF.schema.fields.find(_.name == "custom_tags") match {
+            case Some(field) =>
+              field.dataType match {
+                case structType: StructType =>
+                  val newFields = structType.fields.map { structField =>
+                    if (structField.name.equalsIgnoreCase("KeepAlive")) {
+                      col(s"custom_tags.${structField.name}").as("keepAlive")
+                    } else {
+                      col(s"custom_tags.${structField.name}")
+                    }
+                  }
+                  explodedDF.select(col("*"), struct(newFields: _*).alias("new_custom_tags"))
+                    .drop("custom_tags")
+                    .withColumnRenamed("new_custom_tags", "custom_tags")
+                case _ => explodedDF // If it's not a struct, do nothing
+              }
+            case None => explodedDF // If custom_tags column doesn't exist, do nothing
+          }
+
+          // Replace the custom_tags field inside the spec struct with custom_tags outside of spec column
+          val updatedDf = normalizedDf.schema.fields.find(_.name == "spec") match {
+            case Some(field) =>
+              field.dataType match {
+                case structType: StructType =>
+                  // Create a new struct expression, replacing the specified field with the new column
+                  val newFields = structType.fields.map { f =>
+                    if (f.name.equalsIgnoreCase("custom_tags")) {
+                      col("custom_tags").as("custom_tags") // Replace with new column if names match
+                    } else {
+                      col(s"spec.${f.name}") // Keep existing fields as is
+                    }
+                  }
+                  // Update the DataFrame with the new struct replacing the old one
+                  normalizedDf.withColumn("spec", struct(newFields: _*))
+                case _ => normalizedDf // No action if the specified structColName is not a struct type
+              }
+            case None => normalizedDf // No action if the specified structColName does not exist
+          }
+
+          updatedDf.drop("custom_tags")
+            .withColumnRenamed("custom_tags_old", "custom_tags")
 
         } else {
           throw new NoNewDataException(msg, Level.WARN, true)
