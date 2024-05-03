@@ -864,12 +864,24 @@ object DeploymentValidation extends SparkSessionWrapper {
                                        workspace_token_key: String,
                                        workspace_scope:String
                                       ): DeploymentValidationReport = {
-    val testDetails = s"Testing for System table - ${table_name} and workspace_id - ${workspace_id}"
+    val testDetails = s"Testing for System table - ${table_name} and workspace_id - ${workspace_id}" // need to change this
     val ifDataExists = if(sql_endpoint.trim.isEmpty)
       verifySystemTableAudit(table_name, workspace_id)
-    else
+    else {
+//      val driverWorkspaceId = dbutils.notebook.getContext().workspaceId.get
+      val driverWorkspaceId = spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
+      if(driverWorkspaceId == workspace_id) {
+       return DeploymentValidationReport(false,
+          getSimpleMsg("Validate_SystemTablesAudit"), // need to change this
+          testDetails,
+          Some(s"No need to configure sql-endpoint for workspace_id - ${workspace_id}"),
+          Some(workspace_id)
+        )
+      }
+      else
       verifyAuditLogFromExternalAccount(table_name,workspace_id, workspace_host,
         sql_endpoint, workspace_scope, workspace_token_key)
+    }
 
     if(spark.catalog.tableExists(table_name) && !ifDataExists) {
       DeploymentValidationReport(true,
