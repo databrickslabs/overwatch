@@ -425,11 +425,11 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param config
    * @return
    */
-  private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
+  private def cloudSpecificValidation(config: MultiWorkspaceConfig, currentOrgID: String): DeploymentValidationReport = {
     if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system")) {
       val tableName = fetchTableName(config.auditlogprefix_source_path)
       validateSystemTableAudit(tableName, config.workspace_id, config.sql_endpoint.getOrElse(""),
-        config.workspace_url, config.secret_scope, config.secret_key_dbpat)
+        config.workspace_url, config.secret_scope, config.secret_key_dbpat, currentOrgID)
     }
     else
     config.cloud.toLowerCase match {
@@ -773,6 +773,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Validate_Mount" => "Number of mount points in the workspace should not exceed 50"
       case "Validate_SystemTablesAudit" => "System table name should be system.access.audit"
       case "Validate_Wasbs" => "Wasbs path should not be provided"
+      case "Validate_SqlEndpoint_Config" => "SqlEndpoint is not required for Driver Workspace"
     }
   }
 
@@ -841,7 +842,7 @@ object DeploymentValidation extends SparkSessionWrapper {
       validateRuleAndUpdateStatus(groupedRuleSet,parallelism) ++
         validateRuleAndUpdateStatus(nonGroupedRuleSet,parallelism)++
         configToValidate.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
-        configToValidate.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
+        configToValidate.map(cloudSpecificValidation(_, currentOrgID))++ //Connection check for audit logs s3/EH
         configToValidate.map(validateMountCount(_,currentOrgID))
     //Access validation for etl_storage_prefix
     validationStatus.append(storagePrefixAccessValidation(configToValidate.head)) //Check read/write/create/list access for etl_storage_prefix
@@ -862,19 +863,18 @@ object DeploymentValidation extends SparkSessionWrapper {
                                        sql_endpoint: String,
                                        workspace_host: String,
                                        workspace_token_key: String,
-                                       workspace_scope:String
+                                       workspace_scope:String,
+                                       currentOrgID: String
                                       ): DeploymentValidationReport = {
-    val testDetails = s"Testing for System table - ${table_name} and workspace_id - ${workspace_id}" // need to change this
+    val testDetails = s"Testing for System table - ${table_name}/sql-endpoint and workspace_id - ${workspace_id}"
     val ifDataExists = if(sql_endpoint.trim.isEmpty)
       verifySystemTableAudit(table_name, workspace_id)
     else {
-//      val driverWorkspaceId = dbutils.notebook.getContext().workspaceId.get
-      val driverWorkspaceId = spark.conf.get("spark.databricks.clusterUsageTags.clusterOwnerOrgId")
-      if(driverWorkspaceId == workspace_id) {
+      if(currentOrgID == workspace_id) {
        return DeploymentValidationReport(false,
-          getSimpleMsg("Validate_SystemTablesAudit"), // need to change this
+          getSimpleMsg("Validate_SqlEndpoint_Config"),
           testDetails,
-          Some(s"No need to configure sql-endpoint for workspace_id - ${workspace_id}"),
+          Some(s"No need to configure sql-endpoint for Driver workspace workspace_id - ${workspace_id}"),
           Some(workspace_id)
         )
       }
