@@ -6,7 +6,6 @@ date: 2022-12-12T11:29:59-05:00
 ## Fast Travel
 * [Configuring Overwatch on Azure Databricks](#configuring-overwatch-on-azure-databricks)
 * [Reference Architecture](#reference-architecture)
-* [Reference Architecture (Legacy)](#reference-architecture-legacy)
 * [Configuring Audit Log Delivery Through Event Hub](#audit-log-delivery-via-event-hub)
 * [Setting up Storage Accounts](#setting-up-storage-accounts)
 * [Mount Storage Accounts](https://docs.databricks.com/data/data-sources/azure/adls-gen2/azure-datalake-gen2-sp-access.html)
@@ -43,16 +42,18 @@ There are many cases where some workspaces should be able to monitor many worksp
 themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play, 
 this reference architecture can accommodate all of these needs. To learn more about the details walk through the 
 [deployment steps]({{%relref "DeployOverwatch"%}})
-![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)
+Using System tables             |  Using EventHubs
+:-------------------------:|:-------------------------:
+![AzureArchSystemTables](/images/EnvironmentSetup/Overwatch_Arch_Azure_Sys_Tables.png)  |  ![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_Azure.png)
 
-### Audit Log Delivery via Event Hub
-* Audit Log Delivery
-    * At present the only supported method for audit log delivery is through Eventhub delivery via Azure Diagnostic Logging.
-      Overwatch will consume the events as a batch stream (Trigger.Once) once/period when the job runs. To configure
+### Audit Log Delivery
+There are two ways for Overwatch to read the Audit logs:
+* Using System Tables (see [System Table Configuration Details]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}}) ) or 
+* Through EventHubs via Azure Diagnostic Logging. Overwatch will consume the events as a batch stream (Trigger.Once) once/period when the job runs. To configure
       Eventhub to deliver these logs, follow the steps below.
 
 {{% notice note%}}
-**LIMIT** If Event Hub subscription is Standard, max of 10 Hubs per Namespace. If more than 10 workspaces are deployed in the same region plan to
+**LIMIT** If Event Hub subscription is Standard, max of 10 Hubs per Namespace. If more than 10 workspaces are deployed in the same region, plan to
 distribute your Event Hubs and Namespaces appropriately.
 {{% /notice %}}
 

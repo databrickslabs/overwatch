@@ -38,4 +38,7 @@ There are many cases where some workspaces should be able to monitor many worksp
 themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play,
 this reference architecture can accommodate all of these needs. To learn more about the details walk through the
 [deployment steps]({{%relref "DeployOverwatch"%}})
-![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_AWS.png)
+
+Using System tables             |  Using GCS Delivery
+:-------------------------:|:-------------------------:
+![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_GCP_SysTables.png) | ![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_GCP.png)

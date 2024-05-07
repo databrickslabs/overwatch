@@ -35,15 +35,14 @@ There are many cases where some workspaces should be able to monitor many worksp
 themselves. Additionally, co-location of the output data and who should be able to access what data also comes into play,
 this reference architecture can accommodate all of these needs. To learn more about the details walk through the
 [deployment steps]({{%relref "DeployOverwatch"%}})
-![AzureArch](/images/EnvironmentSetup/Overwatch_Arch_AWS.png)
 
-## With Databricks Billable Usage Delivery Logs
+Using System tables             |  Using S3 Delivery
+:-------------------------:|:-------------------------:
+![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_AWS_SysTables.png) | ![AWSArch](/images/EnvironmentSetup/Overwatch_Arch_AWS.png)
+
+## With Databricks Billable Usage Delivery Logs/billing system table
 Detailed costs data
 [directly from Databricks](https://docs.databricks.com/administration-guide/account-settings/billable-usage-delivery.html).
-This data can significantly enhance deeper level cost metrics. Even though Overwatch doesn't support this just yet,
-if you go ahead and configure the delivery of these reports, when Overwatch begins supporting it, it will be able
-to load all the historical data from the day that you began receiving it.
-
-In the meantime, it's easy to join these up with the Overwatch data for cost validation and / or exact cost break
-down by dimensions not supported in the usage logs.
+This data can significantly enhance deeper level cost metrics, and t's easy to join these up with the Overwatch data for 
+cost validation and / or exact cost break down by dimensions not supported in the usage logs/billing system table.
 

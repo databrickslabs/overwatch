@@ -4,6 +4,28 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.8.1.0
+
+### Upgrading
+
+There are no mandatory changes in this release, you can simply swap the jar, and Overwatch will run normally. 
+Now, it is recommended that you run this script, given that the changes in this release try to mitigate changes in the source 
+Databricks APIs that could lead to some data loss for some clusters details.
+
+Upgrade script: **[HTML](/assets/ChangeLog/0810_Upgrade.html) | [DBC](/assets/ChangeLog/0810_Upgrade.dbc)**
+
+Also, remember to upgrade the jar version used in your Optimizer job :)
+
+### Bug Fixes
+* Created a workaround for generating the Clusters snapshot table, since we were using the clusters/list API endpoint, 
+  which now has started enforcing limits to the number of clusters returned
+* Improved logic to include late-arriving cluster events
+* Revamped the logic for splitting cluster usage and dbu share per job tasks when they are ran in parallel on the same cluster
+
+Released May 8th, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/23?closed=1)
+
+------------------------------------------------------------------------------------------------
+
 ## 0.8.0.0 (Major Release)
 
 ### Upgrading
