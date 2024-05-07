@@ -26,6 +26,14 @@ Released May 8th, 2024 - [Full Change Inventory](https://github.com/databricksla
 
 ------------------------------------------------------------------------------------------------
 
+## 0.8.0.1 (Patch)
+
+Fixed a bug when creating Warehouse dimension during the very first run
+
+Released March 21st, 2024
+
+------------------------------------------------------------------------------------------------
+
 ## 0.8.0.0 (Major Release)
 
 ### Upgrading
