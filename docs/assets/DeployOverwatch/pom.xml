@@ -5,7 +5,7 @@
 
     <groupId>com.databricks.labs</groupId>
     <artifactId>overwatch-uber</artifactId>
-    <version>0.7.2.0.1</version>
+    <version>0.8.1.0</version>
 
     <properties>
         <scala.version>2.12</scala.version>
@@ -17,7 +17,7 @@
         <dependency>
             <groupId>com.databricks.labs</groupId>
             <artifactId>overwatch_${scala.version}</artifactId>
-            <version>0.7.2.0.1</version>
+            <version>0.8.1.0</version>
         </dependency>
         <dependency>
             <groupId>com.microsoft.azure</groupId>

@@ -2,291 +2,200 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Welcome To OverWatch on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/</link>
+    <link>http://localhost:1313/overwatch/</link>
     <description>Recent content in Welcome To OverWatch on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Tue, 23 Jan 2024 16:30:21 +0530</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 23 Jan 2024 16:30:21 +0530</lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>AWS</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</guid>
-      <description>Below are the requirements needed for Storage Access setup in AWS
-AWS IAM Role/Policy required for Storage Credentials
-Trust Relation required in Storage Credentials IAM Role
-Instance Profile required for Overwatch Job/Interactive Cluster
-AWS IAM Role required for Storage Credentials This IAM Role to authorize access to the external location. It will be configured while creating the Databricks Storage Credential. Below policy will be used for creating the IAM Role. Please refer this doc for a detailed description on creating IAM role for Storage Credentials</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</guid>
+      <description>Below are the requirements needed for Storage Access setup in AWS&#xA;AWS IAM Role/Policy required for Storage Credentials&#xA;Trust Relation required in Storage Credentials IAM Role&#xA;Instance Profile required for Overwatch Job/Interactive Cluster&#xA;AWS IAM Role required for Storage Credentials This IAM Role to authorize access to the external location. It will be configured while creating the Databricks Storage Credential. Below policy will be used for creating the IAM Role. Please refer this doc for a detailed description on creating IAM role for Storage Credentials</description>
     </item>
-    
     <item>
       <title>Cluster Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</link>
       <pubDate>Tue, 13 Dec 2022 17:01:49 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</guid>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</guid>
       <description>Cluster Requirements DBR 11.3LTS as of 0.7.1.0 Overwatch will likely run on different versions of DBR but is built and tested on 11.3LTS since 0.7.1 Overwatch &amp;lt; 0.7.1 &amp;ndash; DBR 10.4LTS Overwatch &amp;lt; 0.6.1 &amp;ndash; DBR 9.1LTS Using Photon As of 0.7.1.0 Photon is recommended so long as the Overwatch cluster is using DBR 11.3LTS+. Photon does increase the DBU spend but the performance boost often results in the code running significantly more efficiently netting out a benefit.</description>
     </item>
-    
     <item>
       <title>Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configuration/</link>
       <pubDate>Mon, 12 Dec 2022 11:35:40 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
       <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format or delta table. This configuration will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
     </item>
-    
     <item>
       <title>Azure</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
-      <description>Creating the Managed Identity Create a Managed Identity to authorize access to the external location. This managed Identity will be configured using a Databricks Storage Credential. Databricks recommends using an Access Connector for Azure Databricks.
-After the managed identity is created, it needs to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).
-Provisioning the Managed Identity to The Storage If you intend to provision the managed identity to the storage account you need to grant the managed identity</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
+      <description>Creating the Managed Identity Create a Managed Identity to authorize access to the external location. This managed Identity will be configured using a Databricks Storage Credential. Databricks recommends using an Access Connector for Azure Databricks.&#xA;After the managed identity is created, it needs to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).&#xA;Provisioning the Managed Identity to The Storage If you intend to provision the managed identity to the storage account you need to grant the managed identity</description>
     </item>
-    
     <item>
       <title>UC Pre-Requisites</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/uceprereqs/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</guid>
-      <description>Unity Catalog Prerequisites After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.
-This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.
-Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). UC Storage Requirements Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/uceprereqs/</guid>
+      <description>Unity Catalog Prerequisites After all UC Pre-requisites are completed, please continue to Deploy Overwatch section.&#xA;This section will walk you through the steps necessary as a prerequisite to deploy Overwatch on Unity Catalog.&#xA;Workspace should be UC enabled. Overwatch Pipeline Cluster must be UC enabled (single user and runtime version &amp;gt; 11.3+). UC Storage Requirements Create Storage Credentials to be used by the external locations provisioned with appropriate read/write access to the UC External Location (AWS | GCP | AZURE) with privileges: READ FILES WRITE FILES CREATE EXTERNAL TABLE Create UC External location where Overwatch data is to be stored (AWS | GCP | AZURE).</description>
     </item>
-    
     <item>
       <title>Custom Costs</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/customcosts/</link>
       <pubDate>Tue, 13 Dec 2022 14:35:00 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</guid>
-      <description>Fine-Tuning Your Costs Every customer has their own contracts and this means that the costs associated with cloud compute and DBUs may differ between customers. To ensure the costs in Overwatch are as accurate as possible it&amp;rsquo;s important that these costs are configured as accurately as possible.
-Configuring Custom Costs There are three essential components to the cost function:
-The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) by Workspace The node type (instanceDetails.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/customcosts/</guid>
+      <description>Fine-Tuning Your Costs Every customer has their own contracts and this means that the costs associated with cloud compute and DBUs may differ between customers. To ensure the costs in Overwatch are as accurate as possible it&amp;rsquo;s important that these costs are configured as accurately as possible.&#xA;Configuring Custom Costs There are three essential components to the cost function:&#xA;The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) by Workspace The node type (instanceDetails.</description>
     </item>
-    
     <item>
       <title>As A Notebook</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/notebook/</link>
       <pubDate>Mon, 12 Dec 2022 12:04:26 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
-      <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.
-This deployment method requires Overwatch Version 0.7.1.0+
-Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
+      <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.&#xA;This deployment method requires Overwatch Version 0.7.1.0+&#xA;Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
     </item>
-    
     <item>
       <title>Modules / Scopes</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/modules/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/modules/</link>
       <pubDate>Mon, 12 Dec 2022 11:40:34 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/modules/</guid>
-      <description>Modules A module is a single workload that builds a target table. More details about all the modules are available in Pipeline Management.
-Scopes Scopes are the method by which Overwatch is segmented and a scope will contain all the related modules to build the output from Bronze through to Gold. For example there&amp;rsquo;s one scope called &amp;ldquo;jobs&amp;rdquo; but it contains all the modules for jobs and job runs from bronze through gold as well as the jobruncostpotentialfact gold fact table.</description>
+      <guid>http://localhost:1313/overwatch/dataengineer/modules/</guid>
+      <description>Modules A module is a single workload that builds a target table. More details about all the modules are available in Pipeline Management.&#xA;Scopes Scopes are the method by which Overwatch is segmented and a scope will contain all the related modules to build the output from Bronze through to Gold. For example there&amp;rsquo;s one scope called &amp;ldquo;jobs&amp;rdquo; but it contains all the modules for jobs and job runs from bronze through gold as well as the jobruncostpotentialfact gold fact table.</description>
     </item>
-    
     <item>
       <title>GCP</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</guid>
-      <description>Below are the requirement needed for Storage Access setup in GCP
-Google Service Account for Storage Credentials
-Google Service Account for Overwatch Job Cluster
-Cluster Logging Locations Setup
-Google Service Account for Storage Credentials Unity Catalog Storage credentials should have the ability to read and write to a External Location(GCS bucket) by assigning appropriate IAM roles on that bucket to a Databricks-generated Google Cloud service account. Please refer the docs for detailed steps.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</guid>
+      <description>Below are the requirement needed for Storage Access setup in GCP&#xA;Google Service Account for Storage Credentials&#xA;Google Service Account for Overwatch Job Cluster&#xA;Cluster Logging Locations Setup&#xA;Google Service Account for Storage Credentials Unity Catalog Storage credentials should have the ability to read and write to a External Location(GCS bucket) by assigning appropriate IAM roles on that bucket to a Databricks-generated Google Cloud service account. Please refer the docs for detailed steps.</description>
     </item>
-    
     <item>
       <title>UC Configuration Details</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</guid>
-      <description>Configuration changes required for UC Enablement There is no unique configuration process for UC; however, the format for the THREE CONFIGURATIONS below are specific for UC Enablement. For all other configurations, please follow the Configuration
-etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;gt; consumer_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;consumer_database_name&amp;gt; storage_prefix - &amp;lt;UC External Location&amp;gt;/&amp;lt;storage_prefix&amp;gt; </description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</guid>
+      <description>Configuration changes required for UC Enablement There is no unique configuration process for UC; however, the format for the THREE CONFIGURATIONS below are specific for UC Enablement. For all other configurations, please follow the Configuration&#xA;etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;gt; consumer_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;consumer_database_name&amp;gt; storage_prefix - &amp;lt;UC External Location&amp;gt;/&amp;lt;storage_prefix&amp;gt; </description>
     </item>
-    
     <item>
       <title>As A JAR</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/jar/</link>
       <pubDate>Tue, 13 Dec 2022 16:09:01 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</guid>
-      <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+
-Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner
-Dependent Library com.databricks.labs:overwatch_2.12:0.7.x.x
-com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only - If not using system tables)
-com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH, if not using system tables)
-Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following
-&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/jar/</guid>
+      <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+&#xA;Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner&#xA;Dependent Library com.databricks.labs:overwatch_2.12:0.8.x.x&#xA;com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only - If not using system tables)&#xA;com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH, if not using system tables)&#xA;Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following&#xA;&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .</description>
     </item>
-    
     <item>
       <title>Security Considerations</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</link>
       <pubDate>Tue, 13 Dec 2022 14:48:09 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</guid>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</guid>
       <description>API Access Overwatch utilizes several APIs to normalize the platform data. Overwatch leverages secret scopes and keys to acquire a token that is authorized to access the platform. The account that owns the token (i.e. dapi token) must have read access to the assets you wish to manage. If the token owner is a non-admin account the account must be granted read level access to the assets to be monitored.</description>
     </item>
-    
     <item>
       <title>Pipeline_Management</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/pipeline_management/</link>
       <pubDate>Mon, 11 Jan 2021 12:21:46 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</guid>
+      <guid>http://localhost:1313/overwatch/dataengineer/pipeline_management/</guid>
       <description>Overwatch Data Promotion Process Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the data is enriched between the stages. The presentation layer is composed of views that reference the latest schema version of the gold layer. This disconnects the consumption layer from the underlying data structure so that developers can transparently add and alter columns without user disruption. All tables in each layer (except consumption) are suffixed in the ETL database with _layer.</description>
     </item>
-    
     <item>
       <title>Migrating To UC</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/migratingtouc/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</guid>
-      <description>Migrating Existing Deployment From Hive_Metastore To UC Migrating a deployment from Hive Metastore has been made very simple. The steps are
-Complete the UC Pre-Requisites Ensure storage is set up correctly Update the Overwatch Configuration appropriately for UC Use the Migration Notebook below to migrate the data from Hive to UC Resume the job Migration Notebook Migration Notebook ( HTML | DBC ) Details to Run are in the notebook </description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/migratingtouc/</guid>
+      <description>Migrating Existing Deployment From Hive_Metastore To UC Migrating a deployment from Hive Metastore has been made very simple. The steps are&#xA;Complete the UC Pre-Requisites Ensure storage is set up correctly Update the Overwatch Configuration appropriately for UC Use the Migration Notebook below to migrate the data from Hive to UC Resume the job Migration Notebook Migration Notebook ( HTML | DBC ) Details to Run are in the notebook </description>
     </item>
-    
     <item>
       <title>Sharing Overwatch Data</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/sharingoverwatch/</link>
       <pubDate>Thu, 15 Dec 2022 18:31:01 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</guid>
-      <description>Granting Access Via DBSQL If your storage prefix is referencing a mount point, nothing should be necessary here as the mount point is already accessible to all workspace users. If using a direct path (i.e. s3://, abfss://, or gs://) you will need to configure the appropriate access in Admin Settings &amp;ndash;&amp;gt; SQL Warehouse Settings.
-If using a Hive Metastore you may still need to review your grants to ensure users have access to the Overwatch tables / views.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/sharingoverwatch/</guid>
+      <description>Granting Access Via DBSQL If your storage prefix is referencing a mount point, nothing should be necessary here as the mount point is already accessible to all workspace users. If using a direct path (i.e. s3://, abfss://, or gs://) you will need to configure the appropriate access in Admin Settings &amp;ndash;&amp;gt; SQL Warehouse Settings.&#xA;If using a Hive Metastore you may still need to review your grants to ensure users have access to the Overwatch tables / views.</description>
     </item>
-    
     <item>
       <title>Validation</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/validation/</link>
       <pubDate>Mon, 12 Dec 2022 11:36:53 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</guid>
-      <description>Deployment Validations Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below
-Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/validation/</guid>
+      <description>Deployment Validations Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below&#xA;Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key.</description>
     </item>
-    
     <item>
       <title>Upgrades</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/upgrade/</link>
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
-      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. Basic pseudocode can be found below as a reference. For actual version upgrade scripts please reference the upgrade scripts linked to your target version in the Changelog.
-When a schema upgrade is required between versions, this step cannot be skipped.</description>
+      <guid>http://localhost:1313/overwatch/dataengineer/upgrade/</guid>
+      <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. Basic pseudocode can be found below as a reference. For actual version upgrade scripts please reference the upgrade scripts linked to your target version in the Changelog.&#xA;When a schema upgrade is required between versions, this step cannot be skipped.</description>
     </item>
-    
     <item>
       <title>Productionizing</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/productionizing/</link>
       <pubDate>Wed, 20 Jul 2022 15:03:23 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</guid>
-      <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch
-Cluster Logging Simplify and Unify your cluster logging directories
-Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
+      <guid>http://localhost:1313/overwatch/dataengineer/productionizing/</guid>
+      <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch&#xA;Cluster Logging Simplify and Unify your cluster logging directories&#xA;Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
     </item>
-    
     <item>
       <title>AdvancedTopics</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/advancedtopics/</link>
       <pubDate>Mon, 12 Dec 2022 11:41:13 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</guid>
+      <guid>http://localhost:1313/overwatch/dataengineer/advancedtopics/</guid>
       <description>Quick Reference Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Optimizing Overwatch Maximizing First Run Potential Historical Loads Cluster Logs Ingest Details Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run.</description>
     </item>
-    
     <item>
       <title>System Table Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</link>
       <pubDate>Tue, 23 Jan 2024 16:30:21 +0530</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</guid>
-      <description>Configuration changes required for System Table Integration There is no unique configuration process for System Table. The only change required to the configuration for integration is below -
-auditlogprefix_source_path - Instead of adding a fully qualified path (s3 or GC) for auditlog, add keyword system in this column. This will enable the system table integration. For all other configurations, please follow the Configuration
-Once the customer migrate to system table (version 0.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</guid>
+      <description>Configuration changes required for System Table Integration There is no unique configuration process for System Table. The only change required to the configuration for integration is below -&#xA;auditlogprefix_source_path - Instead of adding a fully qualified path (s3 or GC) for auditlog, add keyword system in this column. This will enable the system table integration. For all other configurations, please follow the Configuration&#xA;Once the customer migrate to system table (version 0.</description>
     </item>
-    
     <item>
       <title>System Table Pre-Requisites</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</link>
       <pubDate>Tue, 23 Jan 2024 16:27:22 +0530</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</guid>
-      <description>This section will walk you through the steps necessary as a prerequisite for System Table Integration with Overwatch.
-Workspace should be UC enabled and System Table enabled. Enabling system tables is straightforward, you do need to have at least one unity-catalog enabled workspace. System tables must be enabled by an account admin. You can enable system tables using the Unity Catalog REST API. Once enabled, the tables will appear in a catalog called system, which is included in every Unity Catalog metastore.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</guid>
+      <description>This section will walk you through the steps necessary as a prerequisite for System Table Integration with Overwatch.&#xA;Workspace should be UC enabled and System Table enabled. Enabling system tables is straightforward, you do need to have at least one unity-catalog enabled workspace. System tables must be enabled by an account admin. You can enable system tables using the Unity Catalog REST API. Once enabled, the tables will appear in a catalog called system, which is included in every Unity Catalog metastore.</description>
     </item>
-    
     <item>
       <title>GCP</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/gcp/</link>
       <pubDate>Thu, 07 Sep 2023 00:00:00 +0000</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/</guid>
-      <description>Configuring Overwatch on GCP - Databricks Reach out to your Databricks representative to help you with these tasks as needed.
-There are two primary sources of data that need to be configured:
-Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions. We don&amp;rsquo;t want multiple workspaces delivering into the same prefix.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/gcp/</guid>
+      <description>Configuring Overwatch on GCP - Databricks Reach out to your Databricks representative to help you with these tasks as needed.&#xA;There are two primary sources of data that need to be configured:&#xA;Audit Logs-GCP These will be delivered to the configured bucket. These buckets are configured on a per-workspace basis and can be delivered to the same target bucket, just ensure that the prefixes are different to avoid collisions. We don&amp;rsquo;t want multiple workspaces delivering into the same prefix.</description>
     </item>
-    
     <item>
       <title>Azure</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/azure/</link>
       <pubDate>Mon, 12 Dec 2022 11:29:59 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/</guid>
-      <description>Fast Travel Configuring Overwatch on Azure Databricks Reference Architecture Reference Architecture (Legacy) Configuring Audit Log Delivery Through Event Hub Setting up Storage Accounts Mount Storage Accounts Configuring Overwatch on Azure Databricks Reach out to your Databricks representative to help you with these tasks as needed. To get started, we suggest you deploy a single workspace end to end so that you can figure out the steps involved and you can then apply these for the other workspaces to be deployed.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/azure/</guid>
+      <description>Fast Travel Configuring Overwatch on Azure Databricks Reference Architecture Configuring Audit Log Delivery Through Event Hub Setting up Storage Accounts Mount Storage Accounts Configuring Overwatch on Azure Databricks Reach out to your Databricks representative to help you with these tasks as needed. To get started, we suggest you deploy a single workspace end to end so that you can figure out the steps involved and you can then apply these for the other workspaces to be deployed.</description>
     </item>
-    
     <item>
       <title>AWS</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/aws/</link>
       <pubDate>Mon, 12 Dec 2022 11:29:56 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</guid>
-      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.
-There are two primary sources of data that need to be configured:
-Audit Logs-AWS The audit logs contain data for every interaction within the environment and are used to track the state of various objects through time along with which accounts interacted with them. This data is relatively small and delivery occurs infrequently which is why it&amp;rsquo;s rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/aws/</guid>
+      <description>Configuring Overwatch on AWS - Databricks Reach out to your Customer Success Engineer (CSE) to help you with these tasks as needed.&#xA;There are two primary sources of data that need to be configured:&#xA;Audit Logs-AWS The audit logs contain data for every interaction within the environment and are used to track the state of various objects through time along with which accounts interacted with them. This data is relatively small and delivery occurs infrequently which is why it&amp;rsquo;s rarely of any consequence to deliver audit logs to buckets even outside of the control plane region.</description>
     </item>
-    
     <item>
       <title>Data Dictionary - 0.6.1.x</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/definitions/061x/</link>
       <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
+      <guid>http://localhost:1313/overwatch/dataengineer/definitions/061x/</guid>
       <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
     </item>
-    
     <item>
       <title>Data Dictionary - 0.7.1.x</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/definitions/071x/</link>
       <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</guid>
-      <description>ERD The &amp;ldquo;ERD&amp;rdquo; below is a visual representation of the consumer layer data model. Many of the joinable lines have been omitted to reduce chaos and complexity in the visualization. All columns with the same name are joinable (even if there&amp;rsquo;s not a line from one table to the other). The relations depicted are to call the analyst&amp;rsquo;s attention to less obvious joins.
-The goal is to present a data model that unifies the different parts of the platform.</description>
+      <guid>http://localhost:1313/overwatch/dataengineer/definitions/071x/</guid>
+      <description>ERD The &amp;ldquo;ERD&amp;rdquo; below is a visual representation of the consumer layer data model. Many of the joinable lines have been omitted to reduce chaos and complexity in the visualization. All columns with the same name are joinable (even if there&amp;rsquo;s not a line from one table to the other). The relations depicted are to call the analyst&amp;rsquo;s attention to less obvious joins.&#xA;The goal is to present a data model that unifies the different parts of the platform.</description>
     </item>
-    
     <item>
       <title>Configuration Details By Version</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</guid>
-      <description>Overwatch Deployment Configuration By Version 0.7.2.x Configuration 0.7.1.x Configuration Column description 0.7.2.x Column Type IsRequired Description workspace_name String True Name of the workspace. workspace_id String True Id of the workspace. workspace_url String True URL of the workspace. api_url String True API URL for the Workspace (execute in scala dbutils.notebook.getContext().apiUrl.get ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces).</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</guid>
+      <description>Overwatch Deployment Configuration By Version 0.8.x.x Configuration 0.7.2.x Configuration 0.7.1.x Configuration Column description 0.8.x.x Column Type IsRequired Description workspace_name String True Name of the workspace. workspace_id String True Id of the workspace. MUST BE VALUE AFTER THE o= in the URL bar. To ensure you get the right value, run the following on the target workspace. Initializer.getOrgId workspace_url String True URL of the workspace. Should be in format of https://*.com or https://*.</description>
     </item>
-    
   </channel>
 </rss>

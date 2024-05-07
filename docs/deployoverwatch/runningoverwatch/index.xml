@@ -2,45 +2,32 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Running Overwatch on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/</link>
+    <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/</link>
     <description>Recent content in Running Overwatch on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Mon, 12 Dec 2022 11:37:52 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 13 Dec 2022 17:01:49 -0500</lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Cluster Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</link>
       <pubDate>Tue, 13 Dec 2022 17:01:49 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</guid>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</guid>
       <description>Cluster Requirements DBR 11.3LTS as of 0.7.1.0 Overwatch will likely run on different versions of DBR but is built and tested on 11.3LTS since 0.7.1 Overwatch &amp;lt; 0.7.1 &amp;ndash; DBR 10.4LTS Overwatch &amp;lt; 0.6.1 &amp;ndash; DBR 9.1LTS Using Photon As of 0.7.1.0 Photon is recommended so long as the Overwatch cluster is using DBR 11.3LTS+. Photon does increase the DBU spend but the performance boost often results in the code running significantly more efficiently netting out a benefit.</description>
     </item>
-    
     <item>
       <title>As A Notebook</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/notebook/</link>
       <pubDate>Mon, 12 Dec 2022 12:04:26 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
-      <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.
-This deployment method requires Overwatch Version 0.7.1.0+
-Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/notebook/</guid>
+      <description>Deploying Overwatch As A Notebook Notebooks can either be run manually or scheduled to run as a job. While the notebook can be scheduled as a job, it&amp;rsquo;s strongly recommended that Overwatch be run as a JAR instead of a notebook. Notebook execution is great for rapid testing and validation.&#xA;This deployment method requires Overwatch Version 0.7.1.0+&#xA;Jumpstart Notebook Below is an example deployment. When you&amp;rsquo;re ready to get started simply download the rapid start linked notebook below.</description>
     </item>
-    
     <item>
       <title>As A JAR</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/jar/</link>
       <pubDate>Tue, 13 Dec 2022 16:09:01 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</guid>
-      <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+
-Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner
-Dependent Library com.databricks.labs:overwatch_2.12:0.7.x.x
-com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only - If not using system tables)
-com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH, if not using system tables)
-Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following
-&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/jar/</guid>
+      <description>Deploying Overwatch As A JAR On Databricks Workflows This deployment method requires Overwatch Version 0.7.1.0+&#xA;Main Class The main class for job is com.databricks.labs.overwatch.MultiWorkspaceRunner&#xA;Dependent Library com.databricks.labs:overwatch_2.12:0.8.x.x&#xA;com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21 (Azure only - If not using system tables)&#xA;com.microsoft.azure:msal4j:1.10.1 (Azure Only - With AAD Auth For EH, if not using system tables)&#xA;Parameters As of 0.7.1.1 the config.csv referenced below can be any one of the following&#xA;&amp;ldquo;dbfs:/path/to/config.csv&amp;rdquo; &amp;ndash; original config csv approach still works (must end with .</description>
     </item>
-    
   </channel>
 </rss>

@@ -2,10 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Troubleshooting on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/troubleshooting/</link>
+    <link>http://localhost:1313/overwatch/troubleshooting/</link>
     <description>Recent content in Troubleshooting on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Tue, 13 Dec 2022 13:49:40 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/troubleshooting/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate></lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/troubleshooting/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>

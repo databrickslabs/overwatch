@@ -2,132 +2,132 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/clusterconfig/</loc>
     <lastmod>2022-12-13T17:01:49-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configuration/</loc>
     <lastmod>2022-12-12T11:35:40-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/</loc>
     <lastmod>2022-12-12T11:29:49-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/definitions/</loc>
     <lastmod>2021-01-11T12:21:19-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceprereqs/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/uceprereqs/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/customcosts/</loc>
     <lastmod>2022-12-13T14:35:00-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/notebook/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/notebook/</loc>
     <lastmod>2022-12-12T12:04:26-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/modules/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/modules/</loc>
     <lastmod>2022-12-12T11:40:34-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/</loc>
     <lastmod>2022-12-12T11:34:59-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/</loc>
     <lastmod>2022-12-12T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/jar/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/jar/</loc>
     <lastmod>2022-12-13T16:09:01-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</loc>
     <lastmod>2022-12-13T14:48:09-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/</loc>
     <lastmod>2022-12-12T11:41:13-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/runningoverwatch/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/runningoverwatch/</loc>
     <lastmod>2022-12-12T11:37:52-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/pipeline_management/</loc>
     <lastmod>2021-01-11T12:21:46-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/migratingtouc/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/sharingoverwatch/</loc>
     <lastmod>2022-12-15T18:31:01-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/validation/</loc>
     <lastmod>2022-12-12T11:36:53-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/upgrade/</loc>
     <lastmod>2021-05-20T21:27:44-04:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/changelog/</loc>
+    <loc>http://localhost:1313/overwatch/changelog/</loc>
     <lastmod>2021-05-05T17:00:13-04:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/productionizing/</loc>
     <lastmod>2022-07-20T15:03:23-04:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/faq/</loc>
+    <loc>http://localhost:1313/overwatch/faq/</loc>
     <lastmod>2021-01-12T05:49:17-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/advancedtopics/</loc>
     <lastmod>2022-12-12T11:41:13-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</loc>
     <lastmod>2024-01-23T16:30:21+05:30</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/</loc>
+    <loc>http://localhost:1313/overwatch/</loc>
     <lastmod>2024-01-23T16:30:21+05:30</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</loc>
     <lastmod>2024-01-23T16:27:22+05:30</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/</loc>
     <lastmod>2024-01-22T19:35:23+05:30</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/gcp/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/gcp/</loc>
     <lastmod>2023-09-07T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dashboards/</loc>
+    <loc>http://localhost:1313/overwatch/dashboards/</loc>
     <lastmod>2022-12-13T13:49:40-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/troubleshooting/</loc>
+    <loc>http://localhost:1313/overwatch/troubleshooting/</loc>
     <lastmod>2022-12-13T13:49:40-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/azure/</loc>
     <lastmod>2022-12-12T11:29:59-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/aws/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/cloudinfra/aws/</loc>
     <lastmod>2022-12-12T11:29:56-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/definitions/061x/</loc>
     <lastmod>2022-09-26T08:47:24-04:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</loc>
+    <loc>http://localhost:1313/overwatch/dataengineer/definitions/071x/</loc>
     <lastmod>2022-09-26T08:47:24-04:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/contributing/</loc>
+    <loc>http://localhost:1313/overwatch/contributing/</loc>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/categories/</loc>
+    <loc>http://localhost:1313/overwatch/categories/</loc>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</loc>
+    <loc>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</loc>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/tags/</loc>
+    <loc>http://localhost:1313/overwatch/tags/</loc>
   </url>
 </urlset>
