@@ -2,31 +2,31 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>UC Storage Requirements on Overwatch</title>
-    <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/</link>
+    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/</link>
     <description>Recent content in UC Storage Requirements on Overwatch</description>
     <generator>Hugo</generator>
     <language>en</language>
     <lastBuildDate>Tue, 18 Apr 2023 11:28:39 -0500</lastBuildDate>
-    <atom:link href="http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>AWS</title>
-      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/aws/</guid>
       <description>Below are the requirements needed for Storage Access setup in AWS&#xA;AWS IAM Role/Policy required for Storage Credentials&#xA;Trust Relation required in Storage Credentials IAM Role&#xA;Instance Profile required for Overwatch Job/Interactive Cluster&#xA;AWS IAM Role required for Storage Credentials This IAM Role to authorize access to the external location. It will be configured while creating the Databricks Storage Credential. Below policy will be used for creating the IAM Role. Please refer this doc for a detailed description on creating IAM role for Storage Credentials</description>
     </item>
     <item>
       <title>Azure</title>
-      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</link>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/azure/</guid>
       <description>Creating the Managed Identity Create a Managed Identity to authorize access to the external location. This managed Identity will be configured using a Databricks Storage Credential. Databricks recommends using an Access Connector for Azure Databricks.&#xA;After the managed identity is created, it needs to be provisioned read/write access to the storage target for the Overwatch Output (which will ultimately become your external location).&#xA;Provisioning the Managed Identity to The Storage If you intend to provision the managed identity to the storage account you need to grant the managed identity</description>
     </item>
     <item>
       <title>GCP</title>
-      <link>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</link>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
-      <guid>http://localhost:1313/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/cloudstorageaccessrequirements/gcp/</guid>
       <description>Below are the requirement needed for Storage Access setup in GCP&#xA;Google Service Account for Storage Credentials&#xA;Google Service Account for Overwatch Job Cluster&#xA;Cluster Logging Locations Setup&#xA;Google Service Account for Storage Credentials Unity Catalog Storage credentials should have the ability to read and write to a External Location(GCS bucket) by assigning appropriate IAM roles on that bucket to a Databricks-generated Google Cloud service account. Please refer the docs for detailed steps.</description>
     </item>
   </channel>

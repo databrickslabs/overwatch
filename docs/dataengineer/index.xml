@@ -2,45 +2,45 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Data Engineering on Overwatch</title>
-    <link>http://localhost:1313/overwatch/dataengineer/</link>
+    <link>https://databrickslabs.github.io/overwatch/dataengineer/</link>
     <description>Recent content in Data Engineering on Overwatch</description>
     <generator>Hugo</generator>
     <language>en</language>
     <lastBuildDate>Mon, 12 Dec 2022 11:41:13 -0500</lastBuildDate>
-    <atom:link href="http://localhost:1313/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Modules / Scopes</title>
-      <link>http://localhost:1313/overwatch/dataengineer/modules/</link>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/modules/</link>
       <pubDate>Mon, 12 Dec 2022 11:40:34 -0500</pubDate>
-      <guid>http://localhost:1313/overwatch/dataengineer/modules/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/modules/</guid>
       <description>Modules A module is a single workload that builds a target table. More details about all the modules are available in Pipeline Management.&#xA;Scopes Scopes are the method by which Overwatch is segmented and a scope will contain all the related modules to build the output from Bronze through to Gold. For example there&amp;rsquo;s one scope called &amp;ldquo;jobs&amp;rdquo; but it contains all the modules for jobs and job runs from bronze through gold as well as the jobruncostpotentialfact gold fact table.</description>
     </item>
     <item>
       <title>Pipeline_Management</title>
-      <link>http://localhost:1313/overwatch/dataengineer/pipeline_management/</link>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</link>
       <pubDate>Mon, 11 Jan 2021 12:21:46 -0500</pubDate>
-      <guid>http://localhost:1313/overwatch/dataengineer/pipeline_management/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/pipeline_management/</guid>
       <description>Overwatch Data Promotion Process Overwatch data is promoted from bronze - silver - gold - presentation to ensure data consistency and quality as the data is enriched between the stages. The presentation layer is composed of views that reference the latest schema version of the gold layer. This disconnects the consumption layer from the underlying data structure so that developers can transparently add and alter columns without user disruption. All tables in each layer (except consumption) are suffixed in the ETL database with _layer.</description>
     </item>
     <item>
       <title>Upgrades</title>
-      <link>http://localhost:1313/overwatch/dataengineer/upgrade/</link>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</link>
       <pubDate>Thu, 20 May 2021 21:27:44 -0400</pubDate>
-      <guid>http://localhost:1313/overwatch/dataengineer/upgrade/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/upgrade/</guid>
       <description>Sometimes upgrading from one version to the next requires a schema change. In these cases, the CHANGELOG will be explicit. Upgrades MUST be executed WITH the new library (jar) and before the pipeline is executed. Basic pseudocode can be found below as a reference. For actual version upgrade scripts please reference the upgrade scripts linked to your target version in the Changelog.&#xA;When a schema upgrade is required between versions, this step cannot be skipped.</description>
     </item>
     <item>
       <title>Productionizing</title>
-      <link>http://localhost:1313/overwatch/dataengineer/productionizing/</link>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</link>
       <pubDate>Wed, 20 Jul 2022 15:03:23 -0400</pubDate>
-      <guid>http://localhost:1313/overwatch/dataengineer/productionizing/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</guid>
       <description>Moving To Production When you&amp;rsquo;re ready to move to production, there are a few things to keep in mind and best practices to follow to get the most out of Overwatch&#xA;Cluster Logging Simplify and Unify your cluster logging directories&#xA;Many users forget to enable cluster logging and without it Overwatch cannot provide usage telemetry by notebook, job, user so it&amp;rsquo;s critical that all clusters have clusters logs enabled If users are allowed to create clusters/jobs without any governance, log files will be produced and stored all over the place.</description>
     </item>
     <item>
       <title>AdvancedTopics</title>
-      <link>http://localhost:1313/overwatch/dataengineer/advancedtopics/</link>
+      <link>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</link>
       <pubDate>Mon, 12 Dec 2022 11:41:13 -0500</pubDate>
-      <guid>http://localhost:1313/overwatch/dataengineer/advancedtopics/</guid>
+      <guid>https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/</guid>
       <description>Quick Reference Externalize Optimize &amp;amp; Z-Order Interacting With Overwatch and its State Optimizing Overwatch Maximizing First Run Potential Historical Loads Cluster Logs Ingest Details Joining With Slow Changing Dimensions (SCD) Optimizing Overwatch Expectation Check Note that Overwatch analyzes nearly all aspects of the Workspace and manages its own pipeline among many other tasks. This results in 1000s of spark job executions and as such, the Overwatch job will take some time to run.</description>
     </item>
   </channel>
