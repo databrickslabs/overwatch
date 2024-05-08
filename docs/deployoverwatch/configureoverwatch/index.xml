@@ -2,58 +2,46 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Configure Overwatch on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/</link>
+    <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/</link>
     <description>Recent content in Configure Overwatch on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Mon, 12 Dec 2022 11:34:59 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 13 Dec 2022 14:48:09 -0500</lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configuration/</link>
       <pubDate>Mon, 12 Dec 2022 11:35:40 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configuration/</guid>
       <description>Overwatch Deployment Configuration How it works Overwatch deployment is driven by a configuration file which will ultimately be loaded into the deployment as a csv format or delta table. This configuration will contain all the necessary details to perform the deployment. Since CSVs are a bit cantankerous we&amp;rsquo;ve offered two different methods for building the configuration file. If you&amp;rsquo;re good at VSCode or similar text editor and want to edit the CSV directly feel free to do so.</description>
     </item>
-    
     <item>
       <title>Custom Costs</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/customcosts/</link>
       <pubDate>Tue, 13 Dec 2022 14:35:00 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/</guid>
-      <description>Fine-Tuning Your Costs Every customer has their own contracts and this means that the costs associated with cloud compute and DBUs may differ between customers. To ensure the costs in Overwatch are as accurate as possible it&amp;rsquo;s important that these costs are configured as accurately as possible.
-Configuring Custom Costs There are three essential components to the cost function:
-The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) by Workspace The node type (instanceDetails.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/customcosts/</guid>
+      <description>Fine-Tuning Your Costs Every customer has their own contracts and this means that the costs associated with cloud compute and DBUs may differ between customers. To ensure the costs in Overwatch are as accurate as possible it&amp;rsquo;s important that these costs are configured as accurately as possible.&#xA;Configuring Custom Costs There are three essential components to the cost function:&#xA;The node type (instanceDetails.Api_Name) and its associated contract price (instanceDetails.Compute_Contract_Price) by Workspace The node type (instanceDetails.</description>
     </item>
-    
     <item>
       <title>Security Considerations</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</link>
       <pubDate>Tue, 13 Dec 2022 14:48:09 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</guid>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/securityconsiderations/</guid>
       <description>API Access Overwatch utilizes several APIs to normalize the platform data. Overwatch leverages secret scopes and keys to acquire a token that is authorized to access the platform. The account that owns the token (i.e. dapi token) must have read access to the assets you wish to manage. If the token owner is a non-admin account the account must be granted read level access to the assets to be monitored.</description>
     </item>
-    
     <item>
       <title>Validation</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/validation/</link>
       <pubDate>Mon, 12 Dec 2022 11:36:53 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</guid>
-      <description>Deployment Validations Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below
-Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/validation/</guid>
+      <description>Deployment Validations Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below&#xA;Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key.</description>
     </item>
-    
     <item>
       <title>Configuration Details By Version</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</guid>
-      <description>Overwatch Deployment Configuration By Version 0.7.2.x Configuration 0.7.1.x Configuration Column description 0.7.2.x Column Type IsRequired Description workspace_name String True Name of the workspace. workspace_id String True Id of the workspace. workspace_url String True URL of the workspace. api_url String True API URL for the Workspace (execute in scala dbutils.notebook.getContext().apiUrl.get ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces).</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/</guid>
+      <description>Overwatch Deployment Configuration By Version 0.8.x.x Configuration 0.7.2.x Configuration 0.7.1.x Configuration Column description 0.8.x.x Column Type IsRequired Description workspace_name String True Name of the workspace. workspace_id String True Id of the workspace. MUST BE VALUE AFTER THE o= in the URL bar. To ensure you get the right value, run the following on the target workspace. Initializer.getOrgId workspace_url String True URL of the workspace. Should be in format of https://*.com or https://*.</description>
     </item>
-    
   </channel>
 </rss>

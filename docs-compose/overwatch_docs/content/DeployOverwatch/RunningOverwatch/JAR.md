@@ -11,7 +11,7 @@ weight: 3
 The main class for job is `com.databricks.labs.overwatch.MultiWorkspaceRunner`<br>
 
 ### Dependent Library
-`com.databricks.labs:overwatch_2.12:0.7.x.x`
+`com.databricks.labs:overwatch_2.12:0.8.x.x`
 
 `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21` **(Azure only - If not using system tables)**
 

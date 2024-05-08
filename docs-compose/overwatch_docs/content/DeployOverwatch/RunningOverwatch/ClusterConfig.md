@@ -28,9 +28,10 @@ Add the following dependencies to your cluster
     * Maven Coordinate: `com.microsoft.azure:azure-eventhubs-spark_2.12:2.3.21`
 * **(Azure Only - With AAD Auth For EH, if not using system tables)** msal4j - library to support AAD Authorization
   * Maven Coordinate: `com.microsoft.azure:msal4j:1.10.1`
-* If **maven isn't accessible** in your environment you can compile an uber jar with all dependencies
-  * Download the [**uber_pom.xml**](/assets/DeployOverwatch/pom.xml) and run `mvn clean package` from within the same directory as the pom.xml
-    * This method does require you have maven installed and configured correctly
+* If **maven isn't accessible** in your environment you have two options:
+  1. On Github, go to the [Releases page](https://github.com/databrickslabs/overwatch/releases), find the version you're interested in, and scroll down to the Assets section, there you can download the jar or uber jar, as needed. 
+  2. Compile an uber jar with all dependencies. To do this, download the [**uber_pom.xml**](/assets/DeployOverwatch/pom.xml) (Ensure the Overwatch version specified in the pom file is the version you want, there are 2 places to check) and run `mvn clean package` from within the same directory as the pom.xml
+      * This method does require you have maven installed and configured correctly
 
 ### Cluster Config Recommendations
 * Azure

@@ -2,31 +2,25 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>System Table Integration on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/</link>
+    <link>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/</link>
     <description>Recent content in System Table Integration on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Mon, 22 Jan 2024 19:35:23 +0530</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 23 Jan 2024 16:30:21 +0530</lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>System Table Configuration</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</link>
       <pubDate>Tue, 23 Jan 2024 16:30:21 +0530</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</guid>
-      <description>Configuration changes required for System Table Integration There is no unique configuration process for System Table. The only change required to the configuration for integration is below -
-auditlogprefix_source_path - Instead of adding a fully qualified path (s3 or GC) for auditlog, add keyword system in this column. This will enable the system table integration. For all other configurations, please follow the Configuration
-Once the customer migrate to system table (version 0.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/</guid>
+      <description>Configuration changes required for System Table Integration There is no unique configuration process for System Table. The only change required to the configuration for integration is below -&#xA;auditlogprefix_source_path - Instead of adding a fully qualified path (s3 or GC) for auditlog, add keyword system in this column. This will enable the system table integration. For all other configurations, please follow the Configuration&#xA;Once the customer migrate to system table (version 0.</description>
     </item>
-    
     <item>
       <title>System Table Pre-Requisites</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</link>
       <pubDate>Tue, 23 Jan 2024 16:27:22 +0530</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</guid>
-      <description>This section will walk you through the steps necessary as a prerequisite for System Table Integration with Overwatch.
-Workspace should be UC enabled and System Table enabled. Enabling system tables is straightforward, you do need to have at least one unity-catalog enabled workspace. System tables must be enabled by an account admin. You can enable system tables using the Unity Catalog REST API. Once enabled, the tables will appear in a catalog called system, which is included in every Unity Catalog metastore.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/systemtableintegration/systemtableprereq/</guid>
+      <description>This section will walk you through the steps necessary as a prerequisite for System Table Integration with Overwatch.&#xA;Workspace should be UC enabled and System Table enabled. Enabling system tables is straightforward, you do need to have at least one unity-catalog enabled workspace. System tables must be enabled by an account admin. You can enable system tables using the Unity Catalog REST API. Once enabled, the tables will appear in a catalog called system, which is included in every Unity Catalog metastore.</description>
     </item>
-    
   </channel>
 </rss>

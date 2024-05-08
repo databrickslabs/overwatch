@@ -2,20 +2,18 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Deploy Overwatch on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/deployoverwatch/</link>
+    <link>http://localhost:1313/overwatch/deployoverwatch/</link>
     <description>Recent content in Deploy Overwatch on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Mon, 12 Dec 2022 11:28:39 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 15 Dec 2022 18:31:01 -0500</lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/deployoverwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Sharing Overwatch Data</title>
-      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</link>
+      <link>http://localhost:1313/overwatch/deployoverwatch/sharingoverwatch/</link>
       <pubDate>Thu, 15 Dec 2022 18:31:01 -0500</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</guid>
-      <description>Granting Access Via DBSQL If your storage prefix is referencing a mount point, nothing should be necessary here as the mount point is already accessible to all workspace users. If using a direct path (i.e. s3://, abfss://, or gs://) you will need to configure the appropriate access in Admin Settings &amp;ndash;&amp;gt; SQL Warehouse Settings.
-If using a Hive Metastore you may still need to review your grants to ensure users have access to the Overwatch tables / views.</description>
+      <guid>http://localhost:1313/overwatch/deployoverwatch/sharingoverwatch/</guid>
+      <description>Granting Access Via DBSQL If your storage prefix is referencing a mount point, nothing should be necessary here as the mount point is already accessible to all workspace users. If using a direct path (i.e. s3://, abfss://, or gs://) you will need to configure the appropriate access in Admin Settings &amp;ndash;&amp;gt; SQL Warehouse Settings.&#xA;If using a Hive Metastore you may still need to review your grants to ensure users have access to the Overwatch tables / views.</description>
     </item>
-    
   </channel>
 </rss>

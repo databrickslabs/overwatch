@@ -2,29 +2,25 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Data Dictionary (Latest) on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/</link>
+    <link>http://localhost:1313/overwatch/dataengineer/definitions/</link>
     <description>Recent content in Data Dictionary (Latest) on Overwatch</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Mon, 11 Jan 2021 12:21:19 -0500</lastBuildDate><atom:link href="https://databrickslabs.github.io/overwatch/dataengineer/definitions/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 26 Sep 2022 08:47:24 -0400</lastBuildDate>
+    <atom:link href="http://localhost:1313/overwatch/dataengineer/definitions/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Data Dictionary - 0.6.1.x</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/definitions/061x/</link>
       <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/061x/</guid>
+      <guid>http://localhost:1313/overwatch/dataengineer/definitions/061x/</guid>
       <description>Consumption Layer Column Descriptions ETL Tables Bronze Silver Gold Consumption Layer &amp;ldquo;Tables&amp;rdquo; (Views) All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex. Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart from the ETL tables to minimize clutter and confusion. These entities in this layer are actually not tables at all (with a few minor exceptions such as lookup tables) but rather views.</description>
     </item>
-    
     <item>
       <title>Data Dictionary - 0.7.1.x</title>
-      <link>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</link>
+      <link>http://localhost:1313/overwatch/dataengineer/definitions/071x/</link>
       <pubDate>Mon, 26 Sep 2022 08:47:24 -0400</pubDate>
-      
-      <guid>https://databrickslabs.github.io/overwatch/dataengineer/definitions/071x/</guid>
-      <description>ERD The &amp;ldquo;ERD&amp;rdquo; below is a visual representation of the consumer layer data model. Many of the joinable lines have been omitted to reduce chaos and complexity in the visualization. All columns with the same name are joinable (even if there&amp;rsquo;s not a line from one table to the other). The relations depicted are to call the analyst&amp;rsquo;s attention to less obvious joins.
-The goal is to present a data model that unifies the different parts of the platform.</description>
+      <guid>http://localhost:1313/overwatch/dataengineer/definitions/071x/</guid>
+      <description>ERD The &amp;ldquo;ERD&amp;rdquo; below is a visual representation of the consumer layer data model. Many of the joinable lines have been omitted to reduce chaos and complexity in the visualization. All columns with the same name are joinable (even if there&amp;rsquo;s not a line from one table to the other). The relations depicted are to call the analyst&amp;rsquo;s attention to less obvious joins.&#xA;The goal is to present a data model that unifies the different parts of the platform.</description>
     </item>
-    
   </channel>
 </rss>
