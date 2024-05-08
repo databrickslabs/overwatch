@@ -395,7 +395,8 @@ All data captured as part of traceability will be stored in the apiEventDetails 
 
 ### How to enable Traceability
 
-By default, the traceability module is disabled. To enable traceability, please set the following configuration in the advanced Spark settings: "overwatch.traceapi true".
+By default, the traceability module is disabled. To enable traceability, please set the following configuration in the 
+advanced Spark settings: `overwatch.traceapi true`.
 
 ### Column Descriptions of ApiEventDetails
 
@@ -414,9 +415,10 @@ By default, the traceability module is disabled. To enable traceability, please 
 | timestamp | long      | Timestamp in which this row was inserted into the table.                                                                                                                                                                                           
 | Overwatch_RunID | long      | GUID for the overwatch run.                                                                                                                                                                                             
 
-### How to read the binary data which has been stored in ApiEventDetils
+### How to read the binary data which has been stored in ApiEventDetails
 
-With the help of helper functions has been introduced in release 0730 the binary data can be decoded to human readable format.
+The following function was introduced in version 0.8.1.0 to decode the binary data received into a readable format, which 
+you can use as follows:
 ```scala
 import com.databricks.labs.overwatch.utils._
 val df = Helpers.transformBinaryDf(spark.read.table("<etl_db_name>.apieventdetails"))

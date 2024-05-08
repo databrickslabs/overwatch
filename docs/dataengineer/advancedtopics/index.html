@@ -12,21 +12,21 @@
     <title>AdvancedTopics :: Overwatch</title>
 
     
-    <link href="http://localhost:1313/overwatch/css/nucleus.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/fontawesome-all.min.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/hybrid.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/featherlight.min.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/perfect-scrollbar.min.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/auto-complete.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/atom-one-dark-reasonable.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/theme.css?1715193044" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/hugo-theme.css?1715193044" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/nucleus.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/fontawesome-all.min.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/hybrid.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/featherlight.min.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/perfect-scrollbar.min.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/auto-complete.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/atom-one-dark-reasonable.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/theme.css?1715193560" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/hugo-theme.css?1715193560" rel="stylesheet">
     
-    <link href="http://localhost:1313/overwatch/css/theme-blue.css?1715193044" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/theme-blue.css?1715193560" rel="stylesheet">
     
     
 
-    <script src="http://localhost:1313/overwatch/js/jquery-3.3.1.min.js?1715193044"></script>
+    <script src="http://localhost:1313/overwatch/js/jquery-3.3.1.min.js?1715193560"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="http://localhost:1313/overwatch/js/lunr.min.js?1715193044"></script>
-<script type="text/javascript" src="http://localhost:1313/overwatch/js/auto-complete.js?1715193044"></script>
+<script type="text/javascript" src="http://localhost:1313/overwatch/js/lunr.min.js?1715193560"></script>
+<script type="text/javascript" src="http://localhost:1313/overwatch/js/auto-complete.js?1715193560"></script>
 <script type="text/javascript">
     
         var baseurl = "http:\/\/localhost:1313\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="http://localhost:1313/overwatch/js/search.js?1715193044"></script>
+<script type="text/javascript" src="http://localhost:1313/overwatch/js/search.js?1715193560"></script>
 
     
   </div>
@@ -1150,6 +1150,13 @@
       </ul>
     </li>
     <li><a href="#joining-with-slow-changing-dimensions-scd">Joining With Slow Changing Dimensions (SCD)</a></li>
+    <li><a href="#api-traceability">API Traceability</a>
+      <ul>
+        <li><a href="#how-to-enable-traceability">How to enable Traceability</a></li>
+        <li><a href="#column-descriptions-of-apieventdetails">Column Descriptions of ApiEventDetails</a></li>
+        <li><a href="#how-to-read-the-binary-data-which-has-been-stored-in-apieventdetails">How to read the binary data which has been stored in ApiEventDetails</a></li>
+      </ul>
+    </li>
     <li><a href="#using-overwatch-data-to-enrich-realtime-monitoring">Using Overwatch Data to enrich realtime monitoring</a>
       <ul>
         <li></li>
@@ -1614,6 +1621,92 @@ value at the time of some event in a driving table.</p>
 </span></span><span style="display:flex;"><span>  <span style="color:#f92672">)</span>
 </span></span><span style="display:flex;"><span>  <span style="color:#f92672">.</span>df
 </span></span><span style="display:flex;"><span>  <span style="color:#f92672">.</span>show<span style="color:#f92672">(</span><span style="color:#ae81ff">20</span><span style="color:#f92672">,</span> <span style="color:#66d9ef">false</span><span style="color:#f92672">)</span>
+</span></span></code></pre></div><h2 id="api-traceability">API Traceability</h2>
+<p>The Overwatch pipeline runs in multiple threads, making numerous API calls in parallel and asynchronously to enhance processing speed.
+Due to the challenge of capturing lineage between requests and responses, a traceability module has been implemented.
+Through traceability, we can record the request made and the corresponding response received.
+All data captured as part of traceability will be stored in the apiEventDetails table, which can be found in the ETL database.</p>
+<h3 id="how-to-enable-traceability">How to enable Traceability</h3>
+<p>By default, the traceability module is disabled. To enable traceability, please set the following configuration in the
+advanced Spark settings: <code>overwatch.traceapi true</code>.</p>
+<h3 id="column-descriptions-of-apieventdetails">Column Descriptions of ApiEventDetails</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">end_point</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Api call end point.</td>
+</tr>
+<tr>
+<td style="text-align:left">type</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Type of api call.</td>
+</tr>
+<tr>
+<td style="text-align:left">apiVersion</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Api call version.</td>
+</tr>
+<tr>
+<td style="text-align:left">batch_key_filter</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Parameters that has been specified in the api call.It will be String of Json.</td>
+</tr>
+<tr>
+<td style="text-align:left">response_code</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Response code for the api call.</td>
+</tr>
+<tr>
+<td style="text-align:left">data</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Response which is stored in binary format.</td>
+</tr>
+<tr>
+<td style="text-align:left">moduleID</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Id of the module from which Api call was initiated.</td>
+</tr>
+<tr>
+<td style="text-align:left">moduleName</td>
+<td style="text-align:left">String</td>
+<td style="text-align:left">Name of the module from which api call was initiated.</td>
+</tr>
+<tr>
+<td style="text-align:left">organization_id</td>
+<td style="text-align:left">Long</td>
+<td style="text-align:left">Id of the workspace.</td>
+</tr>
+<tr>
+<td style="text-align:left">snap_ts</td>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">Time in which this row was inserted into the table.</td>
+</tr>
+<tr>
+<td style="text-align:left">timestamp</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Timestamp in which this row was inserted into the table.</td>
+</tr>
+<tr>
+<td style="text-align:left">Overwatch_RunID</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">GUID for the overwatch run.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-to-read-the-binary-data-which-has-been-stored-in-apieventdetails">How to read the binary data which has been stored in ApiEventDetails</h3>
+<p>The following function was introduced in version 0.8.1.0 to decode the binary data received into a readable format, which
+you can use as follows:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.utils._
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">val</span> df <span style="color:#66d9ef">=</span> <span style="color:#a6e22e">Helpers</span><span style="color:#f92672">.</span>transformBinaryDf<span style="color:#f92672">(</span>spark<span style="color:#f92672">.</span>read<span style="color:#f92672">.</span>table<span style="color:#f92672">(</span><span style="color:#e6db74">&#34;&lt;etl_db_name&gt;.apieventdetails&#34;</span><span style="color:#f92672">))</span>
+</span></span><span style="display:flex;"><span>display<span style="color:#f92672">(</span>df<span style="color:#f92672">)</span>
 </span></span></code></pre></div><h2 id="using-overwatch-data-to-enrich-realtime-monitoring">Using Overwatch Data to enrich realtime monitoring</h2>
 
 <div class="notices note" ><p>A supported <strong>TSDB</strong> (time-series database) is required to enable and integrate this. Databricks cannot provide
@@ -2368,19 +2461,19 @@ standing up / configuring the real-time infrastructure itself.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="http://localhost:1313/overwatch/js/clipboard.min.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.min.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.jquery.min.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/jquery.sticky.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/featherlight.min.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/highlight.pack.js?1715193044"></script>
+    <script src="http://localhost:1313/overwatch/js/clipboard.min.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.min.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.jquery.min.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/jquery.sticky.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/featherlight.min.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/highlight.pack.js?1715193560"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="http://localhost:1313/overwatch/js/modernizr.custom-3.6.0.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/learn.js?1715193044"></script>
-    <script src="http://localhost:1313/overwatch/js/hugo-learn.js?1715193044"></script>
+    <script src="http://localhost:1313/overwatch/js/modernizr.custom-3.6.0.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/learn.js?1715193560"></script>
+    <script src="http://localhost:1313/overwatch/js/hugo-learn.js?1715193560"></script>
 
-    <link href="http://localhost:1313/overwatch/mermaid/mermaid.css?1715193044" rel="stylesheet" />
-    <script src="http://localhost:1313/overwatch/mermaid/mermaid.js?1715193044"></script>
+    <link href="http://localhost:1313/overwatch/mermaid/mermaid.css?1715193560" rel="stylesheet" />
+    <script src="http://localhost:1313/overwatch/mermaid/mermaid.js?1715193560"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
