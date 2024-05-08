@@ -18,7 +18,7 @@ There are no mandatory changes in this release, you can simply swap the jar, and
 Now, it is recommended that you run this script, given that the changes in this release try to mitigate changes in the source 
 Databricks APIs that could lead to some data loss for some clusters details.
 
-Upgrade script: **[HTML](/assets/ChangeLog/0810_Upgrade.html) | [DBC](/assets/ChangeLog/0810_Upgrade.dbc)**
+Upgrade script: **[HTML](/assets/ChangeLog/0810_upgrade.html) | [DBC](/assets/ChangeLog/0810_upgrade.dbc)**
 
 Also, remember to upgrade the jar version used in your Optimizer job :)
 
