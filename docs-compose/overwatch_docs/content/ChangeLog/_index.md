@@ -5,6 +5,12 @@ weight: 4
 ---
 
 ## 0.8.1.0
+In this release we made some changes that address key data quality issues, to ensure we are collecting all the data 
+and to improve our parallel cluster utilization calculations. As a result of these changes, you will see more data in
+`jobruncostpotential_fact` and `clusterstatefact_gold` since we're also bringing in jobs that run on serverless compute 
+or DLT clusters.
+Now, Overwatch still doesn't support cost calculations for either serverless or DLT, but you will at least be able to see
+those jobs' performance metrics and monitor their utilization.
 
 ### Upgrading
 
