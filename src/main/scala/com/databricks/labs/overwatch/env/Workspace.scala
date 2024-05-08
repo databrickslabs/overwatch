@@ -2,17 +2,21 @@ package com.databricks.labs.overwatch.env
 
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.ApiCallV2
-import com.databricks.labs.overwatch.pipeline.PipelineFunctions
+import com.databricks.labs.overwatch.pipeline.{PipelineFunctions, Schema}
 import com.databricks.labs.overwatch.utils.Helpers.deriveRawApiResponseDF
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 
 import java.util
 import java.util.Collections
 import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.Future
 import scala.concurrent.forkjoin.ForkJoinPool
+import scala.util.{Failure, Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 /**

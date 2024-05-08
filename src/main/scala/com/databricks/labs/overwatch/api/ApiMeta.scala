@@ -160,9 +160,18 @@ trait ApiMeta {
     Map[String, String]()
   }
 
-  private[overwatch] def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
-    logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
-    Map[String, String]()
+//  private[overwatch] def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+//    logger.log(Level.INFO, s"""Needs to be override for specific API for intializing Parallel API call function""")
+//    Map[String, String]()
+//  }
+
+  private[overwatch]  def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    Map(
+      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
+      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
+      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
+      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
+    )
   }
 
   /**
@@ -173,7 +182,7 @@ trait ApiMeta {
    * @param queryMap
    * @return a string containing the api response and the meta for the api call.
    */
-  private[overwatch] def enrichAPIResponse(response: HttpResponse[String], jsonQuery: String, queryMap: Map[String, String]): String = {
+  private[overwatch] def enrichAPIResponse(response: String, resopnseCode : Int, jsonQuery: String, queryMap: Map[String, String]): String = {
     val filter: String = if (apiCallType.equals("POST")) jsonQuery else {
       val mapper = new ObjectMapper()
       mapper.registerModule(DefaultScalaModule)
@@ -184,9 +193,9 @@ trait ApiMeta {
     apiTraceabilityMeta.put("endPoint", apiName)
     apiTraceabilityMeta.put("type", apiCallType)
     apiTraceabilityMeta.put("apiVersion", apiV)
-    apiTraceabilityMeta.put("responseCode", response.code)
+    apiTraceabilityMeta.put("responseCode", resopnseCode)
     apiTraceabilityMeta.put("batchKeyFilter", filter)
-    jsonObject.put("rawResponse", response.body.trim)
+    jsonObject.put("rawResponse", response.trim)
     jsonObject.put("apiTraceabilityMeta", apiTraceabilityMeta)
     jsonObject.toString
   }
@@ -204,6 +213,7 @@ class ApiMetaFactory {
     val meta = _apiName match {
       case "jobs/list" => new JobListApi
       case "clusters/list" => new ClusterListApi
+      case "clusters/get" => new ClusterGetApi
       case "clusters/events" => new ClusterEventsApi
       case "dbfs/list" => new DbfsListApi
       case "instance-pools/list" => new InstancePoolsListApi
@@ -279,14 +289,8 @@ class SqlQueryHistoryApi extends ApiMeta {
       "filter_by.query_start_time_range.end_time_ms" ->  s"$endTime"
     )
   }
-
   private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
-    Map(
-      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
-      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
-      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
-      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
-    )
+    super.getParallelAPIParams(jsonInput)
   }
 }
 
@@ -316,6 +320,20 @@ class ClusterListApi extends ApiMeta {
   setApiCallType("GET")
 }
 
+class ClusterGetApi extends ApiMeta {
+  setDataframeColumn("cluster_name")
+  setApiCallType("GET")
+  setBatchPersist(true)
+  private[overwatch] override def getAPIJsonQuery(startValue: Long, endValue: Long, jsonInput: Map[String, String]): Map[String, String] = {
+    val clusterIDs = jsonInput.get("cluster_ids").get.split(",").map(_.trim).toArray
+    Map("cluster_id" -> s"""${clusterIDs(startValue.toInt)}"""
+    )
+  }
+
+  private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
+    super.getParallelAPIParams(jsonInput)
+  }
+}
 
 class JobListApi extends ApiMeta {
   setDataframeColumn("jobs")
@@ -334,7 +352,7 @@ class JobListApi extends ApiMeta {
   }
 }
 
-class ClusterEventsApi extends ApiMeta {
+class ClusterEventsApi extends ApiMeta{
   setPaginationKey("next_page")
   setPaginationToken("next_page")
   setDataframeColumn("events")
@@ -352,16 +370,9 @@ class ClusterEventsApi extends ApiMeta {
       "limit" -> "500"
     )
   }
-
   private[overwatch] override def getParallelAPIParams(jsonInput: Map[String, String]): Map[String, String] = {
-    Map(
-      "start_value" -> s"""${jsonInput.get("start_value").get.toLong}""",
-      "end_value" -> s"""${jsonInput.get("end_value").get.toLong}""",
-      "increment_counter" -> s"""${jsonInput.get("increment_counter").get.toLong}""",
-      "final_response_count" -> s"""${jsonInput.get("final_response_count").get.toLong}"""
-    )
+    super.getParallelAPIParams(jsonInput)
   }
-
 }
 
 class JobRunsApi extends ApiMeta {
