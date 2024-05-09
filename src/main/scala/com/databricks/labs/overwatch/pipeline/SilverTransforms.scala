@@ -10,7 +10,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 
 
-trait SilverTransforms extends SparkSessionWrapper {
+trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
   import spark.implicits._
 
@@ -1336,7 +1336,7 @@ trait SilverTransforms extends SparkSessionWrapper {
         to_json('tags).alias("tags"),
         'schedule,
         'max_concurrent_runs,
-        to_json('queue) // .alias("jobStatus_queue"),
+        to_json('queue), // .alias("jobStatus_queue"),
         'run_as_user_name,
         'timeout_seconds,
         'created_by,
@@ -1365,6 +1365,13 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val cancelAllQueuedRunsIntervals =
       jobRunsLag30D transform jobRunsDeriveCancelAllQueuedRunsIntervals
+    val intervalCount = cancelAllQueuedRunsIntervals.count.toInt
+
+    logger.log( Level.INFO, s"cancelAllQueuedRunsIntervals.count: ${intervalCount}")
+
+    cancelAllQueuedRunsIntervals
+      .showLines( intervalCount, 0, true)
+      .foreach( logger.log( Level.INFO, _))
 
     jobRunsDeriveRunsBase( jobRunsLag30D)
       .transform( jobRunsAppendClusterName( jobRunsLookups))

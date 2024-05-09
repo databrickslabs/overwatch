@@ -4,13 +4,16 @@ import com.databricks.labs.overwatch.pipeline.PipelineFunctions.fillForward
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
-import org.apache.log4j.Level
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
 
-object WorkflowsTransforms extends SparkSessionWrapper {
+
+object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
+
+  private val logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
 
@@ -804,7 +807,6 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     df.filter(
         'actionName isin "cancelAllRuns"
-          and 'all_queued_runs
           and $"response.statusCode" === 200)
       .withColumn( "is_distinct_request",
         row_number.over( requestWindow) === lit( 1))
@@ -917,34 +919,47 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
     // avoid bad column references after modification
 
-    // def matchModifiedColumn( c: String): Column =
-
     val modifiedColumns = Set(
       "requestDetails",
       "timeDetails",
       "terminalState")
 
-    val selectColumns = runsBaseWithMeta.columns map {
-      case c if modifiedColumns.contains(c) => col( c)
-      case c => col( s"runs.$c")
-    }
+    val selectColumns =
+      runsBaseWithMeta.columns map {
+        case c if modifiedColumns.contains(c) => col( c)
+        case c => col( s"runs.$c")
+      }
 
 
-    runsBaseWithMeta
-      .withColumn( "queue_enabled",
-        get_json_object('queue, "$.enabled")
-          cast BooleanType)
-      .alias( "runs")
-      .transform( joinByJobId(
-        intervals where $"jobId".isNotNull))
-      .transform( joinNullJobId(
-        intervals where $"jobId".isNull))
-      .transform( populateTimeDetails)
-      .transform( populateRequestDetails)
-      .transform( populateTerminalState)
-      .select(
-        selectColumns:_*)
-  }
+    val requestDetails =
+      runsBaseWithMeta
+        .withColumn( "queue_enabled",
+          get_json_object('queue, "$.enabled")
+            cast BooleanType)
+        .alias( "runs")
+        .transform( joinByJobId( intervals where $"jobId".isNotNull))
+        .transform( joinNullJobId( intervals where $"jobId".isNull))
+        .transform( populateTimeDetails)
+        .transform( populateRequestDetails)
+        .transform( populateTerminalState)
+
+    val debugDF =
+      requestDetails
+        .where( "runs.jobId = 903015066329560")
+        .select(
+          $"runs.jobId", $"jobRunId", $"taskRunId",
+          $"startEpochMS",
+          $"startTaskEpochMS",
+          $"intervals_by_job.cancellationTime",
+          $"intervals_null_job.cancellationTime")
+
+    debugDF
+      .showLines( debugDF.count.toInt, 0, true)
+      .foreach( logger.log( Level.INFO, _))
+
+    requestDetails.select( selectColumns:_*)
+
+    })
 
 
   def jobRunsDeriveRunsBase(df: DataFrame): DataFrame = {
