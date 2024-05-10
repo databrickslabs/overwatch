@@ -16,6 +16,7 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
   private val logger = Logger.getLogger(this.getClass)
 
   import spark.implicits._
+  import TransformationDescriber._
 
   /**
    * BEGIN Workflow generic functions
@@ -793,55 +794,60 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
     * @return
    */
 
-  def jobRunsDeriveCancelAllQueuedRunsIntervals( df: DataFrame): DataFrame = {
+  val jobRunsDeriveCancelAllQueuedRunsIntervals =
+    new NamedTransformation( (df:DataFrame) => {
 
-    val maxQueueDurationMS = lit( 48 * 60 * 60 * 1000)
+      val maxQueueDurationMS = lit( 48 * 60 * 60 * 1000)
 
-    val requestWindow = Window
-      .partitionBy( 'organization_id, 'requestId)
-      .orderBy( 'timestamp)
+      val requestWindow = Window
+        .partitionBy( 'organization_id, 'requestId)
+        .orderBy( 'timestamp)
 
-    val intervalWindow = Window
-      .partitionBy( 'organization_id, 'jobId)
-      .orderBy( 'timestamp)
+      val intervalWindow = Window
+        .partitionBy( 'organization_id, 'jobId)
+        .orderBy( 'timestamp)
 
-    df.filter(
+      df.filter(
         'actionName isin "cancelAllRuns"
           and $"response.statusCode" === 200)
-      .withColumn( "is_distinct_request",
-        row_number.over( requestWindow) === lit( 1))
-      .filter( 'is_distinct_request)
-      .select(
-        'organization_id,
-        'job_id cast "long"
-          alias "jobId",
-        greatest(
-          lag( $"timestamp", offset= 1, defaultValue= 0)
-            over intervalWindow,
-          'timestamp - maxQueueDurationMS)
-          alias "fromMS",
-        'timestamp
-          alias "untilMS",
-        lit( "Cancelled")
-          alias "cancelled",
-        'requestId
-          alias "cancellationRequestId",
-        'response
-          alias "cancellationResponse",
-        'sessionId
-          alias "cancellationSessionId",
-        'sourceIPAddress
-          alias "cancellationSourceIP",
-        'timestamp
-          alias "cancellationTime",
-        'userAgent
-          alias "cancelledUserAgent",
-        'userIdentity
-          alias "cancelledBy")
-  }
+        .withColumn( "is_distinct_request",
+          row_number.over( requestWindow) === lit( 1))
+        .filter( 'is_distinct_request)
+        .select(
+          'organization_id,
+          'job_id cast "long"
+            alias "jobId",
+          greatest(
+            lag( $"timestamp", offset= 1, defaultValue= 0)
+              over intervalWindow,
+            'timestamp - maxQueueDurationMS)
+            alias "fromMS",
+          'timestamp
+            alias "untilMS",
+          lit( "Cancelled")
+            alias "cancelled",
+          'requestId
+            alias "cancellationRequestId",
+          'response
+            alias "cancellationResponse",
+          'sessionId
+            alias "cancellationSessionId",
+          'sourceIPAddress
+            alias "cancellationSourceIP",
+          'timestamp
+            alias "cancellationTime",
+          'userAgent
+            alias "cancelledUserAgent",
+          'userIdentity
+            alias "cancelledBy")
+    })
 
 
-  def jobRunsCancelAllQueuedRuns( intervals: DataFrame)( runsBaseWithMeta: DataFrame): DataFrame = {
+
+// was  def jobRunsCancelAllQueuedRuns( intervals: DataFrame)( runsBaseWithMeta: DataFrame): DataFrame = {
+  def jobRunsCancelAllQueuedRuns( intervals: DataFrame) =
+    new NamedTransformation(
+      ( runsBaseWithMeta: DataFrame) => {
 
     val rangeJoinBinSize = 60 * 60 * 1000  // 1 hour in milliseconds
 

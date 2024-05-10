@@ -13,6 +13,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
   import spark.implicits._
+  import TransformationDescriber._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val responseSuccessFilter: Column = $"response.statusCode" === 200
@@ -1364,7 +1365,10 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
     )
 
     val cancelAllQueuedRunsIntervals =
-      jobRunsLag30D transform jobRunsDeriveCancelAllQueuedRunsIntervals
+      jobRunsLag30D
+        .transformWithDescription(
+          jobRunsDeriveCancelAllQueuedRunsIntervals)
+
     val intervalCount = cancelAllQueuedRunsIntervals.count.toInt
 
     logger.log( Level.INFO, s"cancelAllQueuedRunsIntervals.count: ${intervalCount}")
@@ -1376,7 +1380,8 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
     jobRunsDeriveRunsBase( jobRunsLag30D)
       .transform( jobRunsAppendClusterName( jobRunsLookups))
       .transform( jobRunsAppendJobMeta( jobRunsLookups))
-      .transform( jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
+      .transformWithDescription(
+        jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
       .transform( jobRunsStructifyLookupMeta( optimalCacheParts))
       .transform( jobRunsAppendTaskAndClusterDetails)
       .transform( jobRunsCleanseCreatedNestedStructures( targetKeys))
