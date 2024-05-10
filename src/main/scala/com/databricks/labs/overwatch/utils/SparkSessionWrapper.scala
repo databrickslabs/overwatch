@@ -36,19 +36,32 @@ object SparkSessionWrapper {
 }
 
 /**
- * Enables access to the Spark variable.
- * Additional logic can be added to the if statement to enable different types of spark environments
- * Common uses include DBRemote and local, driver only spark, and local docker configured spark
- */
+  * Enables access to the Spark variable.
+  *
+  * Additional logic can be added to the `if` statement to enable
+  * different types of Spark environments.
+  *
+  * Potential use cases include:
+  *
+  *   - Databricks Connect*
+  *   - local, driver-only Spark
+  *   - local, Docker-configured Spark
+  */
+
 trait SparkSessionWrapper extends Serializable {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val sessionsMap = SparkSessionWrapper.sessionsMap
 
   /**
-   * Init environment. This structure alows for multiple calls to "reinit" the environment. Important in the case of
-   * autoscaling. When the cluster scales up/down envInit and then check for current cluster cores.
-   */
+    * Initialize environment.
+    *
+    * Allows for multiple calls to reinitialize the environment.
+    *
+    * Important in the case of autoscaling.  When the cluster scales
+    * up/down apply `envInit()` and then check for current cluster
+    * cores.
+    */
   lazy protected val _envInit: Boolean = envInit()
 
 
@@ -58,25 +71,25 @@ trait SparkSessionWrapper extends Serializable {
       .appName("Overwatch - GlobalSession")
       .getOrCreate()
   }
-  /**
-   * Access to spark
-   * If testing locally or using DBConnect, the System variable "OVERWATCH" is set to "LOCAL" to make the code base
-   * behavior differently to work in remote execution AND/OR local only mode but local only mode
-   * requires some additional setup.
-   */
-  private[overwatch] def spark(globalSession : Boolean = false): SparkSession = {
 
-    if(SparkSessionWrapper.parSessionsOn){
-      if(globalSession){
+  /**
+    * Provides thread-safe access to `spark: SparkSession`.
+    */
+
+  private[overwatch] def spark( globalSession: Boolean = false): SparkSession = {
+
+    if( SparkSessionWrapper.parSessionsOn) {
+      if( globalSession) {
         buildSpark()
-      }
-      else{
+      } else {
         val currentThreadID = Thread.currentThread().getId
-        val sparkSession = sessionsMap.getOrElse(currentThreadID, buildSpark().newSession())
-        sessionsMap.put(currentThreadID, sparkSession)
+        val sparkSession = sessionsMap.getOrElse(
+          currentThreadID,
+          buildSpark().newSession())
+        sessionsMap.put( currentThreadID, sparkSession)
         sparkSession
       }
-    }else{
+    } else {
       buildSpark()
     }
   }
@@ -84,7 +97,7 @@ trait SparkSessionWrapper extends Serializable {
   @transient lazy val spark:SparkSession = spark(false)
 
   lazy val sc: SparkContext = spark.sparkContext
-//  sc.setLogLevel("WARN")
+  //  sc.setLogLevel("WARN")
 
   protected def clearThreadFromSessionsMap(): Unit ={
     sessionsMap.remove(Thread.currentThread().getId)
