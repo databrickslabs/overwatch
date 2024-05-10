@@ -28,7 +28,7 @@ class ETLDefinition(
     val transformedDF = transforms.foldLeft(verifiedSourceDF) {
       case (df, transform) =>
         df.sparkSession.sparkContext.setJobGroup(
-          module.moduleName,
+          s"${module.pipeline.config.workspaceName}:${module.moduleName}",
           transform.toString)
         df.transform( transform)
     }
