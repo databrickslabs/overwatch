@@ -549,6 +549,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
       try {
+
         val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
         if (rawDF.columns.contains("cluster_id")) {
           val outputDF = SchemaScrubber.scrubSchema(rawDF)
@@ -566,25 +567,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumnRenamed("custom_tags", "custom_tags_old")
             .selectExpr("*", "spec.custom_tags")
 
-          // Renaming KeepAlive if it exist to keepAlive
-          val normalizedDf = explodedDF.schema.fields.find(_.name == "custom_tags") match {
-            case Some(field) =>
-              field.dataType match {
-                case structType: StructType =>
-                  val newFields = structType.fields.map { structField =>
-                    if (structField.name.equalsIgnoreCase("KeepAlive")) {
-                      col(s"custom_tags.${structField.name}").as("keepAlive")
-                    } else {
-                      col(s"custom_tags.${structField.name}")
-                    }
-                  }
-                  explodedDF.select(col("*"), struct(newFields: _*).alias("new_custom_tags"))
-                    .drop("custom_tags")
-                    .withColumnRenamed("new_custom_tags", "custom_tags")
-                case _ => explodedDF // If it's not a struct, do nothing
-              }
-            case None => explodedDF // If custom_tags column doesn't exist, do nothing
-          }
+          val normalizedDf = explodedDF.withColumn("custom_tags", SchemaTools.structToMap(explodedDF, "custom_tags"))
 
           // Replace the custom_tags field inside the spec struct with custom_tags outside of spec column
           val updatedDf = normalizedDf.schema.fields.find(_.name == "spec") match {
