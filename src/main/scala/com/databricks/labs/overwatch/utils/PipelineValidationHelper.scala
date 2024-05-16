@@ -134,7 +134,7 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
   }
 
   def validateLEQOne(ruleName: String, configColumns: String): Rule = {
-    Rule(ruleName, col(configColumns) > lit(1))
+    Rule(ruleName, col(configColumns) <= lit(1))
   }
 
   def checkRunningDays(ruleName: String, configColumns: String): Rule = {
@@ -177,8 +177,13 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
     validateNullRuleSet.getRules.foreach(elem => {
       val colName = elem.inputColumn.toString.split("\\(")(1).split("\\)")(0).split(" ")(0)
       val healthCheckRuleColumn = elem.ruleName
-      val dfWithNegativeValidation = completeReportDF.filter((col(s"$healthCheckRuleColumn.passed") === false) ||
-        col(s"$healthCheckRuleColumn.passed").isNull).select(keys.map(col): _*)
+      val dfWithNegativeValidation = if (validationType == "validate_leq_one") {
+        completeReportDF.filter((col(s"$healthCheckRuleColumn.passed") === false)).select(keys.map(col): _*)
+      }else{
+         completeReportDF.filter((col(s"$healthCheckRuleColumn.passed") === false) ||
+          col(s"$healthCheckRuleColumn.passed").isNull).select(keys.map(col): _*)
+      }
+
       val countOfNegativeValidation = dfWithNegativeValidation.count()
       if (validationType.toLowerCase() == "validate_not_required"){
         val healthCheckMsg = s"Validation is not required for ${table_name} for Overwatch_RunID ${Overwatch_RunID}. The Table doesn't contain any data"
@@ -315,7 +320,10 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
           tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero", Overwatch_RunID)
 
         (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
-          RuleSet(clsf_df.where("cluster_name is not null").where("databricks_billable is true")).add(validateRules(4)),
+          RuleSet(clsf_df.where("cluster_name is not null")
+            .where("databricks_billable is true")
+            .where("custom_tags not like '%SqlEndpointId%'")
+            .where("unixTimeMS_state_end > unixTimeMS_state_start")).add(validateRules(4)),
           tableName, key, validationStatus, quarantineStatus, "validate_greater_than_zero", Overwatch_RunID)
 
         (validationStatus, quarantineStatus) == validateRuleAndUpdateStatus(
