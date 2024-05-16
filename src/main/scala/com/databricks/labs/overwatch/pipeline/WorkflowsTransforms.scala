@@ -943,11 +943,11 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
           get_json_object('queue, "$.enabled")
             cast BooleanType)
         .alias( "runs")
-        .transform( joinByJobId( intervals where $"jobId".isNotNull))
-        .transform( joinNullJobId( intervals where $"jobId".isNull))
-        .transform( populateTimeDetails)
-        .transform( populateRequestDetails)
-        .transform( populateTerminalState)
+        .transformWithDescription( joinByJobId( intervals where $"jobId".isNotNull))
+        .transformWithDescription( joinNullJobId( intervals where $"jobId".isNull))
+        .transformWithDescription( populateTimeDetails)
+        .transformWithDescription( populateRequestDetails)
+        .transformWithDescription( populateTerminalState)
 
     val debugDF =
       requestDetails

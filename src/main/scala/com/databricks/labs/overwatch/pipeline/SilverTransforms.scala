@@ -1254,11 +1254,11 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     jobStatusDeriveJobsStatusBase(jobsBase)
-      .transform(jobStatusLookupJobMeta(jobSnapLookup))
-      .transform(jobStatusDeriveBaseLookupAndFillForward(lastJobStatus))
-      .transform(jobStatusStructifyJsonCols(optimalCacheParts))
-      .transform(jobStatusCleanseForPublication(targetKeys, optimalCacheParts))
-      .transform(
+      .transformWithDescription( jobStatusLookupJobMeta(jobSnapLookup))
+      .transformWithDescription( jobStatusDeriveBaseLookupAndFillForward(lastJobStatus))
+      .transformWithDescription( jobStatusStructifyJsonCols(optimalCacheParts))
+      .transformWithDescription( jobStatusCleanseForPublication(targetKeys, optimalCacheParts))
+      .transformWithDescription(
         jobStatusFirstRunImputeFromSnap(
           isFirstRunAndJobsSnapshotHasRecords,
           jobsBaseHasRecords,
@@ -1378,13 +1378,13 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .foreach( logger.log( Level.INFO, _))
 
     jobRunsDeriveRunsBase( jobRunsLag30D)
-      .transform( jobRunsAppendClusterName( jobRunsLookups))
-      .transform( jobRunsAppendJobMeta( jobRunsLookups))
+      .transformWithDescription( jobRunsAppendClusterName( jobRunsLookups))
+      .transformWithDescription( jobRunsAppendJobMeta( jobRunsLookups))
       .transformWithDescription(
         jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
-      .transform( jobRunsStructifyLookupMeta( optimalCacheParts))
-      .transform( jobRunsAppendTaskAndClusterDetails)
-      .transform( jobRunsCleanseCreatedNestedStructures( targetKeys))
+      .transformWithDescription( jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transformWithDescription( jobRunsAppendTaskAndClusterDetails)
+      .transformWithDescription( jobRunsCleanseCreatedNestedStructures( targetKeys))
       .drop( "timestamp")
 
     // `timestamp` could be duplicated to enable `asOf` lookups; dropping to clean up
@@ -1424,7 +1424,7 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     deriveInputForWarehouseBase(df,silver_warehouse_spec,auditBaseCols)
-    .transform(deriveWarehouseBase())
-      .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
+      .transformWithDescription( deriveWarehouseBase())
+      .transformWithDescription( deriveWarehouseBaseFilled( isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
   }
 }
