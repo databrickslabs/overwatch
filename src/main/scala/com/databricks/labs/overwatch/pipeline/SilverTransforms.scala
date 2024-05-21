@@ -1254,19 +1254,22 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
     jobStatusDeriveJobsStatusBase(jobsBase)
-      .transformWithDescription( jobStatusLookupJobMeta(jobSnapLookup))
-      .transformWithDescription( jobStatusDeriveBaseLookupAndFillForward(lastJobStatus))
-      .transformWithDescription( jobStatusStructifyJsonCols(optimalCacheParts))
-      .transformWithDescription( jobStatusCleanseForPublication(targetKeys, optimalCacheParts))
-      .transformWithDescription(
+      .transform(
+        jobStatusLookupJobMeta( jobSnapLookup))
+      .transform(
+        jobStatusDeriveBaseLookupAndFillForward( lastJobStatus))
+      .transform(
+        jobStatusStructifyJsonCols( optimalCacheParts))
+      .transform(
+        jobStatusCleanseForPublication( targetKeys, optimalCacheParts))
+      .transform(
         jobStatusFirstRunImputeFromSnap(
           isFirstRunAndJobsSnapshotHasRecords,
           jobsBaseHasRecords,
           jobsSnapshotDFComplete,
           fromTime,
-          tempWorkingDir
-        )
-      )
+          tempWorkingDir))
+
   }
 
   /**
@@ -1378,13 +1381,18 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .foreach( logger.log( Level.INFO, _))
 
     jobRunsDeriveRunsBase( jobRunsLag30D)
-      .transformWithDescription( jobRunsAppendClusterName( jobRunsLookups))
-      .transformWithDescription( jobRunsAppendJobMeta( jobRunsLookups))
+      .transformWithDescription(
+        jobRunsAppendClusterName( jobRunsLookups))
+      .transformWithDescription(
+        jobRunsAppendJobMeta( jobRunsLookups))
       .transformWithDescription(
         jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
-      .transformWithDescription( jobRunsStructifyLookupMeta( optimalCacheParts))
-      .transformWithDescription( jobRunsAppendTaskAndClusterDetails)
-      .transformWithDescription( jobRunsCleanseCreatedNestedStructures( targetKeys))
+      .transformWithDescription(
+        jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transformWithDescription(
+        jobRunsAppendTaskAndClusterDetails)
+      .transformWithDescription(
+        jobRunsCleanseCreatedNestedStructures( targetKeys))
       .drop( "timestamp")
 
     // `timestamp` could be duplicated to enable `asOf` lookups; dropping to clean up
@@ -1424,7 +1432,7 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
 
     deriveInputForWarehouseBase(df,silver_warehouse_spec,auditBaseCols)
-      .transformWithDescription( deriveWarehouseBase())
-      .transformWithDescription( deriveWarehouseBaseFilled( isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
+      .transform( deriveWarehouseBase())
+      .transform( deriveWarehouseBaseFilled( isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
   }
 }
