@@ -6,11 +6,11 @@ object TransformationDescriber {
 
   class NamedTransformation[T,U](
     val transformation: Dataset[T] => Dataset[U])(
-    implicit _name: sourcecode.Name) {
+    implicit name: sourcecode.Name) {
 
-    def name = _name.value
+    // def name = name.value
 
-    override def toString = s"${sourcecode.Name} ${_name.value}"
+    override def toString = s"NamedTransformation ${name.value}"
 
   }
 
@@ -18,9 +18,9 @@ object TransformationDescriber {
   object NamedTransformation {
 
     def apply[T,U](
-      t: Dataset[T] => Dataset[U])(
-      implicit _name: sourcecode.Name) =
-      new NamedTransformation( t)( _name)
+      transformation: Dataset[T] => Dataset[U])(
+      implicit name: sourcecode.Name) =
+      new NamedTransformation( transformation)( name)
 
   }
 
@@ -31,14 +31,14 @@ object TransformationDescriber {
       namedTransformation: NamedTransformation[T,U])(
       implicit
         // enclosing: sourcecode.Enclosing,
-        _name: sourcecode.Name,
-        _fileName: sourcecode.FileName,
-        _line: sourcecode.Line
+        name: sourcecode.Name,
+        fileName: sourcecode.FileName,
+        line: sourcecode.Line
     ): Dataset[U] = {
 
       // println( s"Inside TransformationDescriber.transformWithDescription: $enclosing")
 
-      val callSite =  s"${_name.value} at ${_fileName.value}:${_line.value}"
+      val callSite =  s"${name.value} at ${fileName.value}:${line.value}"
 
       val sc = ds.sparkSession.sparkContext
       sc.setJobDescription( namedTransformation.toString)
