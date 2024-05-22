@@ -4,6 +4,20 @@ date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
 
+## 0.8.1.1 (PATCH)
+Patch for 0.8.1.0. Fixes a [regression introduced in 0.8.1.0](https://github.com/databrickslabs/overwatch/pull/1219)
+for clusterSnapshotBronze. 
+This patch also adds a validation rule so that the driver workspace doesn't specify a sql_endpoint
+in the configuration file.
+
+* **If you did not run 0810**, you can simply swap the jar.
+* **If you previously ran 0.8.1.0 you must run the following repair script** to correct data in clusters_snapshot_bronze.
+  If you don't you might receive schema merge errors in clusterSnapshot bronze module. 
+  * [HTML](/assets/ChangeLog/0811_clustersSnapshotSchemaRepair.html) | [DBC](/assets/ChangeLog/0811_clustersSnapshotSchemaRepair.dbc)
+
+Released May 22nd, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/34?closed=1)
+
+------------------------------------------------------------------------------------------------
 ## 0.8.1.0
 In this release we made some changes that address key data quality issues, to ensure we are collecting all the data 
 and to improve our parallel cluster utilization calculations. As a result of these changes, you will see more data in
