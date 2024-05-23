@@ -4,6 +4,7 @@ import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import org.apache.spark.sql.DataFrame
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.GivenWhenThen
+import java.io.ByteArrayOutputStream
 
 class TransformationDescriberTest
     extends AnyFunSpec
@@ -18,9 +19,15 @@ class TransformationDescriberTest
 
   val nt = NamedTransformation( t)
 
+  // TODO: replace use of `s` and `Console.withOut` with an abstraction
+
+  val s = new ByteArrayOutputStream
+
   describe( "A NamedTransformation") {
 
     it( "wraps a function literal") {
+
+      info( s"nt.transformation: ${nt.transformation}")
 
       assert( nt.transformation === t)
 
@@ -28,7 +35,11 @@ class TransformationDescriberTest
 
     it( "knows its own name") {
 
+      info( s"`nt.name`: ${nt.name}")
+      info( s"`nt.toString`: ${nt.toString}")
+
       assert( nt.name === "nt")
+      assert( nt.toString === "NamedTransformation nt")
 
     }
 
@@ -36,15 +47,42 @@ class TransformationDescriberTest
 
     val in = Seq( ("foo", "bar")).toDF( "foo", "bar")
 
+    Console.withOut( s) {
+      in.show(numRows= 1, truncate= 0, vertical= true)
+    }
+    // info( s.toString)
+    s.toString.linesIterator.foreach( info(_))
+    s.reset
 
     When( "a `NamedTransformation` is applied")
 
     val out = in.transformWithDescription( nt)
 
+    // val s = new ByteArrayOutputStream
+    Console.withOut( s) {
+      out.show(numRows= 1, truncate= 0, vertical= true)
+    }
+    // info( s.toString)
+    s.toString.linesIterator.foreach( info(_))
+
+
 
     Then( "the resulting Spark jobs have a matching description (pending)")
 
-    // spark.sc.
+    // info( s"""spark.jobGroup.id: ${out.sparkSession.sparkContext.getLocalProperty( "spark.jobGroup.id")}""")
+
+    val sjd = out.sparkSession.sparkContext.getLocalProperty( "spark.job.description")
+
+    info( s"spark.job.description: ${sjd}")
+
+    assert( sjd === "NamedTransformation nt")
+
+    // info( s"""spark.callSite.short: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.short")}""")
+    // info( s"""spark.callSite.long: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.long")}""")
+
+    
+
+
 
 
     And( "the result of the transformation is correct")
