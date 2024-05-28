@@ -10,7 +10,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 
 
-trait SilverTransforms extends SparkSessionWrapper {
+trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
   import TransformationDescriber._
   import spark.implicits._
@@ -1313,6 +1313,15 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // eagerly force this highly reused DF into cache()
     jobRunsLag30D.count()
+
+    
+    // TODO: remove or comment out or change log level or . . .
+
+    logger.log( Level.INFO, "Showing first 5 rows of `jobRunsLag30D`:")
+
+    jobRunsLag30D
+      .showLines(5, 20, true)
+      .foreach( logger.log( Level.INFO, _))
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSpecNameLookup = clusterSpec.asDF
