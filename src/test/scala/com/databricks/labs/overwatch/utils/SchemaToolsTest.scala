@@ -270,8 +270,8 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
 
       val expectedResString = "`b_2_2_2` STRUCT<`abc`: STRING, `c_1__45`: BIGINT>,`exception_parent` " +
         "STRUCT<`dup1`: BIGINT, `dup2`: BIGINT, `xyz`: STRUCT<`_mixed`: BIGINT, `_bad`: BIGINT, " +
-        "`dup1_UNIQUESUFFIX_95946320`: BIGINT, `dup1_UNIQUESUFFIX_95946320`: BIGINT, `dup2_UNIQUESUFFIX_3095059`: " +
-        "BIGINT, `dup2_UNIQUESUFFIX_3095059`: STRING, `good_col`: BIGINT, `jkl`: BIGINT, `otherexcept`: BIGINT>, " +
+        "`dup1_UNIQUESUFFIX_95946320_1`: BIGINT, `dup1_UNIQUESUFFIX_95946320_2`: BIGINT, `dup2_UNIQUESUFFIX_3095059_1`: " +
+        "BIGINT, `dup2_UNIQUESUFFIX_3095059_2`: STRING, `good_col`: BIGINT, `jkl`: BIGINT, `otherexcept`: BIGINT>, " +
         "`zyx`: BIGINT>,`i_1` BIGINT,`parentwspace` STRING,`validParent` STRING"
       val ddlFromLogic = df.scrubSchema(exceptionScrubber).schema.toDDL
       assertResult(expectedResString) {
