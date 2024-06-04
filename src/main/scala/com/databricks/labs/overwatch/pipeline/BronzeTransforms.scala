@@ -4,7 +4,7 @@ import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
-import com.databricks.labs.overwatch.pipeline.Schema.{clusterSnapMinimumSchema, temp_clusterSnapMinimumSchema}
+import com.databricks.labs.overwatch.pipeline.Schema.{clusterSnapMinimumSchema, custom_tags_Schema}
 import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{getJobsBase, workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
@@ -552,25 +552,36 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
         val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
         if (rawDF.columns.contains("cluster_id")) {
-          val outputDF = SchemaScrubber.scrubSchema(rawDF)
-          val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
-            .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
-            .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
-            .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
-            .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
-            .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
-            .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
+          val scrubbedDF = SchemaScrubber.scrubSchema(rawDF)
+          val df = scrubbedDF
+            .withColumn("default_tags", SchemaTools.structToMap(scrubbedDF, "default_tags"))
+            .withColumn("custom_tags", SchemaTools.structToMap(scrubbedDF, "custom_tags"))
+            .withColumn("spark_conf", SchemaTools.structToMap(scrubbedDF, "spark_conf"))
+            .withColumn("spark_env_vars", SchemaTools.structToMap(scrubbedDF, "spark_env_vars"))
+            .withColumn(s"aws_attributes", SchemaTools.structToMap(scrubbedDF, s"aws_attributes"))
+            .withColumn(s"azure_attributes", SchemaTools.structToMap(scrubbedDF, s"azure_attributes"))
+            .withColumn(s"gcp_attributes", SchemaTools.structToMap(scrubbedDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
-            .verifyMinimumSchema(temp_clusterSnapMinimumSchema)
 
-          val explodedDF = finalDF
+          val specSchema = df.schema("spec").dataType.asInstanceOf[StructType]
+          val customTagsExists = specSchema.fieldNames.contains("custom_tags")
+
+          val updatedDf = if (!customTagsExists) {
+            val existingStructFields = df.schema("spec").dataType.asInstanceOf[StructType].fields.map(f => col(s"spec.${f.name}"))
+            val newField = lit(null).cast(custom_tags_Schema).as("custom_tags")
+            df.withColumn("spec", struct(existingStructFields :+ newField: _*))
+          } else {
+            df
+          }
+
+          val explodedDF = updatedDf
             .withColumnRenamed("custom_tags", "custom_tags_old")
             .selectExpr("*", "spec.custom_tags")
 
           val normalizedDf = explodedDF.withColumn("custom_tags", SchemaTools.structToMap(explodedDF, "custom_tags"))
 
           // Replace the custom_tags field inside the spec struct with custom_tags outside of spec column
-          val updatedDf = normalizedDf.schema.fields.find(_.name == "spec") match {
+          val finalDF = normalizedDf.schema.fields.find(_.name == "spec") match {
             case Some(field) =>
               field.dataType match {
                 case structType: StructType =>
@@ -589,7 +600,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             case None => normalizedDf // No action if the specified structColName does not exist
           }
 
-          updatedDf.drop("custom_tags")
+          finalDF.drop("custom_tags")
             .withColumnRenamed("custom_tags_old", "custom_tags")
             .verifyMinimumSchema(clusterSnapMinimumSchema)
 
@@ -606,10 +617,10 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def landClusterSnapshot(clusterIDs: Array[String],
-                                pipelineSnapTime: Long,
-                                tmpClusterSnapSuccessPath: String,
-                                tmpClusterSnapErrorPath: String,
-                                config: Config) : String = {
+                                  pipelineSnapTime: Long,
+                                  tmpClusterSnapSuccessPath: String,
+                                  tmpClusterSnapErrorPath: String,
+                                  config: Config) : String = {
     val finalResponseCount = clusterIDs.length
     val clusterEventsEndpoint = "clusters/get"
 
@@ -665,7 +676,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
         logger.log(Level.ERROR, errMsg)
         throw e
     }
-     if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
+    if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
         deriveRawApiResponseDF(spark.read.json(tmpClusterEventsErrorPath))
           .withColumn("from_ts", toTS(col("from_epoch")))
@@ -1084,7 +1095,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
       .join(incrementalClusterIDs.hint("SHUFFLE_HASH"), Seq("cluster_id"))
       .withColumn("cluster_log_conf",
         coalesce(get_json_object('cluster_log_conf, "$.dbfs"), get_json_object('cluster_log_conf, "$.s3")))
-//      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
+      //      .withColumn("cluster_log_conf", get_json_object('cluster_log_conf, "$.destination"))
       .withColumn("cluster_log_conf",
         fetchClusterLogConfiguration(cloudProvider, get_json_object('cluster_log_conf, "$.destination"),
           isMultiWorkSpaceDeployment, organisationId))
@@ -1115,20 +1126,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
     // /some/log/prefix/cluster_id/eventlog
     val allEventLogPrefixes =
     if(isMultiWorkSpaceDeployment && organisationId != Initializer.getOrgId(Some(apiEnv.workspaceURL))) {
-        if(newLogDirsNotIdentifiedInAudit.isEmpty){
-          getAllEventLogPrefix(incrementalClusterWLogging, apiEnv).select('wildPrefix).distinct()
-        }else{
-          getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
-            .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
-        }
+      if(newLogDirsNotIdentifiedInAudit.isEmpty){
+        getAllEventLogPrefix(incrementalClusterWLogging, apiEnv).select('wildPrefix).distinct()
+      }else{
+        getAllEventLogPrefix(newLogDirsNotIdentifiedInAudit
+          .unionByName(incrementalClusterWLogging), apiEnv).select('wildPrefix).distinct()
+      }
 
     } else {
-       val allEvent = if(newLogDirsNotIdentifiedInAudit.isEmpty){
-         newLogDirsNotIdentifiedInAudit
-        }else{
-         newLogDirsNotIdentifiedInAudit
-           .unionByName(incrementalClusterWLogging)
-       }
+      val allEvent = if(newLogDirsNotIdentifiedInAudit.isEmpty){
+        newLogDirsNotIdentifiedInAudit
+      }else{
+        newLogDirsNotIdentifiedInAudit
+          .unionByName(incrementalClusterWLogging)
+      }
       allEvent.withColumn("cluster_log_conf",removeTrailingSlashes('cluster_log_conf))
         .withColumn("topLevelTargets", array(col("cluster_log_conf"), col("cluster_id"), lit("eventlog")))
         .withColumn("wildPrefix", concat_ws("/", 'topLevelTargets))
@@ -1195,12 +1206,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   private def fetchDatafromSystemTableAuditLog(
-                                        fromTimeSysTableCompatible: String,
-                                        untilTimeSysTableCompatible: String,
-                                        organizationId: String,
-                                        auditLogConfig: AuditLogConfig,
-                                        apiEnv: ApiEnv
-                                       ): DataFrame = {
+                                                fromTimeSysTableCompatible: String,
+                                                untilTimeSysTableCompatible: String,
+                                                organizationId: String,
+                                                auditLogConfig: AuditLogConfig,
+                                                apiEnv: ApiEnv
+                                              ): DataFrame = {
     try {
       if(auditLogConfig.sqlEndpoint.getOrElse("").nonEmpty) {
         val host = apiEnv.workspaceURL.stripPrefix("https://").stripSuffix("/")
@@ -1235,12 +1246,12 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
 
   def getAuditLogsDfFromSystemTables(
-                               fromTime: LocalDateTime,
-                               untilTime: LocalDateTime,
-                               organizationId: String,
-                               auditLogConfig: AuditLogConfig,
-                               apiEnv: ApiEnv
-                             ): DataFrame = {
+                                      fromTime: LocalDateTime,
+                                      untilTime: LocalDateTime,
+                                      organizationId: String,
+                                      auditLogConfig: AuditLogConfig,
+                                      apiEnv: ApiEnv
+                                    ): DataFrame = {
     try {
       println(s"Fetching data from system.access.audit for workspace_id - ${organizationId}")
       val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
@@ -1251,11 +1262,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
       println(s"system.access.audit untilTime - ${untilTimeSysTableCompatible}")
 
       val rawSystemTableFiltered = fetchDatafromSystemTableAuditLog(fromTimeSysTableCompatible,
-                                                                    untilTimeSysTableCompatible,
-                                                                    organizationId,
-                                                                    auditLogConfig,
-                                                                    apiEnv
-                                                                    )
+        untilTimeSysTableCompatible,
+        organizationId,
+        auditLogConfig,
+        apiEnv
+      )
 
       if (rawSystemTableFiltered.isEmpty) {
         val message = s"No Data present in system.access.audit for organizationId: $organizationId " +
@@ -1271,34 +1282,34 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
 
       val auditLogFromSysTable = SchemaTools.snakeToCamel(rawSystemTableFiltered)
-          .withColumn("organization_id", col("workspaceID"))
-          .withColumnRenamed("eventDate", "date")
-          .withColumn("timestamp", (col("eventTime").cast("double") * 1000).cast("long"))
-          .withColumn("requestParamsString", deriveRequestParams)
-          .drop("requestParams", "eventTime")
+        .withColumn("organization_id", col("workspaceID"))
+        .withColumnRenamed("eventDate", "date")
+        .withColumn("timestamp", (col("eventTime").cast("double") * 1000).cast("long"))
+        .withColumn("requestParamsString", deriveRequestParams)
+        .drop("requestParams", "eventTime")
 
       // if sql endpoint is not empty, the audit log data will be derived from extenal system tables
       // then userIdentity and response cols needs to be converted to struct from string
       val deriveUserIdentity = if(isSqlEndpointEmpty) col("userIdentity")
-        else structFromJson(spark, auditLogFromSysTable, "userIdentity")
+      else structFromJson(spark, auditLogFromSysTable, "userIdentity")
       val deriveResponse = if(isSqlEndpointEmpty) col("response")
-        else structFromJson(spark, auditLogFromSysTable, "response")
+      else structFromJson(spark, auditLogFromSysTable, "response")
 
       val auditLogFromSysTableToStruct = auditLogFromSysTable
-          .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
-          .withColumn("userIdentity", deriveUserIdentity)
-          .withColumn("response", deriveResponse)
-          .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
-          .verifyMinimumSchema(Schema.auditMasterSchema)
-          .drop("requestParamsString")
-          .withColumn("response", $"response".withField("statusCode",
-            coalesce($"response.statusCode", $"response.status_code".cast(LongType))))
-          .withColumn("response", $"response".withField("errorMessage",
-            coalesce($"response.errorMessage", $"response.error_message")))
-         .withColumn("response", struct($"response.statusCode", $"response.errorMessage", $"response.result"))
+        .withColumn("requestParams", structFromJson(spark, auditLogFromSysTable, "requestParamsString"))
+        .withColumn("userIdentity", deriveUserIdentity)
+        .withColumn("response", deriveResponse)
+        .withColumn("hashKey", xxhash64('organization_id, 'timestamp, 'serviceName, 'actionName, 'requestId, 'requestParamsString))
+        .verifyMinimumSchema(Schema.auditMasterSchema)
+        .drop("requestParamsString")
+        .withColumn("response", $"response".withField("statusCode",
+          coalesce($"response.statusCode", $"response.status_code".cast(LongType))))
+        .withColumn("response", $"response".withField("errorMessage",
+          coalesce($"response.errorMessage", $"response.error_message")))
+        .withColumn("response", struct($"response.statusCode", $"response.errorMessage", $"response.result"))
 
       auditLogFromSysTableToStruct
-  } catch {
+    } catch {
       case e: org.apache.spark.sql.AnalysisException =>
         throw new Exception(s"Issues while fetching data from table system.access.audit: ${e.getMessage}")
       case e: Exception => throw e
@@ -1307,13 +1318,13 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
 
   def getAuditLogsDfFromCloud(auditLogConfig: AuditLogConfig,
-                     cloudProvider: String,
-                     fromTime: LocalDateTime,
-                     untilTime: LocalDateTime,
-                     auditRawLand: PipelineTable,
-                     overwatchRunID: String,
-                     organizationId: String
-                    ): DataFrame = {
+                              cloudProvider: String,
+                              fromTime: LocalDateTime,
+                              untilTime: LocalDateTime,
+                              auditRawLand: PipelineTable,
+                              overwatchRunID: String,
+                              organizationId: String
+                             ): DataFrame = {
     val fromDT = fromTime.toLocalDate
     val untilDT = untilTime.toLocalDate
     if (cloudProvider == "azure") {

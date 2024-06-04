@@ -294,7 +294,7 @@ object Schema extends SparkSessionWrapper {
             StructField("ExecutorID",StringType, nullable = true),
             StructField("Host",StringType, nullable = true),
             StructField("Port",LongType, nullable = true)
-        )), nullable = true),
+          )), nullable = true),
         StructField("ClassName", StringType, nullable = true),
         StructField("Description", StringType, nullable = true),
         StructField("FullStackTrace", StringType, nullable = true),
@@ -477,11 +477,11 @@ object Schema extends SparkSessionWrapper {
   ))
 
   val minimumAccessControlListSchema: ArrayType = ArrayType(
-      StructType(Seq(
-        StructField("user_name",StringType, nullable = true),
-        StructField("group_name",StringType, nullable = true),
-        StructField("permission_level",StringType, nullable = true),
-      ))
+    StructType(Seq(
+      StructField("user_name",StringType, nullable = true),
+      StructField("group_name",StringType, nullable = true),
+      StructField("permission_level",StringType, nullable = true),
+    ))
     , containsNull = true)
 
   val minimumGrantsSchema: ArrayType = ArrayType(
@@ -636,7 +636,7 @@ object Schema extends SparkSessionWrapper {
     StructField("s3", s3LogSchema, true)
   ))
 
-  private val temp_custom_tags_Schema = StructType(Seq(
+  val custom_tags_Schema = StructType(Seq(
     StructField("JobId", StringType, nullable = true),
     StructField("ResourceClass", StringType, nullable = true),
     StructField("RunName", BooleanType, nullable = true),
@@ -646,55 +646,9 @@ object Schema extends SparkSessionWrapper {
     StructField("workflow", StringType, nullable = true)
   ))
 
-  private val temp_specSchema: StructType = StructType(Seq(
-    StructField("custom_tags", temp_custom_tags_Schema, true)
-  ))
-
   private val specSchema = StructType(Seq(
     StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
   ))
-
-
-  // Temporary Spec Schema
-  val temp_clusterSnapMinimumSchema: StructType = StructType(Seq(
-    StructField("autoscale",
-      StructType(Seq(
-        StructField("max_workers", LongType, nullable = true),
-        StructField("min_workers", LongType, nullable = true)
-      )), nullable = true),
-    StructField("autotermination_minutes", LongType, nullable = true),
-    StructField("cluster_id", StringType, nullable = true),
-    StructField("cluster_log_conf", logConfSchema, nullable = true),
-    StructField("cluster_name", StringType, nullable = true),
-    StructField("cluster_source", StringType, nullable = true),
-    StructField("creator_user_name", StringType, nullable = true),
-    StructField("driver_instance_pool_id", StringType, nullable = true),
-    StructField("driver_node_type_id", StringType, nullable = true),
-    StructField("enable_elastic_disk", BooleanType, nullable = true),
-    StructField("enable_local_disk_encryption", BooleanType, nullable = true),
-    StructField("instance_pool_id", StringType, nullable = true),
-    StructField("init_scripts", ArrayType(StructType(Seq(
-      StructField("dbfs", StructType(Seq(
-        StructField("destination", StringType, nullable = true)
-      )), nullable = true)
-    )), containsNull = true), nullable = true),
-    StructField("node_type_id", StringType, nullable = true),
-    StructField("num_workers", LongType, nullable = true),
-    StructField("single_user_name", StringType, nullable = true),
-    StructField("spark_version", StringType, nullable = true),
-    StructField("runtime_engine", StringType, nullable = true),
-    StructField("state", StringType, nullable = true),
-    StructField("default_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
-    StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
-    StructField("spec", temp_specSchema, nullable = true),
-    StructField("start_time", LongType, nullable = true),
-    StructField("terminated_time", LongType, nullable = true),
-    StructField("organization_id", StringType, nullable = false),
-    StructField("Pipeline_SnapTS", TimestampType, nullable = true),
-    StructField("Overwatch_RunID", StringType, nullable = true),
-    StructField("workspace_name", StringType, nullable = true)
-  ))
-
 
   val clusterSnapMinimumSchema: StructType = StructType(Seq(
     StructField("autoscale",
