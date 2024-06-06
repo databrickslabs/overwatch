@@ -636,20 +636,6 @@ object Schema extends SparkSessionWrapper {
     StructField("s3", s3LogSchema, true)
   ))
 
-  val custom_tags_Schema = StructType(Seq(
-    StructField("JobId", StringType, nullable = true),
-    StructField("ResourceClass", StringType, nullable = true),
-    StructField("RunName", BooleanType, nullable = true),
-    StructField("SqlEndpointId", StringType, nullable = true),
-    StructField("databricks_cloud_priority", StringType, nullable = true),
-    StructField("dbsql_channel", StringType, nullable = true),
-    StructField("workflow", StringType, nullable = true)
-  ))
-
-  private val specSchema = StructType(Seq(
-    StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true)
-  ))
-
   val clusterSnapMinimumSchema: StructType = StructType(Seq(
     StructField("autoscale",
       StructType(Seq(
@@ -680,7 +666,6 @@ object Schema extends SparkSessionWrapper {
     StructField("state", StringType, nullable = true),
     StructField("default_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
     StructField("custom_tags", MapType(StringType, StringType, valueContainsNull = true), nullable = true),
-    StructField("spec", specSchema, nullable = true),
     StructField("start_time", LongType, nullable = true),
     StructField("terminated_time", LongType, nullable = true),
     StructField("organization_id", StringType, nullable = false),
