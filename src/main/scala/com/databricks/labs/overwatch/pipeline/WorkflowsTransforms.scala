@@ -768,145 +768,147 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       .agg(collect_list('repair_details).alias("repair_details"))
   }
 
-  def jobRunsDeriveRunsBase(df: DataFrame, etlUntilTime: TimeTypes): DataFrame = {
+  val jobRunsDeriveRunsBase = (etlUntilTime: TimeTypes) => NamedTransformation {
+    (df: DataFrame) => {
 
-    val arrayStringSchema = ArrayType(StringType, containsNull = true)
-    val firstTaskRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId, 'taskRunId).orderBy('timestamp)
-    val firstJobRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId).orderBy('timestamp)
-    val firstRunSemanticsW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
+      val arrayStringSchema = ArrayType(StringType, containsNull = true)
+      val firstTaskRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId, 'taskRunId).orderBy('timestamp)
+      val firstJobRunSemanticsW = Window.partitionBy('organization_id, 'jobRunId).orderBy('timestamp)
+      val firstRunSemanticsW = Window.partitionBy('organization_id, 'runId).orderBy('timestamp)
 
-    // Completes must be >= etlStartTime as it is the driver endpoint
-    // All joiners to Completes may be from the past up to N days as defined in the incremental df
-    // Identify all completed jobs in scope for this overwatch run
-    val allCompletes = jobRunsDeriveCompletedRuns(df, firstTaskRunSemanticsW)
+      // Completes must be >= etlStartTime as it is the driver endpoint
+      // All joiners to Completes may be from the past up to N days as defined in the incremental df
+      // Identify all completed jobs in scope for this overwatch run
+      val allCompletes = jobRunsDeriveCompletedRuns(df, firstTaskRunSemanticsW)
 
-    // CancelRequests are still lookups from the driver "complete" as a cancel request is a request and still
-    // results in a runFailed after the cancellation
-    // Identify all cancelled jobs in scope for this overwatch run
-    val allCancellations = jobRunsDeriveCancelledRuns(df, firstRunSemanticsW)
+      // CancelRequests are still lookups from the driver "complete" as a cancel request is a request and still
+      // results in a runFailed after the cancellation
+      // Identify all cancelled jobs in scope for this overwatch run
+      val allCancellations = jobRunsDeriveCancelledRuns(df, firstRunSemanticsW)
 
-    // DF for jobs launched with actionName == "runNow"
-    // Lookback 30 days for laggard starts prior to current run
-    // only field from runNow that we care about is the response.result.runId
-    val runNowStart = jobRunsDeriveRunsLaunched(df, firstJobRunSemanticsW, arrayStringSchema)
+      // DF for jobs launched with actionName == "runNow"
+      // Lookback 30 days for laggard starts prior to current run
+      // only field from runNow that we care about is the response.result.runId
+      val runNowStart = jobRunsDeriveRunsLaunched(df, firstJobRunSemanticsW, arrayStringSchema)
 
-    val runTriggered = jobRunsDeriveRunsTriggered(df, firstJobRunSemanticsW)
+      val runTriggered = jobRunsDeriveRunsTriggered(df, firstJobRunSemanticsW)
 
-    /**
-     * These are runs submitted using the "submitRun" API endpoint. These runs will have no corresponding job
-     * since the job was never scheduled. The entire definition of the job and the cluster must be sumitted
-     * in this API call. Does not reference an existing job_id present in the jobsStatus Target
-     */
-    val runSubmitStart = jobRunsDeriveSubmittedRuns(df, firstJobRunSemanticsW)
+      /**
+       * These are runs submitted using the "submitRun" API endpoint. These runs will have no corresponding job
+       * since the job was never scheduled. The entire definition of the job and the cluster must be sumitted
+       * in this API call. Does not reference an existing job_id present in the jobsStatus Target
+       */
+      val runSubmitStart = jobRunsDeriveSubmittedRuns(df, firstJobRunSemanticsW)
 
-    // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
-    val allSubmissions = runNowStart
-      .unionByName(runTriggered, allowMissingColumns = true)
-      .unionByName(runSubmitStart, allowMissingColumns = true)
+      // DF to pull unify differing schemas from runNow and submitRun and pull all job launches into one DF
+      val allSubmissions = runNowStart
+        .unionByName(runTriggered, allowMissingColumns = true)
+        .unionByName(runSubmitStart, allowMissingColumns = true)
 
-    // Find the corresponding runStart action for the completed jobs
-    // Lookback 30 days for laggard starts prior to current run
-    val runStarts = jobRunsDeriveRunStarts(df, firstTaskRunSemanticsW)
+      // Find the corresponding runStart action for the completed jobs
+      // Lookback 30 days for laggard starts prior to current run
+      val runStarts = jobRunsDeriveRunStarts(df, firstTaskRunSemanticsW)
 
-    val repairDetails = jobRunsDeriveRepairRunsDetail(df, firstRunSemanticsW)
+      val repairDetails = jobRunsDeriveRepairRunsDetail(df, firstRunSemanticsW)
 
-    val jobRunsMaster = allSubmissions
-      .join(runStarts, Seq("organization_id", "jobRunId"), "left")
-      .join(allCompletes, Seq("organization_id", "jobRunId", "taskRunId"), "left")
-      .withColumn("runId", coalesce('taskRunId, 'jobRunId).cast("long"))
-      .join(allCancellations, Seq("organization_id", "runId"), "left")
-      .withColumn("repairId", coalesce('repairId_runStart, 'repairId_Completed).cast("long"))
-      .join(repairDetails, Seq("organization_id", "runId", "repairId"), "left")
-      .cache() // caching to speed up schema inference
+      val jobRunsMaster = allSubmissions
+        .join(runStarts, Seq("organization_id", "jobRunId"), "left")
+        .join(allCompletes, Seq("organization_id", "jobRunId", "taskRunId"), "left")
+        .withColumn("runId", coalesce('taskRunId, 'jobRunId).cast("long"))
+        .join(allCancellations, Seq("organization_id", "runId"), "left")
+        .withColumn("repairId", coalesce('repairId_runStart, 'repairId_Completed).cast("long"))
+        .join(repairDetails, Seq("organization_id", "runId", "repairId"), "left")
+        .cache() // caching to speed up schema inference
 
-    jobRunsMaster.count
+      jobRunsMaster.count
 
-    jobRunsMaster
-      .select(
-        'organization_id,
-        coalesce('runStartJobId, 'completedJobId, 'submissionJobId).cast("long").alias("jobId"),
-        'jobRunId.cast("long"),
-        'taskRunId.cast("long"),
-        coalesce('taskKey_runStart, 'taskKey_Completed).alias("taskKey"),
-        from_json(coalesce('taskDependencies_runStart, 'taskDependencies_Completed), arrayStringSchema).alias("taskDependencies"),
-        'runId,
-        coalesce('multitaskParentRunId_Started, 'multitaskParentRunId_Completed).cast("long").alias("multitaskParentRunId"),
-        coalesce('parentRunId_Started, 'parentRunId_Completed).cast("long").alias("parentRunId"),
-        coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
-        TransformFunctions.subtractTime(
-          'startTime,
-          array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
-        ).alias("TaskRunTime"), // run launch time until terminal event
-        TransformFunctions.subtractTime(
-          'startTime,
-          array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
-        ).alias("TaskExecutionRunTime"), // from cluster up and run begin until terminal event
-        'run_name,
-        when(coalesce('jobClusterType_Started, 'jobClusterType_Completed).isNull and ('job_clusters.isNotNull or 'new_cluster.isNotNull), "new")
-          .otherwise(coalesce('jobClusterType_Started, 'jobClusterType_Completed)).alias("clusterType"),
-        coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("taskType"),
-        coalesce('jobTriggerType_Triggered,'jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
-        when('cancellationRequestId.isNotNull, "Cancelled")
-          .otherwise('jobTerminalState)
-          .alias("terminalState"),
-        'clusterId,
-        'existing_cluster_id,
-        'new_cluster,
-        'tasks.alias("submitRun_tasks"),
-        'job_clusters.alias("submitRun_job_clusters"),
-        'libraries,
-        'access_control_list,
-        'git_source,
-        'manual_override_params,
-        coalesce('workflow_context_runNow, 'workflow_context_submitRun).alias("workflow_context"),
-        'notebook_task,
-        'spark_python_task,
-        'python_wheel_task,
-        'spark_jar_task,
-        'spark_submit_task,
-        'shell_command_task,
-        'pipeline_task,
-        'repairId,
-        'repair_details,
-        struct(
-          'startTime,
-          'submissionTime,
-          'cancellationTime,
-          'completionTime,
-          'timeout_seconds
-        ).alias("timeDetails"),
-        struct(
+      jobRunsMaster
+        .select(
+          'organization_id,
+          coalesce('runStartJobId, 'completedJobId, 'submissionJobId).cast("long").alias("jobId"),
+          'jobRunId.cast("long"),
+          'taskRunId.cast("long"),
+          coalesce('taskKey_runStart, 'taskKey_Completed).alias("taskKey"),
+          from_json(coalesce('taskDependencies_runStart, 'taskDependencies_Completed), arrayStringSchema).alias("taskDependencies"),
+          'runId,
+          coalesce('multitaskParentRunId_Started, 'multitaskParentRunId_Completed).cast("long").alias("multitaskParentRunId"),
+          coalesce('parentRunId_Started, 'parentRunId_Completed).cast("long").alias("parentRunId"),
+          coalesce('taskRunId, 'idInJob).cast("long").alias("idInJob"),
+          TransformFunctions.subtractTime(
+            'startTime,
+            array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
+          ).alias("TaskRunTime"), // run launch time until terminal event
+          TransformFunctions.subtractTime(
+            'startTime,
+            array_max(array('completionTime, 'cancellationTime)) // endTS must remain null if still open
+          ).alias("TaskExecutionRunTime"), // from cluster up and run begin until terminal event
+          'run_name,
+          when(coalesce('jobClusterType_Started, 'jobClusterType_Completed).isNull and ('job_clusters.isNotNull or 'new_cluster.isNotNull), "new")
+            .otherwise(coalesce('jobClusterType_Started, 'jobClusterType_Completed)).alias("clusterType"),
+          coalesce('jobTaskType_Started, 'jobTaskType_Completed).alias("taskType"),
+          coalesce('jobTriggerType_Triggered,'jobTriggerType_Started, 'jobTriggerType_Completed, 'jobTriggerType_runNow).alias("jobTriggerType"),
+          when('cancellationRequestId.isNotNull, "Cancelled")
+            .otherwise('jobTerminalState)
+            .alias("terminalState"),
+          'clusterId,
+          'existing_cluster_id,
+          'new_cluster,
+          'tasks.alias("submitRun_tasks"),
+          'job_clusters.alias("submitRun_job_clusters"),
+          'libraries,
+          'access_control_list,
+          'git_source,
+          'manual_override_params,
+          coalesce('workflow_context_runNow, 'workflow_context_submitRun).alias("workflow_context"),
+          'notebook_task,
+          'spark_python_task,
+          'python_wheel_task,
+          'spark_jar_task,
+          'spark_submit_task,
+          'shell_command_task,
+          'pipeline_task,
+          'repairId,
+          'repair_details,
           struct(
-            'submitRequestId,
-            'submitResponse,
-            'submitSessionId,
-            'submitSourceIP,
-            'submitUserAgent,
-            'submittedBy
-          ).alias("submissionRequest"),
+            'startTime,
+            'submissionTime,
+            'cancellationTime,
+            'completionTime,
+            'timeout_seconds
+          ).alias("timeDetails"),
           struct(
-            'cancellationRequestId,
-            'cancellationResponse,
-            'cancellationSessionId,
-            'cancellationSourceIP,
-            'cancelledUserAgent,
-            'cancelledBy
-          ).alias("cancellationRequest"),
-          struct(
-            'completionRequestId,
-            'completionResponse
-          ).alias("completionRequest"),
-          struct(
-            'startRequestId
-          ).alias("startRequest")
-        ).alias("requestDetails")
-      )
-      .withColumn("timestamp", $"TaskRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
-      .withColumn("startEpochMS", $"TaskRunTime.startEpochMS") // set launch time as TS key
-//      .scrubSchema
+            struct(
+              'submitRequestId,
+              'submitResponse,
+              'submitSessionId,
+              'submitSourceIP,
+              'submitUserAgent,
+              'submittedBy
+            ).alias("submissionRequest"),
+            struct(
+              'cancellationRequestId,
+              'cancellationResponse,
+              'cancellationSessionId,
+              'cancellationSourceIP,
+              'cancelledUserAgent,
+              'cancelledBy
+            ).alias("cancellationRequest"),
+            struct(
+              'completionRequestId,
+              'completionResponse
+            ).alias("completionRequest"),
+            struct(
+              'startRequestId
+            ).alias("startRequest")
+          ).alias("requestDetails")
+        )
+        .withColumn("timestamp", $"TaskRunTime.startEpochMS") // TS lookup key added for next steps (launch time)
+        .withColumn("startEpochMS", $"TaskRunTime.startEpochMS") // set launch time as TS key
+  //      .scrubSchema
+    }
   }
 
-  def jobRunsStructifyLookupMeta(cacheParts: Int)(df: DataFrame): DataFrame = {
+  val jobRunsStructifyLookupMeta = (cacheParts: Int) => NamedTransformation { (df: DataFrame) => {
     val dfc = df.repartition(cacheParts).cache() // caching to speed up schema inference
     dfc.count()
     val colsToOverride = Array("tasks", "job_clusters", "tags").toSet
@@ -946,9 +948,9 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       )
       .scrubSchema
 
-  }
+  }}
 
-  def jobRunsCleanseCreatedNestedStructures(keys: Array[String])(df: DataFrame): DataFrame = {
+  val jobRunsCleanseCreatedNestedStructures = (keys: Array[String]) => NamedTransformation { (df: DataFrame) => {
     val emptyKeysDF = Seq.empty[(String, Long, Long)].toDF("organization_id", "runId", "startEpochMS")
 
     val cleansedTasksDF = workflowsCleanseTasks(df, keys, emptyKeysDF, "submitRun_details.tasks")
@@ -988,7 +990,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       ) // cleanup temporary cleaner fields
       .scrubSchema
 
-  }
+  }}
 
   /**
     * Look up the cluster_name based on id first from
@@ -1027,34 +1029,36 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
    * snapshot prior to the run
    */
-  def jobRunsAppendJobMeta(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
+  val jobRunsAppendJobMeta = (lookups: Map[String, DataFrame]) => NamedTransformation {
+    (df: DataFrame) => {
 
-    val runsWithJobName1 = if (lookups.contains("job_status_silver")) {
-      df
+      val runsWithJobName1 = if (lookups.contains("job_status_silver")) {
+        df
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
           lookups("job_status_silver")
             .toTSDF("timestamp", "organization_id", "jobId")
         ).df
-    } else df
+      } else df
 
-    val runsWithJobName2 = if (lookups.contains("jobs_snapshot_bronze")) {
-      runsWithJobName1
+      val runsWithJobName2 = if (lookups.contains("jobs_snapshot_bronze")) {
+        runsWithJobName1
         .toTSDF("timestamp", "organization_id", "jobId")
         .lookupWhen(
           lookups("jobs_snapshot_bronze")
             .toTSDF("timestamp", "organization_id", "jobId")
         ).df
-    } else df
+      } else df
 
-    runsWithJobName2
-      .withColumn("jobName", coalesce('jobName, 'run_name))
-      .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
-      .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
+      runsWithJobName2
+        .withColumn("jobName", coalesce('jobName, 'run_name))
+        .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
+        .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
 
+    }
   }
 
-  def jobRunsAppendTaskAndClusterDetails(df: DataFrame): DataFrame = {
+  val jobRunsAppendTaskAndClusterDetails = NamedTransformation { (df: DataFrame) => {
     val computeIsSQLWarehouse = $"task_detail.sql_task.warehouse_id".isNotNull
 
     val dfHasTasks = SchemaTools.nestedColExists(df.schema, "tasks")
@@ -1122,70 +1126,8 @@ object WorkflowsTransforms extends SparkSessionWrapper {
           .drop("tasks")
       }
     } else df // tasks not present in schema
-  }
+  }}
 
-  /**
-   * It's imperative that all nested runs be nested within the jobRun record to ensure cost accuracy downstream in
-   * jrcp -- without it jrcp will double count costs as both the parent and the child will have an associated cost
-   *
-   * A "workflow" in this context isa dbutils.notebook.run execution -- it does spin up a job run in the back end
-   * and will have a workflow_context (field) with root_run_id and parent_run_id. All of these are rolled to the root
-   * to avoid the need to multi-layer joining. It's up to the customer to complete this as needed as the depths can
-   * get very large.
-   *
-   * An multi-task job (mtj) is a job that has at least one task identified (all jobs runs after the change in 2022).
-   * MTJs can execute notebooks which can also run nested workflows using dbutils.notebook.run.
-   *
-   * Workflows can be launched interactively from a notebook or through an mtj; thus it's necessary to account for
-   * both scenarios hence the double join in the last DF.
-   *
-   * Nested runs DO NOT mean tasks inside a jobrun as these are still considered root level tasks. A nested run
-   * is only launched via dbutils.notebook.run either manually or through an MTJ.
-   *
-   * It may be possible to utilize a single field to report both of these as it appears there can never be a child
-   * without a workflow child but the reverse is not true. This can be reviewed with customer to determine if this
-   * is a valid assumption and these can be coalesced, but for now, for safety, they are being kept separate until
-   * all scenarios can be identified
-   */
-  def jobRunsRollupWorkflowsAndChildren(df: DataFrame): DataFrame = {
-
-    // identify root level task runs
-    val rootTaskRuns = df
-      .filter('parentRunId.isNull && get_json_object('workflow_context, "$.root_run_id").isNull)
-
-    // pull only workflow children as defined by having a workflow_context.root_run_id
-    val workflowChildren = df
-      .filter(get_json_object('workflow_context, "$.root_run_id").isNotNull)
-
-    // prepare the nesting by getting keys and the entire record as a nested record
-    val workflowChildrenForNesting = workflowChildren
-      .withColumn("parentRunId", get_json_object('workflow_context, "$.root_run_id").cast("long"))
-      .withColumn("workflowChild", struct(workflowChildren.schema.fieldNames map col: _*))
-      .groupBy('organization_id, 'parentRunId)
-      .agg(collect_list('workflowChild).alias("workflow_children"))
-
-    // get all the children identified as having a parentRunId as they need to be rolled up
-    val children = df
-      .filter('parentRunId.isNotNull)
-      .join(workflowChildrenForNesting, Seq("organization_id", "parentRunId"), "left")
-
-    // prepare the nesting by getting keys and the entire record as a nested record
-    val childrenForNesting = children
-      .withColumn("child", struct(children.schema.fieldNames map col: _*))
-      .groupBy('organization_id, 'parentRunId)
-      .agg(collect_list('child).alias("children"))
-      .withColumnRenamed("parentRunId", "taskRunId") // for simple joining
-
-    // deliver root task runs with workflows and children nested within the root
-    rootTaskRuns
-      .join(childrenForNesting, Seq("organization_id", "taskRunId"), "left") // workflows in mtjs
-      .join(
-        workflowChildrenForNesting.withColumnRenamed("parentRunId", "taskRunId"), // for simple joining
-        Seq("organization_id", "taskRunId"),
-        "left"
-      )
-
-  }
 
   /**
    * BEGIN JRCP Transforms

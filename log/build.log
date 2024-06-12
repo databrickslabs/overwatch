@@ -1,0 +1,1007 @@
+[info] welcome to sbt 1.8.1 (Azul Systems, Inc. Java 1.8.0_302)
+[info] loading settings for project overwatch_0810-build-build-build from metals.sbt ...
+[info] loading project definition from /Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/project/project/project
+[info] loading settings for project overwatch_0810-build-build from metals.sbt ...
+[info] loading project definition from /Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/project/project
+[success] Generated .bloop/overwatch_0810-build-build.json
+[success] Total time: 1 s, completed Jun 11, 2024 3:13:36 PM
+[info] loading settings for project overwatch_0810-build from metals.sbt,plugins.sbt ...
+[info] loading project definition from /Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/project
+[success] Generated .bloop/overwatch_0810-build.json
+[success] Total time: 0 s, completed Jun 11, 2024 3:13:37 PM
+[info] loading settings for project overwatch_0810 from build.sbt ...
+[info] set current project to overwatch (in build file:/Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/)
+[success] Total time: 0 s, completed Jun 11, 2024 3:13:37 PM
+[info] compiling 58 Scala sources to /Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/target/scala-2.12/classes ...
+[warn] two deprecations
+[warn] 14 deprecations (since 2.12.0)
+[warn] 6 deprecations (since 2.12.1)
+[warn] 22 deprecations in total; re-run with -deprecation for details
+[warn] four warnings found
+[info] done compiling
+[info] compiling 15 Scala sources to /Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/target/scala-2.12/test-classes ...
+[warn] three deprecations (since 2.12.1); re-run with -deprecation for details
+[warn] one warning found
+[info] done compiling
+[info] Instrumenting 342 classes to /Users/neil.best/Documents/GitHub/databrickslabs/overwatch_0810/target/scala-2.12/jacoco/instrumented-classes
+[info] HelpersTest:
+[info] Helpers Test
+[info] - Numeric test
+[info] - Trailing slash test
+[info] - Duplicate slash test
+[info] - test sanitizeURL
+[info] StringExtTest:
+[info] StringHelpers Test
+[info] - Simple String Test No Special Characters
+[info] - String with only _
+[info] - String with Period
+[info] - String with special characters
+[info] - String with white spaces characters
+[info] - String with white % characters
+[info] - String with white $ characters
+[info] ApiCallV2Test:
+[info] API v2 test 
+[info] - Consume data from clusters/events API !!! IGNORED !!!
+[info] - Consume data from jobs/list API !!! IGNORED !!!
+[info] - Consume data from dbfs/search-mounts API !!! IGNORED !!!
+[info] - Consume data from clusters/list API !!! IGNORED !!!
+[info] - Consume data from dbfs/list API !!! IGNORED !!!
+[info] - Consume data from instance-pools/list API !!! IGNORED !!!
+[info] - Consume data from instance-profiles/list API !!! IGNORED !!!
+[info] - Consume data from workspace/list API !!! IGNORED !!!
+[info] - Consume data from sql/history/queries API !!! IGNORED !!!
+[info] - Consume data from clusters/resize API !!! IGNORED !!!
+[info] - Consume data from policies/clusters/list API where no cluster policies are available !!! IGNORED !!!
+[info] OLD api Test
+[info] - test clusters/events api !!! IGNORED !!!
+[info] - Consume data from jobs/list API !!! IGNORED !!!
+[info] - Consume data from clusters/list API !!! IGNORED !!!
+[info] - Consume data from clusters/events API !!! IGNORED !!!
+[info] - Consume data from dbfs/listAPI !!! IGNORED !!!
+[info] - Consume data from workspace/list API !!! IGNORED !!!
+[info] - Consume data from instance-pools/list API !!! IGNORED !!!
+[info] - Consume data from instance-profiles/list API !!! IGNORED !!!
+[info] API comparison test
+[info] - comparison test for jobs/list API !!! IGNORED !!!
+[info] - comparison test for clusters/list API !!! IGNORED !!!
+[info] - comparison test for dbfs/list API !!! IGNORED !!!
+[info] - comparison test for instance-pools/list API !!! IGNORED !!!
+[info] - comparison test for instance-profiles/list API !!! IGNORED !!!
+[info] - comparison test for workspace/list API !!! IGNORED !!!
+[info] - test multithreading !!! IGNORED !!!
+[info] - test sqlHistoryDF !!! IGNORED !!!
+[info] - test sqlQueryHistoryParallel !!! IGNORED !!!
+[info] - test jobRunsList !!! IGNORED !!!
+24/06/11 15:13:53 INFO SparkContext: Running Spark version 3.3.0
+24/06/11 15:13:53 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+24/06/11 15:13:53 INFO ResourceUtils: ==============================================================
+24/06/11 15:13:53 INFO ResourceUtils: No custom resources configured for spark.driver.
+24/06/11 15:13:53 INFO ResourceUtils: ==============================================================
+24/06/11 15:13:53 INFO SparkContext: Submitted application: spark session
+24/06/11 15:13:53 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 1, script: , vendor: , memory -> name: memory, amount: 1024, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+24/06/11 15:13:53 INFO ResourceProfile: Limiting resource is cpu
+24/06/11 15:13:53 INFO ResourceProfileManager: Added ResourceProfile id: 0
+24/06/11 15:13:53 INFO SecurityManager: Changing view acls to: neil.best
+24/06/11 15:13:53 INFO SecurityManager: Changing modify acls to: neil.best
+24/06/11 15:13:53 INFO SecurityManager: Changing view acls groups to: 
+24/06/11 15:13:53 INFO SecurityManager: Changing modify acls groups to: 
+24/06/11 15:13:53 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(neil.best); groups with view permissions: Set(); users  with modify permissions: Set(neil.best); groups with modify permissions: Set()
+24/06/11 15:13:53 INFO Utils: Successfully started service 'sparkDriver' on port 55707.
+24/06/11 15:13:53 INFO SparkEnv: Registering MapOutputTracker
+24/06/11 15:13:53 INFO SparkEnv: Registering BlockManagerMaster
+24/06/11 15:13:53 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+24/06/11 15:13:53 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+24/06/11 15:13:53 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+24/06/11 15:13:53 INFO DiskBlockManager: Created local directory at /private/var/folders/71/vsq4kxtx24s82cd7kn0l3kmh0000gp/T/blockmgr-fd105978-3be6-419e-92ab-d0a18e22f9bf
+24/06/11 15:13:53 INFO MemoryStore: MemoryStore started with capacity 4.1 GiB
+24/06/11 15:13:53 INFO SparkEnv: Registering OutputCommitCoordinator
+24/06/11 15:13:53 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+24/06/11 15:13:53 INFO Executor: Starting executor ID driver on host 192.168.4.60
+24/06/11 15:13:53 INFO Executor: Starting executor with user classpath (userClassPathFirst = false): ''
+24/06/11 15:13:53 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 55708.
+24/06/11 15:13:53 INFO NettyBlockTransferService: Server created on 192.168.4.60:55708
+24/06/11 15:13:53 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+24/06/11 15:13:53 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, 192.168.4.60, 55708, None)
+24/06/11 15:13:53 INFO BlockManagerMasterEndpoint: Registering block manager 192.168.4.60:55708 with 4.1 GiB RAM, BlockManagerId(driver, 192.168.4.60, 55708, None)
+24/06/11 15:13:53 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, 192.168.4.60, 55708, None)
+24/06/11 15:13:53 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, 192.168.4.60, 55708, None)
+[info] TransformationDescriberTest:
+[info] com.databricks.labs.overwatch.utils.TransformationDescriberTest *** ABORTED ***
+[info]   Assertion should be put inside it or they clause, not describe clause. (TransformationDescriberTest.scala:90)
+[info] SchemaTest:
+[info] ConfigTest:
+[info] TSDFTest:
+[info] lookupWhen
+24/06/11 15:13:55 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+[info] - should complete a TSDF lookupWhen
+24/06/11 15:13:56 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+[info] PipelineFunctionsTest:
+[info] Tests for add and subtract incremental ticks
+[info] - add tick to every column *** FAILED ***
+[info]   Expected "[`int` INT,`long` BIGINT,`double` DOUBLE,`date` DATE,`timestamp`] TIMESTAMP", but got "[int INT NOT NULL,long BIGINT NOT NULL,double DOUBLE NOT NULL,date DATE,timestamp] TIMESTAMP" (PipelineFunctionsTest.scala:43)
+[info] - subtract tick from every column *** FAILED ***
+[info]   Expected "[`int` INT,`long` BIGINT,`double` DOUBLE,`date` DATE,`timestamp`] TIMESTAMP", but got "[int INT NOT NULL,long BIGINT NOT NULL,double DOUBLE NOT NULL,date DATE,timestamp] TIMESTAMP" (PipelineFunctionsTest.scala:64)
+[info] - should fail on wrong column type
+[info] Tests for getSourceDFParts
+[info] - using streaming
+[info] - using a small dataframe
+[info] Tests for applyFilters
+[info] - match record applyFilter
+[info] - not match record applyFilter
+[info] Tests for cleansePathURI
+[info] - should work for DBFS
+[info] - should work without schema
+[info] - should work for ABFSS
+[info] - should work for ABFSS double slashes
+[info] - should work for S3
+[info] Tests for setSparkOverrides
+[info] - should set necessary configuration params
+[info] Tests for parseEHConnectionString
+Retrieved EH Connection string is not in the correct format.
+[info] - should throw an exception - empty string
+[info]   + Given an event hub connection string 
+[info]   + When the connection string is not in correct format 
+[info]   + Then the function throws an exception 
+Retrieved EH Connection string is not in the correct format.
+[info] - should throw an exception - incorrect format
+[info]   + Given an event hub connection string 
+[info]   + When the connection string is not in correct format 
+[info]   + Then the function throws an exception 
+[info] - should parse the connection string
+[info]   + Given an event hub connection string 
+[info]   + When the connection string is in correct format 
+[info]   + Then the function returns the connection string 
+[info] - should parse the connection string without SAS
+[info]   + Given an event hub connection string 
+[info]   + When the connection string is in correct format 
+[info]   + Then the function returns the connection string 
+[info] - should parse the connection string with special characters
+[info]   + Given an event hub connection string 
+[info]   + When the connection string is in correct format 
+[info]   + Then the function returns the connection string 
+[info] Tests for cleansePathURI - Part 2
+[info] - should work for S3 - double slashes
+[info]   + Given URI path with double slashes 
+[info]   + When function is called 
+[info]   + Then returns the cleansed URI path 
+[info] Tests for epochMilliToTs
++-----------------------+
+|converted_column       |
++-----------------------+
+|2022-08-10 05:29:39.388|
++-----------------------+
+
+[info] - should convert epoch time to timestamp and preserve milliseconds
+[info]   + Given a dataframe with epoch milliseconds time of long type 
+[info]   + When function is called on this column 
+[info]   + Then returns a column of type timestamp and preserves milliseconds 
+[info] - should return null for unexpected timestamp format
+[info]   + Given a dataframe with timestamp column of unexpected format 
+[info]   + When function is called on this column 
+[info]   + Then return a null value for the converted column 
+[info] Tests for tsToEpochMilli
++------------------------+------------------+
+|ts                      |epoch_milliseconds|
++------------------------+------------------+
+|2021-11-12 02:12:23.8870|1636683143887     |
++------------------------+------------------+
+
+[info] - should convert timestamp to epoch time and preserve milliseconds
+[info]   + Given a dataframe with timestamp  
+[info]   + When function is called on this column 
+[info]   + Then convert timestamp to epoch time and preserve milliseconds 
+[info] - should return null for unexpected values
+[info]   + Given a dataframe with unexpected timestamp value 
+[info]   + When function is called on this column 
+[info]   + Then return a null value for the converted column 
+[info] Tests for getDeltaHistory
+[info] com.databricks.labs.overwatch.pipeline.PipelineFunctionsTest *** ABORTED ***
+[info]   java.lang.AbstractMethodError: Method org/apache/spark/sql/delta/commands/WriteIntoDelta.org$apache$spark$sql$catalyst$plans$logical$Command$_setter_$nodePatterns_$eq(Lscala/collection/Seq;)V is abstract
+[info]   at org.apache.spark.sql.delta.commands.WriteIntoDelta.org$apache$spark$sql$catalyst$plans$logical$Command$_setter_$nodePatterns_$eq(WriteIntoDelta.scala)
+[info]   at org.apache.spark.sql.catalyst.plans.logical.Command.$init$(Command.scala:38)
+[info]   at org.apache.spark.sql.delta.commands.WriteIntoDelta.<init>(WriteIntoDelta.scala:53)
+[info]   at org.apache.spark.sql.delta.sources.DeltaDataSource.createRelation(DeltaDataSource.scala:154)
+[info]   at org.apache.spark.sql.execution.datasources.SaveIntoDataSourceCommand.run(SaveIntoDataSourceCommand.scala:45)
+[info]   at org.apache.spark.sql.execution.command.ExecutedCommandExec.sideEffectResult$lzycompute(commands.scala:75)
+[info]   at org.apache.spark.sql.execution.command.ExecutedCommandExec.sideEffectResult(commands.scala:73)
+[info]   at org.apache.spark.sql.execution.command.ExecutedCommandExec.executeCollect(commands.scala:84)
+[info]   at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.$anonfun$applyOrElse$1(QueryExecution.scala:98)
+[info]   at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId$6(SQLExecution.scala:109)
+[info]   ...
+[error] Uncaught exception when running com.databricks.labs.overwatch.pipeline.PipelineFunctionsTest: java.lang.AbstractMethodError: Method org/apache/spark/sql/delta/commands/WriteIntoDelta.org$apache$spark$sql$catalyst$plans$logical$Command$_setter_$nodePatterns_$eq(Lscala/collection/Seq;)V is abstract
+[error] sbt.ForkMain$ForkError: java.lang.AbstractMethodError: Method org/apache/spark/sql/delta/commands/WriteIntoDelta.org$apache$spark$sql$catalyst$plans$logical$Command$_setter_$nodePatterns_$eq(Lscala/collection/Seq;)V is abstract
+[error] 	at org.apache.spark.sql.delta.commands.WriteIntoDelta.org$apache$spark$sql$catalyst$plans$logical$Command$_setter_$nodePatterns_$eq(WriteIntoDelta.scala)
+[error] 	at org.apache.spark.sql.catalyst.plans.logical.Command.$init$(Command.scala:38)
+[error] 	at org.apache.spark.sql.delta.commands.WriteIntoDelta.<init>(WriteIntoDelta.scala:53)
+[error] 	at org.apache.spark.sql.delta.sources.DeltaDataSource.createRelation(DeltaDataSource.scala:154)
+[error] 	at org.apache.spark.sql.execution.datasources.SaveIntoDataSourceCommand.run(SaveIntoDataSourceCommand.scala:45)
+[error] 	at org.apache.spark.sql.execution.command.ExecutedCommandExec.sideEffectResult$lzycompute(commands.scala:75)
+[error] 	at org.apache.spark.sql.execution.command.ExecutedCommandExec.sideEffectResult(commands.scala:73)
+[error] 	at org.apache.spark.sql.execution.command.ExecutedCommandExec.executeCollect(commands.scala:84)
+[error] 	at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.$anonfun$applyOrElse$1(QueryExecution.scala:98)
+[error] 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId$6(SQLExecution.scala:109)
+[error] 	at org.apache.spark.sql.execution.SQLExecution$.withSQLConfPropagated(SQLExecution.scala:169)
+[error] 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId$1(SQLExecution.scala:95)
+[error] 	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:779)
+[error] 	at org.apache.spark.sql.execution.SQLExecution$.withNewExecutionId(SQLExecution.scala:64)
+[error] 	at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.applyOrElse(QueryExecution.scala:98)
+[error] 	at org.apache.spark.sql.execution.QueryExecution$$anonfun$eagerlyExecuteCommands$1.applyOrElse(QueryExecution.scala:94)
+[error] 	at org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$transformDownWithPruning$1(TreeNode.scala:584)
+[error] 	at org.apache.spark.sql.catalyst.trees.CurrentOrigin$.withOrigin(TreeNode.scala:176)
+[error] 	at org.apache.spark.sql.catalyst.trees.TreeNode.transformDownWithPruning(TreeNode.scala:584)
+[error] 	at org.apache.spark.sql.catalyst.plans.logical.LogicalPlan.org$apache$spark$sql$catalyst$plans$logical$AnalysisHelper$$super$transformDownWithPruning(LogicalPlan.scala:30)
+[error] 	at org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper.transformDownWithPruning(AnalysisHelper.scala:267)
+[error] 	at org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper.transformDownWithPruning$(AnalysisHelper.scala:263)
+[error] 	at org.apache.spark.sql.catalyst.plans.logical.LogicalPlan.transformDownWithPruning(LogicalPlan.scala:30)
+[error] 	at org.apache.spark.sql.catalyst.plans.logical.LogicalPlan.transformDownWithPruning(LogicalPlan.scala:30)
+[error] 	at org.apache.spark.sql.catalyst.trees.TreeNode.transformDown(TreeNode.scala:560)
+[error] 	at org.apache.spark.sql.execution.QueryExecution.eagerlyExecuteCommands(QueryExecution.scala:94)
+[error] 	at org.apache.spark.sql.execution.QueryExecution.commandExecuted$lzycompute(QueryExecution.scala:81)
+[error] 	at org.apache.spark.sql.execution.QueryExecution.commandExecuted(QueryExecution.scala:79)
+[error] 	at org.apache.spark.sql.execution.QueryExecution.assertCommandExecuted(QueryExecution.scala:116)
+[error] 	at org.apache.spark.sql.DataFrameWriter.runCommand(DataFrameWriter.scala:860)
+[error] 	at org.apache.spark.sql.DataFrameWriter.saveToV1Source(DataFrameWriter.scala:390)
+[error] 	at org.apache.spark.sql.DataFrameWriter.saveInternal(DataFrameWriter.scala:303)
+[error] 	at org.apache.spark.sql.DataFrameWriter.save(DataFrameWriter.scala:239)
+[error] 	at com.databricks.labs.overwatch.pipeline.PipelineFunctionsTest.$anonfun$new$40(PipelineFunctionsTest.scala:314)
+[error] 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[error] 	at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[error] 	at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[error] 	at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)
+[error] 	at org.scalatest.Transformer.apply(Transformer.scala:22)
+[error] 	at org.scalatest.Transformer.apply(Transformer.scala:20)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike$$anon$1.apply(AnyFunSpecLike.scala:456)
+[error] 	at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)
+[error] 	at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)
+[error] 	at org.scalatest.funspec.AnyFunSpec.withFixture(AnyFunSpec.scala:1631)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.invokeWithFixture$1(AnyFunSpecLike.scala:454)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTest$1(AnyFunSpecLike.scala:466)
+[error] 	at org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.runTest(AnyFunSpecLike.scala:466)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.runTest$(AnyFunSpecLike.scala:448)
+[error] 	at org.scalatest.funspec.AnyFunSpec.runTest(AnyFunSpec.scala:1631)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTests$1(AnyFunSpecLike.scala:499)
+[error] 	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)
+[error] 	at scala.collection.immutable.List.foreach(List.scala:431)
+[error] 	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+[error] 	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)
+[error] 	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)
+[error] 	at scala.collection.immutable.List.foreach(List.scala:431)
+[error] 	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+[error] 	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)
+[error] 	at org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.runTests(AnyFunSpecLike.scala:499)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.runTests$(AnyFunSpecLike.scala:498)
+[error] 	at org.scalatest.funspec.AnyFunSpec.runTests(AnyFunSpec.scala:1631)
+[error] 	at org.scalatest.Suite.run(Suite.scala:1112)
+[error] 	at org.scalatest.Suite.run$(Suite.scala:1094)
+[error] 	at org.scalatest.funspec.AnyFunSpec.org$scalatest$funspec$AnyFunSpecLike$$super$run(AnyFunSpec.scala:1631)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$run$1(AnyFunSpecLike.scala:503)
+[error] 	at org.scalatest.SuperEngine.runImpl(Engine.scala:535)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.run(AnyFunSpecLike.scala:503)
+[error] 	at org.scalatest.funspec.AnyFunSpecLike.run$(AnyFunSpecLike.scala:502)
+[error] 	at org.scalatest.funspec.AnyFunSpec.run(AnyFunSpec.scala:1631)
+[error] 	at org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)
+[error] 	at org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)
+[error] 	at sbt.ForkMain$Run.lambda$runTest$1(ForkMain.java:413)
+[error] 	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+[error] 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+[error] 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+[error] 	at java.lang.Thread.run(Thread.java:748)
+[info] TransformFunctionsTest:
+[info] TransformFunctions.fillFromLookupsByTS
+[info] - should fillFromLookupsByTS
+[info] TransformFunctions.subtractTime
+[info] - should subtractTime *** FAILED ***
+[info]   Expected "[`start` BIGINT,`end` BIGINT,`RunTime` STRUCT<`startEpochMS`: BIGINT, `startTS`: TIMESTAMP, `endEpochMS`: BIGINT, `endTS`: TIMESTAMP, `runTimeMS`: BIGINT, `runTimeS`: DOUBLE, `runTimeM`: DOUBLE, `runTimeH`: DOUBLE>]", but got "[start BIGINT NOT NULL,end BIGINT NOT NULL,RunTime STRUCT<startEpochMS: BIGINT, startTS: TIMESTAMP, endEpochMS: BIGINT, endTS: TIMESTAMP, runTimeMS: BIGINT, runTimeS: DOUBLE, runTimeM: DOUBLE, runTimeH: DOUBLE> NOT NULL]" (TransformFunctionsTest.scala:59)
+[info] TransformFunctions.removeNullCols
+[info] - should maintain columns with at least one non-null record *** FAILED ***
+[info]   Expected "[`myMap` MAP<STRING, INT>,`myString` STRING,`myStruct` STRUCT<`sc1`: STRING, `sc2`: BIGINT>,`myBoolean` BOOLEAN,`myDate` DATE,`myTimestamp` TIMESTAMP,`myArray`] ARRAY<INT>", but got "[myMap MAP<STRING, INT>,myString STRING,myStruct STRUCT<sc1: STRING, sc2: BIGINT> NOT NULL,myBoolean BOOLEAN NOT NULL,myDate DATE,myTimestamp TIMESTAMP,myArray] ARRAY<INT>" (TransformFunctionsTest.scala:101)
+[info]   + When df is fully populated 
+[info]   + Then removes no columns 
+[info] - should remove only the null columns and leave the others *** FAILED ***
+[info]   Expected "[`myString`] STRING", but got "[myString] STRING" (TransformFunctionsTest.scala:116)
+[info]   + When df has boolean with all nulls and string with values 
+[info]   + Then remove only the boolean field 
+[info] TransformFunctions.toTS
+[info] - should work for TimestampType *** FAILED ***
+[info]   Expected "[`long` BIGINT,`tsmilli` TIMESTAMP,`tssec`] TIMESTAMP", but got "[long BIGINT NOT NULL,tsmilli TIMESTAMP,tssec] TIMESTAMP" (TransformFunctionsTest.scala:148)
+[info] - should work for DateType *** FAILED ***
+[info]   Expected "[`long` BIGINT,`tsmilli` DATE,`tssec`] DATE", but got "[long BIGINT NOT NULL,tsmilli DATE,tssec] DATE" (TransformFunctionsTest.scala:163)
+[info] - shouldn't work for LongType
+[info] TransformFunctions.moveColumnsToFront
+[info] - should moveColumnsToFront
+[info] TransformFunctions.stringTsToUnixMillis
+[info] - should convert timestamp string to milliseconds
+[info] - should not convert timestamp string to milliseconds
+[info] TransformFunctions.joinWithLag
+[info] - should join dataframes with lag - jointype: left, laggingside: left *** FAILED ***
+[info]   com.github.mrpowers.spark.fast.tests.DatasetContentMismatch: Diffs
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |                                                  Actual Content|                                                Expected Content|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |[25379,09-s796,386,1,2016-09-30,[/abc/15-00.gz],[/ijk/52-00.gz]]|[25379,09-s999,388,2,2016-09-28,[/hfg/16-00.gz],[/faq/55-00.gz]]|
+[info] |           [25379,09-s888,385,1,2016-09-30,[/abc/75-00.gz],null]| [25379,09-s891,387,0,2016-09-29,[/edv/5-00.gz],[/lmn/53-00.gz]]|
+[info] | [25379,09-s891,387,0,2016-09-29,[/edv/5-00.gz],[/lmn/53-00.gz]]|[25379,09-s796,386,1,2016-09-30,[/abc/15-00.gz],[/ijk/52-00.gz]]|
+[info] |[25379,09-s999,388,2,2016-09-28,[/hfg/16-00.gz],[/faq/55-00.gz]]|           [25379,09-s888,385,1,2016-09-30,[/abc/75-00.gz],null]|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality(DatasetComparer.scala:94)
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality$(DatasetComparer.scala:79)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDatasetEquality(TransformFunctionsTest.scala:15)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality(DataFrameComparer.scala:22)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality$(DataFrameComparer.scala:10)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDataFrameEquality(TransformFunctionsTest.scala:15)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.$anonfun$new$19(TransformFunctionsTest.scala:296)
+[info]   at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[info]   at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[info]   at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[info]   ...
+[info] - should join dataframes with lag - jointype:inner, laggingside:left *** FAILED ***
+[info]   com.github.mrpowers.spark.fast.tests.DatasetContentMismatch: Diffs
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |                                                  Actual Content|                                                Expected Content|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |[25379,09-s796,386,1,2016-09-30,[/abc/15-00.gz],[/ijk/52-00.gz]]|[25379,09-s999,388,2,2016-09-28,[/hfg/16-00.gz],[/faq/55-00.gz]]|
+[info] | [25379,09-s891,387,0,2016-09-29,[/edv/5-00.gz],[/lmn/53-00.gz]]| [25379,09-s891,387,0,2016-09-29,[/edv/5-00.gz],[/lmn/53-00.gz]]|
+[info] |[25379,09-s999,388,2,2016-09-28,[/hfg/16-00.gz],[/faq/55-00.gz]]|[25379,09-s796,386,1,2016-09-30,[/abc/15-00.gz],[/ijk/52-00.gz]]|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality(DatasetComparer.scala:94)
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality$(DatasetComparer.scala:79)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDatasetEquality(TransformFunctionsTest.scala:15)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality(DataFrameComparer.scala:22)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality$(DataFrameComparer.scala:10)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDataFrameEquality(TransformFunctionsTest.scala:15)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.$anonfun$new$20(TransformFunctionsTest.scala:326)
+[info]   at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[info]   at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[info]   at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[info]   ...
+[info] - should join dataframes with lag - jointype: left, laggingside: right *** FAILED ***
+[info]   com.github.mrpowers.spark.fast.tests.DatasetContentMismatch: Diffs
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |                                                  Actual Content|                                                Expected Content|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |[25379,09-s796,386,1,2016-10-30,[/ijk/52-00.gz],[/abc/15-00.gz]]|[25379,09-s999,388,2,2016-09-29,[/faq/55-00.gz],[/hfg/16-00.gz]]|
+[info] | [25379,09-s891,387,0,2016-09-29,[/lmn/53-00.gz],[/edv/5-00.gz]]| [25379,09-s891,387,0,2016-09-29,[/lmn/53-00.gz],[/edv/5-00.gz]]|
+[info] |[25379,09-s999,388,2,2016-09-29,[/faq/55-00.gz],[/hfg/16-00.gz]]|[25379,09-s796,386,1,2016-10-30,[/ijk/52-00.gz],[/abc/15-00.gz]]|
+[info] |           [25379,11-s111,454,2,2016-11-01,[/stc/46-00.gz],null]|           [25379,11-s111,454,2,2016-11-01,[/stc/46-00.gz],null]|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality(DatasetComparer.scala:94)
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality$(DatasetComparer.scala:79)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDatasetEquality(TransformFunctionsTest.scala:15)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality(DataFrameComparer.scala:22)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality$(DataFrameComparer.scala:10)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDataFrameEquality(TransformFunctionsTest.scala:15)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.$anonfun$new$21(TransformFunctionsTest.scala:357)
+[info]   at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[info]   at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[info]   at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[info]   ...
+[info] - should join dataframes with lag - jointype: inner, laggingside: right *** FAILED ***
+[info]   com.github.mrpowers.spark.fast.tests.DatasetContentMismatch: Diffs
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |                                                  Actual Content|                                                Expected Content|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |[25379,09-s796,386,1,2016-10-30,[/ijk/52-00.gz],[/abc/15-00.gz]]|[25379,09-s999,388,2,2016-09-29,[/faq/55-00.gz],[/hfg/16-00.gz]]|
+[info] | [25379,09-s891,387,0,2016-09-29,[/lmn/53-00.gz],[/edv/5-00.gz]]| [25379,09-s891,387,0,2016-09-29,[/lmn/53-00.gz],[/edv/5-00.gz]]|
+[info] |[25379,09-s999,388,2,2016-09-29,[/faq/55-00.gz],[/hfg/16-00.gz]]|[25379,09-s796,386,1,2016-10-30,[/ijk/52-00.gz],[/abc/15-00.gz]]|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality(DatasetComparer.scala:94)
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality$(DatasetComparer.scala:79)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDatasetEquality(TransformFunctionsTest.scala:15)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality(DataFrameComparer.scala:22)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality$(DataFrameComparer.scala:10)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDataFrameEquality(TransformFunctionsTest.scala:15)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.$anonfun$new$22(TransformFunctionsTest.scala:387)
+[info]   at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[info]   at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[info]   at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[info]   ...
+[info] - should join dataframes with lag - jointype: right, laggingside: left *** FAILED ***
+[info]   com.github.mrpowers.spark.fast.tests.DatasetContentMismatch: Diffs
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |                                                  Actual Content|                                                Expected Content|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |[[/abc/15-00.gz],25379,09-s796,386,1,2016-10-30,[/ijk/52-00.gz]]|[[/hfg/16-00.gz],25379,09-s999,388,2,2016-09-29,[/faq/55-00.gz]]|
+[info] | [[/edv/5-00.gz],25379,09-s891,387,0,2016-09-29,[/lmn/53-00.gz]]| [[/edv/5-00.gz],25379,09-s891,387,0,2016-09-29,[/lmn/53-00.gz]]|
+[info] |[[/hfg/16-00.gz],25379,09-s999,388,2,2016-09-29,[/faq/55-00.gz]]|[[/abc/15-00.gz],25379,09-s796,386,1,2016-10-30,[/ijk/52-00.gz]]|
+[info] |           [null,25379,11-s111,454,2,2016-11-01,[/stc/46-00.gz]]|           [null,25379,11-s111,454,2,2016-11-01,[/stc/46-00.gz]]|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality(DatasetComparer.scala:94)
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality$(DatasetComparer.scala:79)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDatasetEquality(TransformFunctionsTest.scala:15)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality(DataFrameComparer.scala:22)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality$(DataFrameComparer.scala:10)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDataFrameEquality(TransformFunctionsTest.scala:15)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.$anonfun$new$23(TransformFunctionsTest.scala:418)
+[info]   at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[info]   at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[info]   at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[info]   ...
+[info] - should join dataframes with lag - jointype: right, laggingside: right *** FAILED ***
+[info]   com.github.mrpowers.spark.fast.tests.DatasetContentMismatch: Diffs
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |                                                  Actual Content|                                                Expected Content|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info] |[[/ijk/52-00.gz],25379,09-s796,386,1,2016-09-30,[/abc/15-00.gz]]|[[/faq/55-00.gz],25379,09-s999,388,2,2016-09-28,[/hfg/16-00.gz]]|
+[info] |           [null,25379,09-s888,385,1,2016-09-30,[/abc/75-00.gz]]| [[/lmn/53-00.gz],25379,09-s891,387,0,2016-09-29,[/edv/5-00.gz]]|
+[info] | [[/lmn/53-00.gz],25379,09-s891,387,0,2016-09-29,[/edv/5-00.gz]]|[[/ijk/52-00.gz],25379,09-s796,386,1,2016-09-30,[/abc/15-00.gz]]|
+[info] |[[/faq/55-00.gz],25379,09-s999,388,2,2016-09-28,[/hfg/16-00.gz]]|           [null,25379,09-s888,385,1,2016-09-30,[/abc/75-00.gz]]|
+[info] +----------------------------------------------------------------+----------------------------------------------------------------+
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality(DatasetComparer.scala:94)
+[info]   at com.github.mrpowers.spark.fast.tests.DatasetComparer.assertSmallDatasetEquality$(DatasetComparer.scala:79)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDatasetEquality(TransformFunctionsTest.scala:15)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality(DataFrameComparer.scala:22)
+[info]   at com.github.mrpowers.spark.fast.tests.DataFrameComparer.assertSmallDataFrameEquality$(DataFrameComparer.scala:10)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.assertSmallDataFrameEquality(TransformFunctionsTest.scala:15)
+[info]   at com.databricks.labs.overwatch.pipeline.TransformFunctionsTest.$anonfun$new$24(TransformFunctionsTest.scala:448)
+[info]   at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)
+[info]   at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+[info]   at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+[info]   ...
+[info] - should not work for missing laggingcolumn in either dataframes
+[info] ParamDeserializerTest:
+[info] ParamDeserializer
+(No Token Secret Defined,java.lang.NullPointerException)
+[info] - should decode incomplete parameters
+[info] InitializerFunctionsTest:
+[info] Tests for InitializerFunctions.loadLocalResource
+24/06/11 15:13:58 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+[info] - should throw exception for non-existing resource
+[info] - should read text file
+[info] Tests for InitializerFunctions.loadLocalCSVResource
+24/06/11 15:13:58 INFO CodeGenerator: Code generated in 2.091709 ms
+24/06/11 15:13:58 INFO CodeGenerator: Code generated in 1.871834 ms
+24/06/11 15:13:59 INFO SparkContext: Starting job: out at TransformationDescriberTest.scala:59
+24/06/11 15:13:59 INFO DAGScheduler: Got job 43 (out at TransformationDescriberTest.scala:59) with 1 output partitions
+24/06/11 15:13:59 INFO DAGScheduler: Final stage: ResultStage 59 (out at TransformationDescriberTest.scala:59)
+24/06/11 15:13:59 INFO DAGScheduler: Parents of final stage: List()
+24/06/11 15:13:59 INFO DAGScheduler: Missing parents: List()
+24/06/11 15:13:59 INFO DAGScheduler: Submitting ResultStage 59 (MapPartitionsRDD[148] at out at TransformationDescriberTest.scala:59), which has no missing parents
+24/06/11 15:13:59 INFO MemoryStore: Block broadcast_49 stored as values in memory (estimated size 21.2 KiB, free 3.9 GiB)
+24/06/11 15:13:59 INFO MemoryStore: Block broadcast_49_piece0 stored as bytes in memory (estimated size 10.0 KiB, free 3.9 GiB)
+24/06/11 15:13:59 INFO BlockManagerInfo: Added broadcast_49_piece0 in memory on 192.168.4.60:55708 (size: 10.0 KiB, free: 4.1 GiB)
+24/06/11 15:13:59 INFO SparkContext: Created broadcast 49 from broadcast at DAGScheduler.scala:1513
+24/06/11 15:13:59 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 59 (MapPartitionsRDD[148] at out at TransformationDescriberTest.scala:59) (first 15 tasks are for partitions Vector(0))
+24/06/11 15:13:59 INFO TaskSchedulerImpl: Adding task set 59.0 with 1 tasks resource profile 0
+24/06/11 15:13:59 INFO TaskSetManager: Starting task 0.0 in stage 59.0 (TID 44) (192.168.4.60, executor driver, partition 0, PROCESS_LOCAL, 4796 bytes) taskResourceAssignments Map()
+24/06/11 15:13:59 INFO Executor: Running task 0.0 in stage 59.0 (TID 44)
+24/06/11 15:13:59 INFO Executor: Finished task 0.0 in stage 59.0 (TID 44). 1297 bytes result sent to driver
+24/06/11 15:13:59 INFO TaskSetManager: Finished task 0.0 in stage 59.0 (TID 44) in 24 ms on 192.168.4.60 (executor driver) (1/1)
+24/06/11 15:13:59 INFO TaskSchedulerImpl: Removed TaskSet 59.0, whose tasks have all completed, from pool 
+24/06/11 15:13:59 INFO DAGScheduler: ResultStage 59 (out at TransformationDescriberTest.scala:59) finished in 0.027 s
+24/06/11 15:13:59 INFO DAGScheduler: Job 43 is finished. Cancelling potential speculative or zombie tasks for this job
+24/06/11 15:13:59 INFO TaskSchedulerImpl: Killing all running tasks in stage 59: Stage finished
+24/06/11 15:13:59 INFO DAGScheduler: Job 43 finished: out at TransformationDescriberTest.scala:59, took 0.028311 s
+[info] - should load CSV from local resource *** FAILED ***
+[info]   Expected "[`field1` INT,`field2` STRING,`field3`] BOOLEAN", but got "[field1 INT,field2 STRING,field3] BOOLEAN" (InitializerFunctionsTest.scala:25)
+24/06/11 15:13:59 INFO SparkContext: Starting job: out at TransformationDescriberTest.scala:59
+24/06/11 15:13:59 INFO DAGScheduler: Got job 44 (out at TransformationDescriberTest.scala:59) with 1 output partitions
+24/06/11 15:13:59 INFO DAGScheduler: Final stage: ResultStage 60 (out at TransformationDescriberTest.scala:59)
+24/06/11 15:13:59 INFO DAGScheduler: Parents of final stage: List()
+24/06/11 15:13:59 INFO DAGScheduler: Missing parents: List()
+24/06/11 15:13:59 INFO DAGScheduler: Submitting ResultStage 60 (MapPartitionsRDD[161] at out at TransformationDescriberTest.scala:59), which has no missing parents
+24/06/11 15:13:59 INFO MemoryStore: Block broadcast_50 stored as values in memory (estimated size 21.2 KiB, free 3.9 GiB)
+24/06/11 15:13:59 INFO MemoryStore: Block broadcast_50_piece0 stored as bytes in memory (estimated size 10.0 KiB, free 3.9 GiB)
+24/06/11 15:13:59 INFO BlockManagerInfo: Added broadcast_50_piece0 in memory on 192.168.4.60:55708 (size: 10.0 KiB, free: 4.1 GiB)
+24/06/11 15:13:59 INFO SparkContext: Created broadcast 50 from broadcast at DAGScheduler.scala:1513
+24/06/11 15:13:59 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 60 (MapPartitionsRDD[161] at out at TransformationDescriberTest.scala:59) (first 15 tasks are for partitions Vector(0))
+24/06/11 15:13:59 INFO TaskSchedulerImpl: Adding task set 60.0 with 1 tasks resource profile 0
+24/06/11 15:13:59 INFO TaskSetManager: Starting task 0.0 in stage 60.0 (TID 45) (192.168.4.60, executor driver, partition 0, PROCESS_LOCAL, 4641 bytes) taskResourceAssignments Map()
+24/06/11 15:13:59 INFO Executor: Running task 0.0 in stage 60.0 (TID 45)
+24/06/11 15:13:59 INFO Executor: Finished task 0.0 in stage 60.0 (TID 45). 1150 bytes result sent to driver
+24/06/11 15:13:59 INFO TaskSetManager: Finished task 0.0 in stage 60.0 (TID 45) in 2 ms on 192.168.4.60 (executor driver) (1/1)
+24/06/11 15:13:59 INFO TaskSchedulerImpl: Removed TaskSet 60.0, whose tasks have all completed, from pool 
+24/06/11 15:13:59 INFO DAGScheduler: ResultStage 60 (out at TransformationDescriberTest.scala:59) finished in 0.005 s
+24/06/11 15:13:59 INFO DAGScheduler: Job 44 is finished. Cancelling potential speculative or zombie tasks for this job
+24/06/11 15:13:59 INFO TaskSchedulerImpl: Killing all running tasks in stage 60: Stage finished
+24/06/11 15:13:59 INFO DAGScheduler: Job 44 finished: out at TransformationDescriberTest.scala:59, took 0.006289 s
+[info] - should load empty dataframe if no header *** FAILED ***
+[info]   Expected "`1` STRING,[`text1` STRING,`false`] STRING", but got "`1` STRING,[text1 STRING,false] STRING" (InitializerFunctionsTest.scala:34)
+24/06/11 15:13:59 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+[info] InitializeTest:
+[info] Tests for Initializer.isPVC
+24/06/11 15:13:59 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+value: false
+[info] - should validate isPVC as false when org id if doesn't have ilb
+value: true
+[info] - should validate isPVC as true when org id contains ilb
+[info] Tests for initialize database
+DEBUG: Database Name and Location set to overwatch_etl and file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db.
+
+ DATA Prefix set to: file:/src/test/resources/overwatch/spark-warehouse/overwatch.db
+DEBUG: Consumer Database Name and Location set to overwatch and file:/src/test/resources/overwatch/spark-warehouse/overwatch.db
+here
+[info] - initializeDatabase function should create both elt and consumer database
+[info] Tests for validateIntelligentScaling configs
+Intelligent Scaling: Minimum cores must be > 0. Set to 0
+[info] - for intelligentScaling minimumCores should not be less than 1 
+Intelligent Scaling: Minimum cores must be > 0. 
+Minimum = 4
+Maximum = 1
+[info] - for intelligentScaling minimumCores can not be greater than maximum cores 
+Intelligent Scaling: Minimum cores must be > 0. 
+Minimum = 4
+Maximum = 1
+[info] - for intelligentScaling coeff must be with in 0 to 10
+[info] - validateIntelligentScaling function should return IntelligentScaling case class upon correct validation
+[info] Tests for quickBuildAuditLogConfig configs
+[info] - quickBuildAuditLogConfig function should remove the last / from audit log path !!! IGNORED !!!
+[info] - quickBuildAuditLogConfig function build path from prefix for azure eventhub config !!! IGNORED !!!
+[info] Tests for validateAuditLogConfigs configs
+[info] - validateAuditLogConfigs function validate auditLogPath in the config  !!! IGNORED !!!
+[info] - validateAuditLogConfigs function validate audit log format in the config  !!! IGNORED !!!
+[info] Tests for validateAndRegisterArgs function
+[info] - validateAndRegisterArgs function should validate and register variables on the conf !!! IGNORED !!!
+[info] - validateAndRegisterArgs function should fail when a parameter is missing !!! IGNORED !!!
+[info] - validateAndRegisterArgs function should through exception when the json is malfunctioned  !!! IGNORED !!!
+[info] - validateAndRegisterArgs function should fail if json is non escaped !!! IGNORED !!!
+[info] Tests for dataTargetIsValid function
+The DB: overwatch_etl exists at location file:/src/test/resources/overwatch/spark-warehouse/overwatch_etl.db which is different than the location entered in the config. Ensure the DBName is unique and the locations match. The location must be a fully qualified URI such as dbfs:/...
+[info] - dataTargetIsValid function should throw exception when the current db location is different than the one present already
+[info] - dataTargetIsValid function should throw exception when the current db is not created from overwatch !!! IGNORED !!!
+[info] Tests for validateScope function
+Scope invalidscope is not supported. Supported scopes include: jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, dbsql, pools, notebookCommands, all.
+[info] - validateScope function should throw exception when the variable in scope is not one of the valid scope
+WARNING: Cluster data without audit will result in loss of granularity. It's recommended to configurethe audit module.
+[info] - validateScope function should check if sparkEvents, clusterEvents, and jobs scopes require clusters scope
+[info] - validateScope function should return all scopes on validation
+[info] - validateScope function should not be case sensitive
+[info] - validateScope function should work irrespective of order of scope
+[info] JsonToolsTest:
+[info] JsonUtils
+[info] - should convert JSON string to Map
+24/06/11 15:13:59 ERROR JsonUtils$: ERROR: Could not convert json to Map. 
+JSON: {"employees":
+com.fasterxml.jackson.core.io.JsonEOFException: Unexpected end-of-input within/between Object entries
+ at [Source: (String)"{"employees":"; line: 1, column: 14]
+	at com.fasterxml.jackson.core.base.ParserMinimalBase._reportInvalidEOF(ParserMinimalBase.java:682)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser._skipColon2(ReaderBasedJsonParser.java:2325)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser._skipColon(ReaderBasedJsonParser.java:2240)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser.nextFieldName(ReaderBasedJsonParser.java:965)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer._readAndBindStringKeyMap(MapDeserializer.java:582)
+	at com.fasterxml.jackson.databind.deser.std.MapDeserializer.deserialize(MapDeserializer.java:437)
+	at com.fasterxml.jackson.module.scala.deser.GenericMapFactoryDeserializerResolver$Deserializer.deserialize(GenericMapFactoryDeserializerResolver.scala:127)
+	at com.fasterxml.jackson.databind.deser.DefaultDeserializationContext.readRootValue(DefaultDeserializationContext.java:323)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:4674)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:3629)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:3597)
+	at com.databricks.labs.overwatch.utils.JsonUtils$.jsonToMap(Tools.scala:111)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$4(JsonToolsTest.scala:28)
+	at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+	at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+	at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)
+	at org.scalatest.Transformer.apply(Transformer.scala:22)
+	at org.scalatest.Transformer.apply(Transformer.scala:20)
+	at org.scalatest.funspec.AnyFunSpecLike$$anon$1.apply(AnyFunSpecLike.scala:456)
+	at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)
+	at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)
+	at org.scalatest.funspec.AnyFunSpec.withFixture(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.invokeWithFixture$1(AnyFunSpecLike.scala:454)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTest$1(AnyFunSpecLike.scala:466)
+	at org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest(AnyFunSpecLike.scala:466)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest$(AnyFunSpecLike.scala:448)
+	at org.scalatest.funspec.AnyFunSpec.runTest(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTests$1(AnyFunSpecLike.scala:499)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)
+	at org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests(AnyFunSpecLike.scala:499)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests$(AnyFunSpecLike.scala:498)
+	at org.scalatest.funspec.AnyFunSpec.runTests(AnyFunSpec.scala:1631)
+	at org.scalatest.Suite.run(Suite.scala:1112)
+	at org.scalatest.Suite.run$(Suite.scala:1094)
+	at org.scalatest.funspec.AnyFunSpec.org$scalatest$funspec$AnyFunSpecLike$$super$run(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$run$1(AnyFunSpecLike.scala:503)
+	at org.scalatest.SuperEngine.runImpl(Engine.scala:535)
+	at org.scalatest.funspec.AnyFunSpecLike.run(AnyFunSpecLike.scala:503)
+	at org.scalatest.funspec.AnyFunSpecLike.run$(AnyFunSpecLike.scala:502)
+	at org.scalatest.funspec.AnyFunSpec.run(AnyFunSpec.scala:1631)
+	at org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)
+	at org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)
+	at sbt.ForkMain$Run.lambda$runTest$1(ForkMain.java:413)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+[info] - shouldn't convert JSON string to Map
+[info] - Issue 105 is fixed
+[info] - should convert almost empty object to JSON string without nulls & empty values
+[info] - should convert non-empty object to JSON string without nulls & empty values
+[info] - should convert almost empty object to JSON string with nulls & with empty values
+[info] - should convert Java map to JSON string without nulls & with empty values
+[info] - should convert Scala map to JSON string without nulls & with empty values
+[info] - should convert empty Scala map to JSON string without nulls & with empty values
+[info] - Should parse the json string and return key and value of that input string 
+24/06/11 15:13:59 ERROR JsonUtils$: ERROR: Could not extract key and value from json. 
+JSON: 
+java.util.NoSuchElementException
+	at java.util.Collections$EmptyIterator.next(Collections.java:4191)
+	at com.databricks.labs.overwatch.utils.JsonUtils$.getJsonKeyValue(Tools.scala:71)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$14(JsonToolsTest.scala:165)
+	at org.scalatest.Assertions.assertThrows(Assertions.scala:808)
+	at org.scalatest.Assertions.assertThrows$(Assertions.scala:804)
+	at org.scalatest.funspec.AnyFunSpec.assertThrows(AnyFunSpec.scala:1631)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$13(JsonToolsTest.scala:165)
+	at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+	at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+	at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)
+	at org.scalatest.Transformer.apply(Transformer.scala:22)
+	at org.scalatest.Transformer.apply(Transformer.scala:20)
+	at org.scalatest.funspec.AnyFunSpecLike$$anon$1.apply(AnyFunSpecLike.scala:456)
+	at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)
+	at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)
+	at org.scalatest.funspec.AnyFunSpec.withFixture(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.invokeWithFixture$1(AnyFunSpecLike.scala:454)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTest$1(AnyFunSpecLike.scala:466)
+	at org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest(AnyFunSpecLike.scala:466)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest$(AnyFunSpecLike.scala:448)
+	at org.scalatest.funspec.AnyFunSpec.runTest(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTests$1(AnyFunSpecLike.scala:499)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)
+	at org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests(AnyFunSpecLike.scala:499)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests$(AnyFunSpecLike.scala:498)
+	at org.scalatest.funspec.AnyFunSpec.runTests(AnyFunSpec.scala:1631)
+	at org.scalatest.Suite.run(Suite.scala:1112)
+	at org.scalatest.Suite.run$(Suite.scala:1094)
+	at org.scalatest.funspec.AnyFunSpec.org$scalatest$funspec$AnyFunSpecLike$$super$run(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$run$1(AnyFunSpecLike.scala:503)
+	at org.scalatest.SuperEngine.runImpl(Engine.scala:535)
+	at org.scalatest.funspec.AnyFunSpecLike.run(AnyFunSpecLike.scala:503)
+	at org.scalatest.funspec.AnyFunSpecLike.run$(AnyFunSpecLike.scala:502)
+	at org.scalatest.funspec.AnyFunSpec.run(AnyFunSpec.scala:1631)
+	at org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)
+	at org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)
+	at sbt.ForkMain$Run.lambda$runTest$1(ForkMain.java:413)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+[info] - Should throw error
+24/06/11 15:13:59 ERROR JsonUtils$: ERROR: Could not extract key and value from json. 
+JSON: {"path":/missing"}
+com.fasterxml.jackson.core.JsonParseException: Unexpected character ('/' (code 47)): maybe a (non-standard) comment? (not recognized as one since Feature 'ALLOW_COMMENTS' not enabled for parser)
+ at [Source: (String)"{"path":/missing"}"; line: 1, column: 10]
+	at com.fasterxml.jackson.core.JsonParser._constructError(JsonParser.java:2391)
+	at com.fasterxml.jackson.core.base.ParserMinimalBase._reportError(ParserMinimalBase.java:735)
+	at com.fasterxml.jackson.core.base.ParserMinimalBase._reportUnexpectedChar(ParserMinimalBase.java:659)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser._skipComment(ReaderBasedJsonParser.java:2524)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser._skipColon2(ReaderBasedJsonParser.java:2297)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser._skipColon(ReaderBasedJsonParser.java:2247)
+	at com.fasterxml.jackson.core.json.ReaderBasedJsonParser.nextFieldName(ReaderBasedJsonParser.java:965)
+	at com.fasterxml.jackson.databind.deser.std.BaseNodeDeserializer._deserializeContainerNoRecursion(JsonNodeDeserializer.java:437)
+	at com.fasterxml.jackson.databind.deser.std.JsonNodeDeserializer.deserialize(JsonNodeDeserializer.java:84)
+	at com.fasterxml.jackson.databind.deser.std.JsonNodeDeserializer.deserialize(JsonNodeDeserializer.java:20)
+	at com.fasterxml.jackson.databind.deser.DefaultDeserializationContext.readRootValue(DefaultDeserializationContext.java:323)
+	at com.fasterxml.jackson.databind.ObjectMapper._readTreeAndClose(ObjectMapper.java:4716)
+	at com.fasterxml.jackson.databind.ObjectMapper.readTree(ObjectMapper.java:3076)
+	at com.databricks.labs.overwatch.utils.JsonUtils$.getJsonKeyValue(Tools.scala:70)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$16(JsonToolsTest.scala:168)
+	at org.scalatest.Assertions.assertThrows(Assertions.scala:808)
+	at org.scalatest.Assertions.assertThrows$(Assertions.scala:804)
+	at org.scalatest.funspec.AnyFunSpec.assertThrows(AnyFunSpec.scala:1631)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$15(JsonToolsTest.scala:168)
+	at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+	at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+	at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)
+	at org.scalatest.Transformer.apply(Transformer.scala:22)
+	at org.scalatest.Transformer.apply(Transformer.scala:20)
+	at org.scalatest.funspec.AnyFunSpecLike$$anon$1.apply(AnyFunSpecLike.scala:456)
+	at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)
+	at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)
+	at org.scalatest.funspec.AnyFunSpec.withFixture(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.invokeWithFixture$1(AnyFunSpecLike.scala:454)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTest$1(AnyFunSpecLike.scala:466)
+	at org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest(AnyFunSpecLike.scala:466)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest$(AnyFunSpecLike.scala:448)
+	at org.scalatest.funspec.AnyFunSpec.runTest(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTests$1(AnyFunSpecLike.scala:499)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)
+	at org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests(AnyFunSpecLike.scala:499)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests$(AnyFunSpecLike.scala:498)
+	at org.scalatest.funspec.AnyFunSpec.runTests(AnyFunSpec.scala:1631)
+	at org.scalatest.Suite.run(Suite.scala:1112)
+	at org.scalatest.Suite.run$(Suite.scala:1094)
+	at org.scalatest.funspec.AnyFunSpec.org$scalatest$funspec$AnyFunSpecLike$$super$run(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$run$1(AnyFunSpecLike.scala:503)
+	at org.scalatest.SuperEngine.runImpl(Engine.scala:535)
+	at org.scalatest.funspec.AnyFunSpecLike.run(AnyFunSpecLike.scala:503)
+	at org.scalatest.funspec.AnyFunSpecLike.run$(AnyFunSpecLike.scala:502)
+	at org.scalatest.funspec.AnyFunSpec.run(AnyFunSpec.scala:1631)
+	at org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)
+	at org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)
+	at sbt.ForkMain$Run.lambda$runTest$1(ForkMain.java:413)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+[info] - Should throw error for corrupted json
+[info] - Should return first pair of key and value
+24/06/11 15:13:59 ERROR JsonUtils$: ERROR: Could not extract key and value from json. 
+JSON: [{"path":"/tmp"},{"path2":"/tmp2"}]
+java.util.NoSuchElementException
+	at java.util.Collections$EmptyIterator.next(Collections.java:4191)
+	at com.databricks.labs.overwatch.utils.JsonUtils$.getJsonKeyValue(Tools.scala:71)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$19(JsonToolsTest.scala:174)
+	at org.scalatest.Assertions.assertThrows(Assertions.scala:808)
+	at org.scalatest.Assertions.assertThrows$(Assertions.scala:804)
+	at org.scalatest.funspec.AnyFunSpec.assertThrows(AnyFunSpec.scala:1631)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$18(JsonToolsTest.scala:174)
+	at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+	at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+	at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)
+	at org.scalatest.Transformer.apply(Transformer.scala:22)
+	at org.scalatest.Transformer.apply(Transformer.scala:20)
+	at org.scalatest.funspec.AnyFunSpecLike$$anon$1.apply(AnyFunSpecLike.scala:456)
+	at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)
+	at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)
+	at org.scalatest.funspec.AnyFunSpec.withFixture(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.invokeWithFixture$1(AnyFunSpecLike.scala:454)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTest$1(AnyFunSpecLike.scala:466)
+	at org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest(AnyFunSpecLike.scala:466)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest$(AnyFunSpecLike.scala:448)
+	at org.scalatest.funspec.AnyFunSpec.runTest(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTests$1(AnyFunSpecLike.scala:499)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)
+	at org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests(AnyFunSpecLike.scala:499)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests$(AnyFunSpecLike.scala:498)
+	at org.scalatest.funspec.AnyFunSpec.runTests(AnyFunSpec.scala:1631)
+	at org.scalatest.Suite.run(Suite.scala:1112)
+	at org.scalatest.Suite.run$(Suite.scala:1094)
+	at org.scalatest.funspec.AnyFunSpec.org$scalatest$funspec$AnyFunSpecLike$$super$run(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$run$1(AnyFunSpecLike.scala:503)
+	at org.scalatest.SuperEngine.runImpl(Engine.scala:535)
+	at org.scalatest.funspec.AnyFunSpecLike.run(AnyFunSpecLike.scala:503)
+	at org.scalatest.funspec.AnyFunSpecLike.run$(AnyFunSpecLike.scala:502)
+	at org.scalatest.funspec.AnyFunSpec.run(AnyFunSpec.scala:1631)
+	at org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)
+	at org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)
+	at sbt.ForkMain$Run.lambda$runTest$1(ForkMain.java:413)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+[info] - Should throw error for unsupported json
+24/06/11 15:13:59 ERROR JsonUtils$: ERROR: Could not extract key and value from json. 
+JSON: [{"path":"/tmp"},{"nestedParent":{"nestedChildKey": "nestedChildValue"}}]
+java.util.NoSuchElementException
+	at java.util.Collections$EmptyIterator.next(Collections.java:4191)
+	at com.databricks.labs.overwatch.utils.JsonUtils$.getJsonKeyValue(Tools.scala:71)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$21(JsonToolsTest.scala:177)
+	at org.scalatest.Assertions.assertThrows(Assertions.scala:808)
+	at org.scalatest.Assertions.assertThrows$(Assertions.scala:804)
+	at org.scalatest.funspec.AnyFunSpec.assertThrows(AnyFunSpec.scala:1631)
+	at com.databricks.labs.overwatch.utils.JsonToolsTest.$anonfun$new$20(JsonToolsTest.scala:177)
+	at org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)
+	at org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)
+	at org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)
+	at org.scalatest.Transformer.apply(Transformer.scala:22)
+	at org.scalatest.Transformer.apply(Transformer.scala:20)
+	at org.scalatest.funspec.AnyFunSpecLike$$anon$1.apply(AnyFunSpecLike.scala:456)
+	at org.scalatest.TestSuite.withFixture(TestSuite.scala:196)
+	at org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)
+	at org.scalatest.funspec.AnyFunSpec.withFixture(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.invokeWithFixture$1(AnyFunSpecLike.scala:454)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTest$1(AnyFunSpecLike.scala:466)
+	at org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest(AnyFunSpecLike.scala:466)
+	at org.scalatest.funspec.AnyFunSpecLike.runTest$(AnyFunSpecLike.scala:448)
+	at org.scalatest.funspec.AnyFunSpec.runTest(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$runTests$1(AnyFunSpecLike.scala:499)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)
+	at org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)
+	at scala.collection.immutable.List.foreach(List.scala:431)
+	at org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)
+	at org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)
+	at org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests(AnyFunSpecLike.scala:499)
+	at org.scalatest.funspec.AnyFunSpecLike.runTests$(AnyFunSpecLike.scala:498)
+	at org.scalatest.funspec.AnyFunSpec.runTests(AnyFunSpec.scala:1631)
+	at org.scalatest.Suite.run(Suite.scala:1112)
+	at org.scalatest.Suite.run$(Suite.scala:1094)
+	at org.scalatest.funspec.AnyFunSpec.org$scalatest$funspec$AnyFunSpecLike$$super$run(AnyFunSpec.scala:1631)
+	at org.scalatest.funspec.AnyFunSpecLike.$anonfun$run$1(AnyFunSpecLike.scala:503)
+	at org.scalatest.SuperEngine.runImpl(Engine.scala:535)
+	at org.scalatest.funspec.AnyFunSpecLike.run(AnyFunSpecLike.scala:503)
+	at org.scalatest.funspec.AnyFunSpecLike.run$(AnyFunSpecLike.scala:502)
+	at org.scalatest.funspec.AnyFunSpec.run(AnyFunSpec.scala:1631)
+	at org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)
+	at org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)
+	at sbt.ForkMain$Run.lambda$runTest$1(ForkMain.java:413)
+	at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+	at java.lang.Thread.run(Thread.java:748)
+[info] - Should throw error for unsupported nested json
+24/06/11 15:13:59 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+[info] SchemaToolsTest:
+[info] cullNestedColumns
+[info] - return struct with all original columns except list of fields defined *** FAILED ***
+[info]   Expected "[`id` BIGINT,`value` STRUCT<`c3`: STRUCT<`c3_1`: BIGINT, `c3_2`: STRING, `c3_3`: STRUCT<`c3_3_1`: STRING, `c3_3_2`: STRING>>>]", but got "[id BIGINT,value STRUCT<c3: STRUCT<c3_1: BIGINT, c3_2: STRING, c3_3: STRUCT<c3_3_1: STRING, c3_3_2: STRING>>> NOT NULL]" (SchemaToolsTest.scala:25)
+[info] - case sensitive return struct with all original columns except list of fields *** FAILED ***
+[info]   Expected "[`id` BIGINT,`value` STRUCT<`c2`: STRING>]", but got "[id BIGINT,value STRUCT<c2: STRING> NOT NULL]" (SchemaToolsTest.scala:39)
+[info] - return a modfied struct with the same name as defined in structToModify *** FAILED ***
+[info]   Expected "[`id` BIGINT,`VAL_MS` STRUCT<`c1`: BIGINT, `c2`: STRING>]", but got "[id BIGINT,VAL_MS STRUCT<c1: BIGINT, c2: STRING> NOT NULL]" (SchemaToolsTest.scala:53)
+Struct To Modify doesn't support column with special characters except _
+[info] - throw immediate exception if structToModify contains a specialCharacter other than -_
+[info] - throw immediate exception if structToModify column doesn't exists
+Recursive culling of nested columns is not yet supported (nestedFieldsToCull)
+[info] - Culling Nested Column in depth
+[info] nestedColExists
+[info] - Basic Nested Col Test Simple
+[info] - Basic Nested Col Test 2 Level
+[info] - Basic Nested Col Test 3 Level
+[info] - Column Doesn't Exist Nested Col Test 
+[info] - Non Nested Column used
+[info] flattenSchema
+[info] - Flatten Schema Recursive *** FAILED ***
+[info]   Expected List("id AS `id`", "value.c1 AS `value_c1`", "value.c2 AS `value_c2`", "value.c3.c3_1 AS `value_c3_c3_1`", "value.c3.c3_2 AS `value_c3_c3_2`", "value.c3.c3_3.c3_3_1 AS `value_c3_c3_3_c3_3_1`", "value.c3.c3_3.c3_3_2 AS `value_c3_c3_3_c3_3_2`"), but got Array("id AS id", "value.c1 AS value_c1", "value.c2 AS value_c2", "value.c3.c3_1 AS value_c3_c3_1", "value.c3.c3_2 AS value_c3_c3_2", "value.c3.c3_3.c3_3_1 AS value_c3_c3_3_c3_3_1", "value.c3.c3_3.c3_3_2 AS value_c3_c3_3_c3_3_2") (SchemaToolsTest.scala:166)
+[info] - Flatten Schema Recursive with Prefix *** FAILED ***
+[info]   Expected List("col_struct.id AS `col_struct_id`", "col_struct.value.c1 AS `col_struct_value_c1`", "col_struct.value.c2 AS `col_struct_value_c2`", "col_struct.value.c3.c3_1 AS `col_struct_value_c3_c3_1`", "col_struct.value.c3.c3_2 AS `col_struct_value_c3_c3_2`", "col_struct.value.c3.c3_3.c3_3_1 AS `col_struct_value_c3_c3_3_c3_3_1`", "col_struct.value.c3.c3_3.c3_3_2 AS `col_struct_value_c3_c3_3_c3_3_2`"), but got Array("col_struct.id AS col_struct_id", "col_struct.value.c1 AS col_struct_value_c1", "col_struct.value.c2 AS col_struct_value_c2", "col_struct.value.c3.c3_1 AS col_struct_value_c3_c3_1", "col_struct.value.c3.c3_2 AS col_struct_value_c3_c3_2", "col_struct.value.c3.c3_3.c3_3_1 AS col_struct_value_c3_c3_3_c3_3_1", "col_struct.value.c3.c3_3.c3_3_2 AS col_struct_value_c3_c3_3_c3_3_2") (SchemaToolsTest.scala:179)
+root
+ |-- id: long (nullable = true)
+ |-- value: string (nullable = true)
+
+[info] - Flatten Schema without nested columns *** FAILED ***
+[info]   Expected List("id AS `id`", "value AS `value`"), but got Array("id AS id", "value AS value") (SchemaToolsTest.scala:193)
+[info] SchemaToolsTest
+24/06/11 15:13:59 WARN SparkSession: Using an existing Spark session; only runtime SQL configurations will take effect.
+[info] - should scrub schema (simple) *** FAILED ***
+[info]   Expected "[`field1` INT,`field2` INT]", but got "[field1 INT NOT NULL,field2 INT NOT NULL]" (SchemaToolsTest.scala:202)
+[info] - should scrub schema (array) *** FAILED ***
+[info]   Expected "...2-2-2` ARRAY<STRUCT<[`abc`]: STRING, `c_1-\45`:...", but got "...2-2-2` ARRAY<STRUCT<[abc]: STRING, `c_1-\45`:..." (SchemaToolsTest.scala:219)
+[info] - should scrub schema (struct) *** FAILED ***
+[info]   Expected "`b-2-2-2` STRUCT<[`abc`]: STRING, `c_1-\45`:...", but got "`b-2-2-2` STRUCT<[abc]: STRING, `c_1-\45`:..." (SchemaToolsTest.scala:237)
+24/06/11 15:13:59 WARN SchemaScrubber: SCHEMA WARNING: --> The following fields were not unique after schema cleansing and have been renamed in place but should be reviewed.
+DUPLICATE FIELDS:
+dup1
+dup2
+24/06/11 15:13:59 WARN SchemaScrubber: 
+dup 1 --> dup1_UNIQUESUFFIX_95946320
+24/06/11 15:13:59 WARN SchemaScrubber: 
+dup 1 --> dup1_UNIQUESUFFIX_95946320
+24/06/11 15:13:59 WARN SchemaScrubber: 
+dup2 --> dup2_UNIQUESUFFIX_3095059
+24/06/11 15:13:59 WARN SchemaScrubber: 
+dup2 --> dup2_UNIQUESUFFIX_3095059
+[info] - should scrub schema (struct) with exceptions *** FAILED ***
+[info]   Expected "[`b_2_2_2` STRUCT<`abc`: STRING, `c_1__45`: BIGINT>,`exception_parent` STRUCT<`dup1`: BIGINT, `dup2`: BIGINT, `xyz`: STRUCT<`_mixed`: BIGINT, `_bad`: BIGINT, `dup1_UNIQUESUFFIX_95946320`: BIGINT, `dup1_UNIQUESUFFIX_95946320`: BIGINT, `dup2_UNIQUESUFFIX_3095059`: BIGINT, `dup2_UNIQUESUFFIX_3095059`: STRING, `good_col`: BIGINT, `jkl`: BIGINT, `otherexcept`: BIGINT>, `zyx`: BIGINT>,`i_1` BIGINT,`parentwspace` STRING,`validParent`] STRING", but got "[b_2_2_2 STRUCT<abc: STRING, c_1__45: BIGINT>,exception_parent STRUCT<dup1: BIGINT, dup2: BIGINT, xyz: STRUCT<_mixed: BIGINT, _bad: BIGINT, dup1_UNIQUESUFFIX_95946320: BIGINT, dup1_UNIQUESUFFIX_95946320: BIGINT, dup2_UNIQUESUFFIX_3095059: BIGINT, dup2_UNIQUESUFFIX_3095059: STRING, good_col: BIGINT, jkl: BIGINT, otherexcept: BIGINT>, zyx: BIGINT>,i_1 BIGINT,parentwspace STRING,validParent] STRING" (SchemaToolsTest.scala:277)
+[info] - should collect column names 1 
+[info] - should collect column names 2
+[info] - should flatten column names 1  *** FAILED ***
+[info]   Expected "[`b222` ARRAY<STRUCT<`abc`: STRING, `c_145`: BIGINT>>,`i1`] BIGINT", but got "[b222 ARRAY<STRUCT<abc: STRING, c_145: BIGINT>>,i1] BIGINT" (SchemaToolsTest.scala:306)
+[info] - should flatten column names 2 *** FAILED ***
+[info]   Expected "[`b222_abc` STRING,`b222_c_145` BIGINT,`i1`] BIGINT", but got "[b222_abc STRING,b222_c_145 BIGINT,i1] BIGINT" (SchemaToolsTest.scala:317)
+[info] - should return a field with the appropriate name and default null type
+[info] - should return a field with the appropriate name and the overridden null type
+[info] - should return the existing field
+[info] - should respect case sensitivity
+[info] Test cases for SchemaTools.structFromJson function
+WARNING: The json schema for column c1 was not parsed correctly, please review.
+[info] - should generate a struct from json string column - malformed json
+[info]   + Given below variables 
+[info]   + When function is called with given parameters and the schema is corrupt 
+[info]   + Then print a warning message and  
+[info] - should throw an exception - column (top level) does not exist in the dataframe
+[info]   + Given below variables 
+[info]   + When function is called with given parameters 
+[info]   + Then throws an exception - java.lang.IllegalArgumentException 
+WARNING: The json schema for column c2 was not parsed correctly, please review.
+[info] - should throw an exception - column is not a StringType
+[info]   + Given below variables 
+[info]   + When function is called with given parameters and column is not a StringType 
+[info]   + Then throws an exception - org.apache.spark.sql.AnalysisException 
+[info] - should return a null - column is StringType but empty
+[info]   + Given below variables 
+[info]   + When function is called with given parameters and column is not a StringType 
+[info]   + Then return a null 
+[info] Test cases for SchemaTools.structToMap function
+[info] - should throw an exception - column is not a StructType
+[info]   + Given a dataframe without a struct column 
+[info]   + When function is called on the given dataframe 
+[info]   + Then throws an exception 
+[info] - should return an empty map<string, string> - null value column
+[info]   + Given a dataframe with a null column 
+[info]   + When function is called on the given dataframe 
+[info]   + Then returns an empty MapType(StringType,StringType,true) 
+[info] - should return an empty map<string, string> - input column does not exist in the df
+[info]   + Given a dataframe with a null column 
+[info]   + When function is called on the given dataframe 
+[info]   + Then returns an empty MapType(StringType,StringType,true) 
+[info] - should return same number of map-keys as columns in input struct - dropEmptyKeys = false
+[info]   + Given a dataframe with a struct column 
+[info]   + When function is called on a struct column 
+[info]   + Then number of key-values in the converted map is same as number of key-values in the input struct 
+[info] - should return map keys only with non-null map values - dropEmptyKeys = true
+[info]   + Given a dataframe with a struct column 
+[info]   + When function is called on a struct column and dropEmptyKeys = true 
+[info]   + Then return map keys only with non-null map values 
+[info] - should return converted column with same name as colToConvert
+[info]   + Given a dataframe with struct column 
+[info]   + When function is called on the struct column 
+[info]   + Then returns a map 
+[info] - should return converted column (nested) with the name of all characters to the right of last period
+[info]   + Given a dataframe with nested struct column 
+[info]   + When function is called on the nested struct column 
+[info]   + Then returns converted column for the nested struct 
+[info] - should return converted column with the name containing period
+[info]   + Given a dataframe with struct column name having period 
+[info]   + When function is called on the struct column name having period 
+[info]   + Then returns converted column name having period 
+[info] Test cases for SchemaTools.modifyStruct
+[info] - should not make alterations to the resulting column if fieldName is not present in the changeInventory
+[info]   + Given a dataframe with struct column and a change inventory 
+[info]   + When function is call on the given df 
+[info]   + Then make no alterations to the resulting column 
+[info] - should make alterations to the struct columns as per the column logic
+[info]   + Given a dataframe with struct column and a changeInventory 
+[info]   + When function is called with given parameters 
+[info]   + Then make alterations to the struct fields as per column logic 
+[info] - should make alterations to the top level struct columns as per the changeInventory
+[info]   + Given a dataframe with struct column and a changeInventory 
+[info]   + When function is called with given parameters 
+[info]   + Then make alterations to the struct fields as per column logic 
+[info] - should make alterations to the nested struct columns as per the changeInventory
+[info]   + Given a dataframe with struct column and a changeInventory 
+[info]   + When function is called with given parameters 
+[info]   + Then make alterations to the struct fields as per column logic 
+[info] - should return the modified struct with the same name as the original struct
+[info]   + Given a dataframe with struct column and a changeInventory 
+[info]   + When function is called with given parameters 
+[info]   + Then modified struct has same name as the original struct 
+[info] - should make alteration to only the struct present in the changeInventory
+[info]   + Given a dataframe with struct column and a changeInventory 
+[info]   + When function is called with given parameters 
+[info]   + Then modified struct has same name as the original struct 
+[info] Run completed in 7 seconds, 655 milliseconds.
+[info] Total number of tests run: 129
+[info] Suites: completed 12, aborted 2
+[info] Tests: succeeded 102, failed 27, canceled 0, ignored 38, pending 0
+[info] *** 2 SUITES ABORTED ***
+[info] *** 27 TESTS FAILED ***
+[error] Failed tests:
+[error] 	com.databricks.labs.overwatch.pipeline.TransformFunctionsTest
+[error] 	com.databricks.labs.overwatch.pipeline.InitializerFunctionsTest
+[error] 	com.databricks.labs.overwatch.utils.SchemaToolsTest
+[error] Error during tests:
+[error] 	com.databricks.labs.overwatch.utils.TransformationDescriberTest
+[error] 	com.databricks.labs.overwatch.pipeline.PipelineFunctionsTest
+[error] (Test / test) sbt.TestsFailedException: Tests unsuccessful
+[error] Total time: 22 s, completed Jun 11, 2024 3:14:00 PM

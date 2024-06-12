@@ -1324,19 +1324,25 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       .foreach( logger.log( Level.INFO, _))
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSpecNameLookup = clusterSpec.asDF
-      .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
-      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
+    lazy val clusterSpecNameLookup =
+      clusterSpec.asDF.transformWithDescription(
+        NamedTransformation { (df: DataFrame) => {
+          df.select( 'organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
+            .filter('clusterId.isNotNull && 'cluster_name.isNotNull)}})
 
     // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSnapNameLookup = clusterSnapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
-      .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
-      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
+    lazy val clusterSnapNameLookup =
+      clusterSnapshot.asDF.transformWithDescription(
+        NamedTransformation { (df: DataFrame) => {
+          df.withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
+            .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
+            .filter('clusterId.isNotNull && 'cluster_name.isNotNull)}})
 
     // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val jobStatusMetaLookup = jobsStatus.asDF
-      .verifyMinimumSchema(Schema.minimumJobStatusSilverMetaLookupSchema)
+    lazy val jobStatusMetaLookup =
+      jobsStatus.asDF.transformWithDescription(
+        NamedTransformation { (df: DataFrame) => {
+          df.verifyMinimumSchema( Schema.minimumJobStatusSilverMetaLookupSchema)
       .select(
         'organization_id,
         'timestamp,
@@ -1358,7 +1364,7 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
         to_json($"task_detail_legacy.spark_submit_task").alias("spark_submit_task"),
         to_json($"task_detail_legacy.shell_command_task").alias("shell_command_task"),
         to_json($"task_detail_legacy.pipeline_task").alias("pipeline_task")
-      )
+      )}})
 
     lazy val jobSnapNameLookup = jobsSnapshot.asDF
       .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
@@ -1372,15 +1378,22 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
     )
 
     // caching before structifying
-    jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
+    jobRunsLag30D
+      .transformWithDescription(
+        jobRunsDeriveRunsBase( etlUntilTime))
       .transformWithDescription(
         jobRunsAppendClusterName( jobRunsLookups))
-      .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
-      .transform(jobRunsAppendTaskAndClusterDetails)
-      .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
-      //      .transform(jobRunsRollupWorkflowsAndChildren)
-      .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
+      .transformWithDescription(
+        jobRunsAppendJobMeta( jobRunsLookups))
+      .transformWithDescription(
+        jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transformWithDescription(
+        jobRunsAppendTaskAndClusterDetails)
+      .transformWithDescription(
+        jobRunsCleanseCreatedNestedStructures( targetKeys))
+      .drop("timestamp")
+    // `timestamp` could be duplicated to enable `asOf` lookups;
+    // dropping to clean up
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
