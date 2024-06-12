@@ -24,53 +24,78 @@ class PipelineFunctionsTest extends AnyFunSpec with DataFrameComparer with Spark
 
   delDir("")
 
-  describe("Tests for add and subtract incremental ticks") {
+  describe("Tests for adding and subtracting incremental ticks") {
 
-    val rawDF = spark.createDataFrame(
-      Seq((2, 2l, 2.0d, java.sql.Date.valueOf("2020-10-30"),
-        java.sql.Timestamp.valueOf("2011-10-31 10:01:11.000")))
-    ).toDF("int", "long", "double", "date", "timestamp")
+    val rawDF = spark.createDataFrame( Seq(
+      ( 2, 2l, 2.0d,
+        java.sql.Date.valueOf("2020-10-30"),
+        java.sql.Timestamp.valueOf("2011-10-31 10:01:11.000"))))
+      .toDF(
+        "int", "long", "double",
+        "date",
+        "timestamp")
 
-    it("add tick to every column") {
-      val generatedDf = rawDF
-        .select(PipelineFunctions.addNTicks(col("int"), 1, IntegerType).as("int"),
-          PipelineFunctions.addNTicks(col("long"), 1, LongType).as("long"),
-          PipelineFunctions.addNTicks(col("double"), 1, DoubleType).as("double"),
-          PipelineFunctions.addNTicks(col("date"), 1, DateType).as("date"),
-          PipelineFunctions.addNTicks(col("timestamp"), 1).as("timestamp")
-        )
+    it("should add a tick to every column") {
 
-      assertResult("`int` INT,`long` BIGINT,`double` DOUBLE,`date` DATE,`timestamp` TIMESTAMP") {
+      val generatedDf = rawDF.select(
+        PipelineFunctions.addNTicks(col("int"), 1, IntegerType).as("int"),
+        PipelineFunctions.addNTicks(col("long"), 1, LongType).as("long"),
+        PipelineFunctions.addNTicks(col("double"), 1, DoubleType).as("double"),
+        PipelineFunctions.addNTicks(col("date"), 1, DateType).as("date"),
+        PipelineFunctions.addNTicks(col("timestamp"), 1).as("timestamp"))
+
+      assertResult( Seq(
+        "int INT NOT NULL,",
+        "long BIGINT NOT NULL,",
+        "double DOUBLE NOT NULL,",
+        "date DATE,",
+        "timestamp TIMESTAMP").mkString) {
         generatedDf.schema.toDDL
       }
 
-      val mustBeDf = spark.createDataFrame(
-        Seq((3, 3l, 2.001d, java.sql.Date.valueOf("2020-10-31"),
-          java.sql.Timestamp.valueOf("2011-10-31 10:01:11.001")))
-      ).toDF("int", "long", "double", "date", "timestamp")
+      val mustBeDf = spark.createDataFrame( Seq(
+        ( 3, 3l, 2.001d,
+          java.sql.Date.valueOf("2020-10-31"),
+          java.sql.Timestamp.valueOf("2011-10-31 10:01:11.001"))))
+        .toDF(
+          "int", "long", "double",
+          "date",
+          "timestamp")
 
       assertApproximateDataFrameEquality(generatedDf, mustBeDf, 0.001)
+
     }
 
-    it("subtract tick from every column") {
-      val generatedDf = rawDF
-        .select(PipelineFunctions.subtractNTicks(col("int"), 1, IntegerType).as("int"),
-          PipelineFunctions.subtractNTicks(col("long"), 1, LongType).as("long"),
-          PipelineFunctions.subtractNTicks(col("double"), 1, DoubleType).as("double"),
-          PipelineFunctions.subtractNTicks(col("date"), 1, DateType).as("date"),
-          PipelineFunctions.subtractNTicks(col("timestamp"), 1).as("timestamp")
-        )
 
-      assertResult("`int` INT,`long` BIGINT,`double` DOUBLE,`date` DATE,`timestamp` TIMESTAMP") {
+    it("should subtract a tick from every column") {
+
+      val generatedDf = rawDF.select(
+        PipelineFunctions.subtractNTicks(col("int"), 1, IntegerType).as("int"),
+        PipelineFunctions.subtractNTicks(col("long"), 1, LongType).as("long"),
+        PipelineFunctions.subtractNTicks(col("double"), 1, DoubleType).as("double"),
+        PipelineFunctions.subtractNTicks(col("date"), 1, DateType).as("date"),
+        PipelineFunctions.subtractNTicks(col("timestamp"), 1).as("timestamp"))
+
+      assertResult( Seq(
+        "int INT NOT NULL,",
+        "long BIGINT NOT NULL,",
+        "double DOUBLE NOT NULL,",
+        "date DATE,",
+        "timestamp TIMESTAMP").mkString) {
         generatedDf.schema.toDDL
       }
 
-      val mustBeDf = spark.createDataFrame(
-        Seq((1, 1l, 1.999d, java.sql.Date.valueOf("2020-10-29"),
-          java.sql.Timestamp.valueOf("2011-10-31 10:01:10.999")))
-      ).toDF("int", "long", "double", "date", "timestamp")
+      val mustBeDf = spark.createDataFrame( Seq(
+        ( 1, 1l, 1.999d,
+          java.sql.Date.valueOf("2020-10-29"),
+          java.sql.Timestamp.valueOf("2011-10-31 10:01:10.999"))))
+        .toDF(
+          "int", "long", "double",
+          "date",
+          "timestamp")
 
       assertApproximateDataFrameEquality(generatedDf, mustBeDf, 0.001)
+
     }
 
     it("should fail on wrong column type") {

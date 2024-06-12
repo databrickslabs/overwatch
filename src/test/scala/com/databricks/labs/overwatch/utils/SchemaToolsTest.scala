@@ -15,12 +15,39 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
 
   describe("cullNestedColumns") {
     it("return struct with all original columns except list of fields defined") {
+
       val strings = Seq(
-        "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
-        "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
-      ).toDS
+
+        //   "{\"id\": 1, \"value\": {\"c1\": 123, \"c2\": \"ttt\", \"c3\": {\"c3_1\": 123, \"c3_2\": \"ttt\", \"c3_3\" : {\"c3_3_1\": \"mmm\", \"c3_3_2\": \"xxx\"}}}}",
+      //   "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
+
+        """{ "id": 1,
+          |  "value": {
+          |    "c1": 123,
+          |    "c2": "ttt",
+          |    "c3": {
+          |      "c3_1": 123,
+          |      "c3_2": "ttt",
+          |      "c3_3" : {
+          |        "c3_3_1": "mmm",
+          |        "c3_3_2": "xxx"
+          |        }}}}""",
+        """{ "id": 2,
+          |  "value": {
+          |    "c1": 234,
+          |    "c2": "bbb",
+          |    "c3": {
+          |      "c3_1": 1234,
+          |      "c3_2": "tttt",
+          |      "c3_3" : {
+          |        "c3_3_1": "mmmm",
+          |        "c3_3_2": "xxxx"
+          |        }}}}""")
+        .map( _.stripMargin)
+        .toDS
+
       val df = spark.read.json(strings)
-      val expectedSchema = s"""`id` BIGINT,`value` STRUCT<`c3`: STRUCT<`c3_1`: BIGINT, `c3_2`: STRING, `c3_3`: STRUCT<`c3_3_1`: STRING, `c3_3_2`: STRING>>>"""
+      val expectedSchema = s"""id BIGINT,value STRUCT<c3: STRUCT<c3_1: BIGINT, c3_2: STRING, c3_3: STRUCT<c3_3_1: STRING, c3_3_2: STRING>>> NOT NULL"""
 
       assertResult(expectedSchema) {
         val ndf = SchemaTools.cullNestedColumns(df, "value", Array("c1", "c2"))
@@ -34,7 +61,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = s"""`id` BIGINT,`value` STRUCT<`c2`: STRING>"""
+      val expectedSchema = s"""id BIGINT,value STRUCT<c2: STRING> NOT NULL"""
 
       assertResult(expectedSchema) {
         val ndf = SchemaTools.cullNestedColumns(df, "value", Array("C1", "C3"))
@@ -48,7 +75,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"id\": 2, \"val_ms\": {\"c1\": 234, \"c2\": \"bbb\", \"C3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = s"""`id` BIGINT,`VAL_MS` STRUCT<`c1`: BIGINT, `c2`: STRING>"""
+      val expectedSchema = s"""id BIGINT,VAL_MS STRUCT<c1: BIGINT, c2: STRING> NOT NULL"""
 
       assertResult(expectedSchema) {
         val ndf = SchemaTools.cullNestedColumns(df, "VAL_MS", Array("c3"))
@@ -161,7 +188,14 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = Seq("id AS `id`", "value.c1 AS `value_c1`", "value.c2 AS `value_c2`", "value.c3.c3_1 AS `value_c3_c3_1`", "value.c3.c3_2 AS `value_c3_c3_2`", "value.c3.c3_3.c3_3_1 AS `value_c3_c3_3_c3_3_1`", "value.c3.c3_3.c3_3_2 AS `value_c3_c3_3_c3_3_2`")
+      val expectedSchema = Seq(
+        "id AS id",
+        "value.c1 AS value_c1",
+        "value.c2 AS value_c2",
+        "value.c3.c3_1 AS value_c3_c3_1",
+        "value.c3.c3_2 AS value_c3_c3_2",
+        "value.c3.c3_3.c3_3_1 AS value_c3_c3_3_c3_3_1",
+        "value.c3.c3_3.c3_3_2 AS value_c3_c3_3_c3_3_2")
 
       assertResult(expectedSchema) {
         SchemaTools.flattenSchema(df.schema).map(_.toString()).toSeq
@@ -174,7 +208,14 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"id\": 2, \"value\": {\"c1\": 234, \"c2\": \"bbb\", \"c3\": {\"c3_1\": 1234, \"c3_2\": \"tttt\", \"c3_3\" : {\"c3_3_1\": \"mmmm\", \"c3_3_2\": \"xxxx\"}}}}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = Seq("col_struct.id AS `col_struct_id`", "col_struct.value.c1 AS `col_struct_value_c1`", "col_struct.value.c2 AS `col_struct_value_c2`", "col_struct.value.c3.c3_1 AS `col_struct_value_c3_c3_1`", "col_struct.value.c3.c3_2 AS `col_struct_value_c3_c3_2`", "col_struct.value.c3.c3_3.c3_3_1 AS `col_struct_value_c3_c3_3_c3_3_1`", "col_struct.value.c3.c3_3.c3_3_2 AS `col_struct_value_c3_c3_3_c3_3_2`")
+      val expectedSchema = Seq(
+        "col_struct.id AS col_struct_id",
+        "col_struct.value.c1 AS col_struct_value_c1",
+        "col_struct.value.c2 AS col_struct_value_c2",
+        "col_struct.value.c3.c3_1 AS col_struct_value_c3_c3_1",
+        "col_struct.value.c3.c3_2 AS col_struct_value_c3_c3_2",
+        "col_struct.value.c3.c3_3.c3_3_1 AS col_struct_value_c3_c3_3_c3_3_1",
+        "col_struct.value.c3.c3_3.c3_3_2 AS col_struct_value_c3_c3_3_c3_3_2")
 
       assertResult(expectedSchema) {
         SchemaTools.flattenSchema(df.schema,"col_struct").map(_.toString()).toSeq
@@ -187,7 +228,9 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"id\": 2, \"value\": \"xyz\"}"
       ).toDS
       val df = spark.read.json(strings)
-      val expectedSchema = Seq("id AS `id`", "value AS `value`")
+      val expectedSchema = Seq(
+        "id AS id",
+        "value AS value")
 
       df.printSchema()
       assertResult(expectedSchema) {
@@ -199,11 +242,11 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
   describe("SchemaToolsTest") {
 
     it("should scrub schema (simple)") {
-      assertResult("`field1` INT,`field2` INT"){
+      assertResult("field1 INT NOT NULL,field2 INT NOT NULL"){
         val df = spark.createDataFrame(Seq((1,2))).toDF("field1", "field2")
         SchemaScrubber.scrubSchema(df).schema.toDDL
       }
-      assertResult("`field_1` INT,`f_i_e_l_d__2` INT"){
+      assertResult("field_1 INT NOT NULL,f_i_e_l_d__2 INT NOT NULL"){
         val df = spark.createDataFrame(Seq((1,2))).toDF("field-1", "f-i-e-l-d\\\\2")
         SchemaScrubber.scrubSchema(df).schema.toDDL
       }
@@ -216,13 +259,13 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
       ).toDS
       val df = spark.read.json(strings)
 
-      assertResult("`b-2-2-2` ARRAY<STRUCT<`abc`: STRING, `c_1-\\45`: BIGINT>>,`i-1` BIGINT") {
+      assertResult("`b-2-2-2` ARRAY<STRUCT<abc: STRING, `c_1-\\45`: BIGINT>>,`i-1` BIGINT") {
         df.schema.toDDL
       }
-      assertResult("`b_2_2_2` ARRAY<STRUCT<`abc`: STRING, `c_1__45`: BIGINT>>,`i_1` BIGINT") {
+      assertResult("b_2_2_2 ARRAY<STRUCT<abc: STRING, c_1__45: BIGINT>>,i_1 BIGINT") {
         SchemaScrubber.scrubSchema(df).schema.toDDL
       }
-      assertResult("`b_2_2_2` ARRAY<STRUCT<`abc`: STRING, `c_1__45`: BIGINT>>,`i_1` BIGINT") {
+      assertResult("b_2_2_2 ARRAY<STRUCT<abc: STRING, c_1__45: BIGINT>>,i_1 BIGINT") {
         df.scrubSchema.schema.toDDL
       }
     }
@@ -234,13 +277,13 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
       ).toDS
       val df = spark.read.json(strings)
 
-      assertResult("`b-2-2-2` STRUCT<`abc`: STRING, `c_1-\\45`: BIGINT>,`i-1` BIGINT") {
+      assertResult("`b-2-2-2` STRUCT<abc: STRING, `c_1-\\45`: BIGINT>,`i-1` BIGINT") {
         df.schema.toDDL
       }
-      assertResult("`b_2_2_2` STRUCT<`abc`: STRING, `c_1__45`: BIGINT>,`i_1` BIGINT") {
+      assertResult("b_2_2_2 STRUCT<abc: STRING, c_1__45: BIGINT>,i_1 BIGINT") {
         SchemaScrubber.scrubSchema(df).schema.toDDL
       }
-      assertResult("`b_2_2_2` STRUCT<`abc`: STRING, `c_1__45`: BIGINT>,`i_1` BIGINT") {
+      assertResult("b_2_2_2 STRUCT<abc: STRING, c_1__45: BIGINT>,i_1 BIGINT") {
         df.scrubSchema.schema.toDDL
       }
     }
@@ -268,11 +311,11 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
       )
       val exceptionScrubber = SchemaScrubber(exceptions = Array(propertiesScrubException))
 
-      val expectedResString = "`b_2_2_2` STRUCT<`abc`: STRING, `c_1__45`: BIGINT>,`exception_parent` " +
-        "STRUCT<`dup1`: BIGINT, `dup2`: BIGINT, `xyz`: STRUCT<`_mixed`: BIGINT, `_bad`: BIGINT, " +
-        "`dup1_UNIQUESUFFIX_95946320`: BIGINT, `dup1_UNIQUESUFFIX_95946320`: BIGINT, `dup2_UNIQUESUFFIX_3095059`: " +
-        "BIGINT, `dup2_UNIQUESUFFIX_3095059`: STRING, `good_col`: BIGINT, `jkl`: BIGINT, `otherexcept`: BIGINT>, " +
-        "`zyx`: BIGINT>,`i_1` BIGINT,`parentwspace` STRING,`validParent` STRING"
+      val expectedResString = "b_2_2_2 STRUCT<abc: STRING, c_1__45: BIGINT>,exception_parent " +
+        "STRUCT<dup1: BIGINT, dup2: BIGINT, xyz: STRUCT<_mixed: BIGINT, _bad: BIGINT, " +
+        "dup1_UNIQUESUFFIX_95946320: BIGINT, dup1_UNIQUESUFFIX_95946320: BIGINT, dup2_UNIQUESUFFIX_3095059: " +
+        "BIGINT, dup2_UNIQUESUFFIX_3095059: STRING, good_col: BIGINT, jkl: BIGINT, otherexcept: BIGINT>, " +
+        "zyx: BIGINT>,i_1 BIGINT,parentwspace STRING,validParent STRING"
       val ddlFromLogic = df.scrubSchema(exceptionScrubber).schema.toDDL
       assertResult(expectedResString) {
         ddlFromLogic
@@ -303,7 +346,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"i1\": 2, \"b222\": [{\"c_145\": 234, \"abc\": \"bbb\"}, {\"c_145\": 434, \"abc\": \"aaa\"}]}"
       ).toDS
       val df = spark.read.json(strings)
-      assertResult("`b222` ARRAY<STRUCT<`abc`: STRING, `c_145`: BIGINT>>,`i1` BIGINT") {
+      assertResult("b222 ARRAY<STRUCT<abc: STRING, c_145: BIGINT>>,i1 BIGINT") {
         df.select(SchemaTools.flattenSchema(df): _*).schema.toDDL
       }
     }
@@ -314,7 +357,7 @@ class SchemaToolsTest extends AnyFunSpec with SparkSessionTestWrapper with Given
         "{\"i1\": 2, \"b222\": {\"c_145\": 234, \"abc\": \"bbb\"}}"
       ).toDS
       val df = spark.read.json(strings)
-      assertResult("`b222_abc` STRING,`b222_c_145` BIGINT,`i1` BIGINT") {
+      assertResult("b222_abc STRING,b222_c_145 BIGINT,i1 BIGINT") {
         df.select(SchemaTools.flattenSchema(df): _*).schema.toDDL
       }
     }

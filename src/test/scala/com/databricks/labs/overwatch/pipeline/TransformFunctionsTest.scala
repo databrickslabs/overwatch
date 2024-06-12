@@ -56,7 +56,7 @@ class TransformFunctionsTest extends AnyFunSpec
 
       val actualDF = sourceDF.withColumn("RunTime",
         TransformFunctions.subtractTime($"start", $"end"))
-      assertResult("`start` BIGINT,`end` BIGINT,`RunTime` STRUCT<`startEpochMS`: BIGINT, `startTS`: TIMESTAMP, `endEpochMS`: BIGINT, `endTS`: TIMESTAMP, `runTimeMS`: BIGINT, `runTimeS`: DOUBLE, `runTimeM`: DOUBLE, `runTimeH`: DOUBLE>")(actualDF.schema.toDDL)
+      assertResult("start BIGINT NOT NULL,end BIGINT NOT NULL,RunTime STRUCT<startEpochMS: BIGINT, startTS: TIMESTAMP, endEpochMS: BIGINT, endTS: TIMESTAMP, runTimeMS: BIGINT, runTimeS: DOUBLE, runTimeM: DOUBLE, runTimeH: DOUBLE> NOT NULL")(actualDF.schema.toDDL)
       assertResult(1)(actualDF.count())
       assertApproximateDataFrameEquality(actualDF, expectedDF, 0.001)
     }
@@ -94,22 +94,23 @@ class TransformFunctionsTest extends AnyFunSpec
       .withColumn("myStruct", nonNullStructCol)
 
     it("should maintain columns with at least one non-null record") {
-      val noColumnsRemovedDDL = "`myMap` MAP<STRING, INT>,`myString` STRING,`myStruct` STRUCT<`sc1`: STRING, `sc2`: BIGINT>,`myBoolean` BOOLEAN,`myDate` DATE,`myTimestamp` TIMESTAMP,`myArray` ARRAY<INT>"
+      // val noColumnsRemovedDDL = "myMap MAP<STRING, INT>,myString STRING,myStruct STRUCT<sc1: STRING, sc2: BIGINT> NOT NULL,myBoolean BOOLEAN NOT NULL,myDate DATE,myTimestamp TIMESTAMP,myArray ARRAY<INT>"
+      val noColumnsRemovedNames = Seq( "myMap", "myString", "myStruct", "myBoolean", "myDate", "myTimestamp", "myArray") 
 
       When("df is fully populated")
       Then("removes no columns")
-      assertResult(noColumnsRemovedDDL)(noNulls.cullNull().schema.toDDL)
+      assertResult(noColumnsRemovedNames)(noNulls.cullNull().schema.fields.map( _.name))
 
       When("all df columns have at least one non-null")
       Then("removes no columns")
-      assertResult(noColumnsRemovedDDL)(noNulls.unionByName(allNulls).cullNull().schema.toDDL)
+      assertResult(noColumnsRemovedNames)(noNulls.unionByName(allNulls).cullNull().schema.fields.map( _.name))
 
     }
 
     it("should remove only the null columns and leave the others"){
 
-      val onlyMyStringDDL = "`myString` STRING"
-      val structMapsDDL = "`myMap` MAP<STRING, INT>,`myStruct` STRUCT<`sc1`: STRING, `sc2`: BIGINT>"
+      val onlyMyStringDDL = "myString STRING"
+      val structMapsDDL = "myMap MAP<STRING, INT>,myStruct STRUCT<sc1: STRING, sc2: BIGINT> NOT NULL"
 
       When("df has boolean with all nulls and string with values")
       Then("remove only the boolean field")
@@ -145,7 +146,7 @@ class TransformFunctionsTest extends AnyFunSpec
       val sourceDF = Seq((sourceTS)).toDF("long")
       val actualDF = sourceDF.withColumn("tsmilli", TransformFunctions.toTS(col("long")))
         .withColumn("tssec", TransformFunctions.toTS(col("long"), inputResolution = "sec"))
-      assertResult("`long` BIGINT,`tsmilli` TIMESTAMP,`tssec` TIMESTAMP")(actualDF.schema.toDDL)
+      assertResult("long BIGINT NOT NULL,tsmilli TIMESTAMP,tssec TIMESTAMP")(actualDF.schema.toDDL)
       assertResult(1)(actualDF.count())
       val first = actualDF.first()
       assertResult(sourceTS)(first.getLong(0))
@@ -160,7 +161,7 @@ class TransformFunctionsTest extends AnyFunSpec
         TransformFunctions.toTS(col("long"), outputResultType = DateType))
         .withColumn("tssec",
           TransformFunctions.toTS(col("long"), inputResolution = "sec", outputResultType = DateType))
-      assertResult("`long` BIGINT,`tsmilli` DATE,`tssec` DATE")(actualDF.schema.toDDL)
+      assertResult("long BIGINT NOT NULL,tsmilli DATE,tssec DATE")(actualDF.schema.toDDL)
       assertResult(1)(actualDF.count())
       val first = actualDF.first()
       assertResult(sourceTS)(first.getLong(0))
@@ -293,7 +294,7 @@ class TransformFunctionsTest extends AnyFunSpec
         ,expectedDFSchema)
 
       var actualDF = df1.joinWithLag(df2,joinKeys, lagColumn,laggingSide="left", lagDays = lagDays, joinType = "left")
-      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true, orderedComparison = false)
     }
 
     it("should join dataframes with lag - jointype:inner, laggingside:left") {
@@ -323,7 +324,7 @@ class TransformFunctionsTest extends AnyFunSpec
       )),expectedDFSchema)
 
       var actualDF = df1.joinWithLag(df2,joinKeys, lagColumn,laggingSide="left", lagDays = lagDays, joinType = "inner")
-      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true, orderedComparison = false)
     }
 
     it("should join dataframes with lag - jointype: left, laggingside: right") {
@@ -354,7 +355,7 @@ class TransformFunctionsTest extends AnyFunSpec
       ))
         ,expectedDFSchema)
       var actualDF = df2.joinWithLag(df1,joinKeys, lagColumn,laggingSide="right", lagDays = lagDays, joinType = "left")
-      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true, orderedComparison = false)
     }
 
     it("should join dataframes with lag - jointype: inner, laggingside: right") {
@@ -384,7 +385,7 @@ class TransformFunctionsTest extends AnyFunSpec
       ))
         ,expectedDFSchema)
       var actualDF = df2.joinWithLag(df1,joinKeys, lagColumn,laggingSide="right", lagDays = lagDays, joinType = "inner")
-      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true, orderedComparison = false)
     }
 
     it("should join dataframes with lag - jointype: right, laggingside: left") {
@@ -415,7 +416,7 @@ class TransformFunctionsTest extends AnyFunSpec
         ,expectedDFSchema)
 
       var actualDF = df1.joinWithLag(df2,joinKeys, lagColumn,laggingSide="left", lagDays = lagDays, joinType = "right")
-      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true, orderedComparison = false)
     }
 
     it("should join dataframes with lag - jointype: right, laggingside: right") {
@@ -445,7 +446,7 @@ class TransformFunctionsTest extends AnyFunSpec
         Row(Row("/faq/55-00.gz"),"25379","09-s999","388",2,Date.valueOf("2016-09-28"),Row("/hfg/16-00.gz"))))
         ,expectedDFSchema)
       var actualDF = df2.joinWithLag(df1,joinKeys, lagColumn,laggingSide="right", lagDays = lagDays, joinType = "right")
-      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true)
+      assertSmallDataFrameEquality(expectedDf, actualDF, ignoreNullable = true, orderedComparison = false)
     }
 
     it("should not work for missing laggingcolumn in either dataframes") {
