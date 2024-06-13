@@ -544,13 +544,13 @@ object WorkflowsTransforms extends SparkSessionWrapper {
    */
 
   //  val jobRunsLookups: Map[String, DataFrame] =
-  def jobRunsInitializeLookups(lookups: (PipelineTable, DataFrame)*): Map[String, DataFrame] = {
-    lookups
-      .filter(_._1.exists)
-      .map(lookup => {
-        (lookup._1.name, lookup._2)
-      }).toMap
-  }
+  // def jobRunsInitializeLookups(lookups: (PipelineTable, DataFrame)*): Map[String, DataFrame] = {
+  //   lookups
+  //     .filter(_._1.exists)
+  //     .map(lookup => {
+  //       (lookup._1.name, lookup._2)
+  //     }).toMap
+  // }
 
   def jobRunsDeriveCompletedRuns(df: DataFrame, firstRunSemanticsW: WindowSpec): DataFrame = {
     df
@@ -992,71 +992,43 @@ object WorkflowsTransforms extends SparkSessionWrapper {
 
   }}
 
-  /**
-    * Look up the cluster_name based on id first from
-    * `job_status_silver`.  If not present there fallback to latest
-    * snapshot prior to the run
-    */
+  // /**
+  //   * Look up the cluster_name based on id first from
+  //   * `job_status_silver`.  If not present there fallback to latest
+  //   * snapshot prior to the run
+  //   */
 
-  val jobRunsAppendClusterName = (lookups: Map[String,DataFrame]) => NamedTransformation {
-
-    (df: DataFrame) => {
-
-      val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
-        df.toTSDF("timestamp", "organization_id", "clusterId")
-          .lookupWhen(
-            lookups("cluster_spec_silver")
-              .toTSDF("timestamp", "organization_id", "clusterId")
-          ).df
-      } else df
-
-      val runsWClusterNames2 = if (lookups.contains("clusters_snapshot_bronze")) {
-        runsWClusterNames1
-          .toTSDF("timestamp", "organization_id", "clusterId")
-          .lookupWhen(
-            lookups("clusters_snapshot_bronze")
-              .toTSDF("timestamp", "organization_id", "clusterId")
-          ).df
-      } else runsWClusterNames1
-
-      runsWClusterNames2
-    }
-
-  }
+  // val jobRunsAppendClusterName = NamedTransformation {
+  //   (df: DataFrame) => {
+  //     val key = Seq( "timestamp", "organization_id", "clusterId")
+  //     df.toTSDF( key:_*)
+  //       .lookupWhen( clusterSpecNameLookup.toTSDF( key:_*))
+  //       .lookupWhen( clusterSnapNameLookup.toTSDF( key:_*))
+  //       .df
+  //   }
+  // }
 
 
-  /**
-   * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
-   * snapshot prior to the run
-   */
-  val jobRunsAppendJobMeta = (lookups: Map[String, DataFrame]) => NamedTransformation {
-    (df: DataFrame) => {
-
-      val runsWithJobName1 = if (lookups.contains("job_status_silver")) {
-        df
-        .toTSDF("timestamp", "organization_id", "jobId")
-        .lookupWhen(
-          lookups("job_status_silver")
-            .toTSDF("timestamp", "organization_id", "jobId")
-        ).df
-      } else df
-
-      val runsWithJobName2 = if (lookups.contains("jobs_snapshot_bronze")) {
-        runsWithJobName1
-        .toTSDF("timestamp", "organization_id", "jobId")
-        .lookupWhen(
-          lookups("jobs_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "jobId")
-        ).df
-      } else df
-
-      runsWithJobName2
-        .withColumn("jobName", coalesce('jobName, 'run_name))
-        .withColumn("tasks", coalesce('tasks, 'submitRun_tasks))
-        .withColumn("job_clusters", coalesce('job_clusters, 'submitRun_job_clusters))
-
-    }
-  }
+  // /**
+  //  * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
+  //  * snapshot prior to the run
+  //  */
+  // val jobRunsAppendJobMeta = NamedTransformation {
+  //   (df: DataFrame) => {
+  //     val key = Seq( "timestamp", "organization_id", "jobId")
+  //     df.toTSDF( key:_*)
+  //       .lookupWhen( jobStatusMetaLookup.toTSDF( key:_*))
+  //       .lookupWhen( jobSnapNameLookup.toTSDF( key:_*))
+  //       .df
+  //       .withColumns( Map(
+  //         "jobName"
+  //           -> coalesce('jobName, 'run_name),
+  //         "tasks"
+  //           -> coalesce('tasks, 'submitRun_tasks),
+  //         "job_clusters"
+  //           -> coalesce('job_clusters, 'submitRun_job_clusters)))
+  //   }
+  // }
 
   val jobRunsAppendTaskAndClusterDetails = NamedTransformation { (df: DataFrame) => {
     val computeIsSQLWarehouse = $"task_detail.sql_task.warehouse_id".isNotNull
