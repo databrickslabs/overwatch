@@ -8,7 +8,6 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit}
 
 import java.time.Duration
-import scala.util.parsing.json.JSON.number
 
 class Module(
               val moduleId: Int,

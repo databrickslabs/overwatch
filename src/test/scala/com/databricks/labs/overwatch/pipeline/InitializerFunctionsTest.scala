@@ -22,7 +22,7 @@ class InitializerFunctionsTest extends AnyFunSpec with DataFrameComparer with Sp
   describe("Tests for InitializerFunctions.loadLocalCSVResource") {
     it("should load CSV from local resource") {
       val df = Initializer.loadLocalCSVResource(spark, "/file1.csv")
-      assertResult("`field1` INT,`field2` STRING,`field3` BOOLEAN")(df.schema.toDDL)
+      assertResult("field1 INT,field2 STRING,field3 BOOLEAN")(df.schema.toDDL)
       assertResult(3)(df.count())
       val mustBeDf = spark.createDataFrame(Seq((1,"text1", false), (2,"text2",true), (3,"text3",false)))
         .toDF("field1", "field2", "field3")
@@ -31,7 +31,7 @@ class InitializerFunctionsTest extends AnyFunSpec with DataFrameComparer with Sp
 
     it("should load empty dataframe if no header") {
       val df = Initializer.loadLocalCSVResource(spark, "/noheader.csv")
-      assertResult("`1` STRING,`text1` STRING,`false` STRING")(df.schema.toDDL)
+      assertResult("`1` STRING,text1 STRING,false STRING")(df.schema.toDDL)
       assertResult(0)(df.count())
     }
   }

@@ -86,10 +86,12 @@ class SchemaScrubber(
         s"DUPLICATE FIELDS:\n" +
         s"${dups.mkString("\n")}"
       logger.log(Level.WARN, warnMsg)
+      val counterMap = scala.collection.mutable.Map[String, Int]().withDefaultValue(0)
       fields.map(f => {
-        val fieldName = if (caseSensitive) f.sanitizedField.name else f.sanitizedField.name.toLowerCase
+        val fieldName = if (caseSensitive) f.sanitizedField.name.trim else f.sanitizedField.name.toLowerCase.trim
         if (dups.contains(fieldName)) {
-          val generatedUniqueName = f.sanitizedField.name + "_UNIQUESUFFIX_" + f.originalField.name.hashCode.toString
+          counterMap(fieldName) += 1
+          val generatedUniqueName = f.sanitizedField.name.trim + "_UNIQUESUFFIX_" + f.originalField.name.trim.hashCode.toString + "_" + counterMap(fieldName)
           val uniqueColumnMapping = s"\n${f.originalField.name} --> ${generatedUniqueName}"
           logger.log(Level.WARN, uniqueColumnMapping)
           f.sanitizedField.copy(name = generatedUniqueName)

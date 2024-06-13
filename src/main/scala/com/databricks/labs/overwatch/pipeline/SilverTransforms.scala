@@ -10,8 +10,9 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 
 
-trait SilverTransforms extends SparkSessionWrapper {
+trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
+  import TransformationDescriber._
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -1313,63 +1314,136 @@ trait SilverTransforms extends SparkSessionWrapper {
     // eagerly force this highly reused DF into cache()
     jobRunsLag30D.count()
 
-    // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSpecNameLookup = clusterSpec.asDF
-      .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
-      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
+    
+    // TODO: remove or comment out or change log level or . . .
 
-    // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSnapNameLookup = clusterSnapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
-      .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
-      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
+    logger.log( Level.INFO, "Showing first 5 rows of `jobRunsLag30D`:")
 
-    // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val jobStatusMetaLookup = jobsStatus.asDF
-      .verifyMinimumSchema(Schema.minimumJobStatusSilverMetaLookupSchema)
-      .select(
-        'organization_id,
-        'timestamp,
-        'jobId,
-        'jobName,
-        to_json('tags).alias("tags"),
-        'schedule,
-        'max_concurrent_runs,
-        'run_as_user_name,
-        'timeout_seconds,
-        'created_by,
-        'last_edited_by,
-        to_json('tasks).alias("tasks"),
-        to_json('job_clusters).alias("job_clusters"),
-        to_json($"task_detail_legacy.notebook_task").alias("notebook_task"),
-        to_json($"task_detail_legacy.spark_python_task").alias("spark_python_task"),
-        to_json($"task_detail_legacy.python_wheel_task").alias("python_wheel_task"),
-        to_json($"task_detail_legacy.spark_jar_task").alias("spark_jar_task"),
-        to_json($"task_detail_legacy.spark_submit_task").alias("spark_submit_task"),
-        to_json($"task_detail_legacy.shell_command_task").alias("shell_command_task"),
-        to_json($"task_detail_legacy.pipeline_task").alias("pipeline_task")
-      )
+    jobRunsLag30D
+      .showLines(5, 20, true)
+      .foreach( logger.log( Level.INFO, _))
 
-    lazy val jobSnapNameLookup = jobsSnapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
-      .select('organization_id, 'timestamp, 'job_id.alias("jobId"), $"settings.name".alias("jobName"))
+    /**
+      * Look up the cluster_name based on id first from
+      * `job_status_silver`.  If not present there fallback to latest
+      * snapshot prior to the run
+      */
 
-    val jobRunsLookups = jobRunsInitializeLookups(
-      (clusterSpec, clusterSpecNameLookup),
-      (clusterSnapshot, clusterSnapNameLookup),
-      (jobsStatus, jobStatusMetaLookup),
-      (jobsSnapshot, jobSnapNameLookup)
-    )
+    val jobRunsAppendClusterName = NamedTransformation {
+      (df: DataFrame) => {
+
+        val key = Seq( "organization_id", "clusterId")
+
+        lazy val clusterSpecNameLookup = clusterSpec.asDF
+          .select(
+            'organization_id,
+            'timestamp,
+            'cluster_name,
+            'cluster_id.alias("clusterId"))
+          .filter(
+            'clusterId.isNotNull
+              && 'cluster_name.isNotNull)
+          .toTSDF( "timestamp", key:_*)
+
+        lazy val clusterSnapNameLookup = clusterSnapshot.asDF
+          .select(
+            // .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
+            'organization_id,
+            ( unix_timestamp('Pipeline_SnapTS) * lit(1000)).alias( "timestamp"),
+            'cluster_name,
+            'cluster_id.alias( "clusterId"))
+          .filter(
+            'clusterId.isNotNull
+              && 'cluster_name.isNotNull)
+          .toTSDF( "timestamp", key:_*)
+
+        df.toTSDF( "timestamp", key:_*)
+          .lookupWhen( clusterSpecNameLookup)
+          .lookupWhen( clusterSnapNameLookup)
+          .df
+      }
+    }
+
+    /**
+      * looks up the job name based on id first from job_status_silver
+      * and if not present there fallback to latest snapshot prior to
+      * the run
+      */
+
+    val jobRunsAppendJobMeta = NamedTransformation {
+      (df: DataFrame) => {
+
+        val key = Seq( "organization_id", "jobId")
+
+        lazy val jobStatusMetaLookup = jobsStatus.asDF
+          .verifyMinimumSchema(
+            Schema.minimumJobStatusSilverMetaLookupSchema)
+          .select(
+            'organization_id,
+            'timestamp,
+            'jobId,
+            'jobName,
+            to_json('tags).alias("tags"),
+            'schedule,
+            'max_concurrent_runs,
+            'run_as_user_name,
+            'timeout_seconds,
+            'created_by,
+            'last_edited_by,
+            to_json( 'tasks).alias("tasks"),
+            to_json( 'job_clusters).alias("job_clusters"),
+            to_json( $"task_detail_legacy.notebook_task").alias( "notebook_task"),
+            to_json( $"task_detail_legacy.spark_python_task").alias( "spark_python_task"),
+            to_json( $"task_detail_legacy.python_wheel_task").alias( "python_wheel_task"),
+            to_json( $"task_detail_legacy.spark_jar_task").alias( "spark_jar_task"),
+            to_json( $"task_detail_legacy.spark_submit_task").alias( "spark_submit_task"),
+            to_json( $"task_detail_legacy.shell_command_task").alias( "shell_command_task"),
+            to_json( $"task_detail_legacy.pipeline_task").alias( "pipeline_task"))
+          .toTSDF( "timestamp", key:_*)
+
+        lazy val jobSnapshotNameLookup = jobsSnapshot.asDF
+          // .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
+          .select(
+            'organization_id,
+            ( unix_timestamp( 'Pipeline_SnapTS) * lit( 1000)).alias( "timestamp"),
+            'job_id.alias("jobId"),
+            $"settings.name".alias("jobName"))
+          .toTSDF( "timestamp", key:_*)
+
+        df.toTSDF( "timestamp", key:_*)
+          .lookupWhen( jobStatusMetaLookup)
+          .lookupWhen( jobSnapshotNameLookup)
+          .df
+          .withColumns( Map(
+            "jobName"
+              -> coalesce('jobName, 'run_name),
+            "tasks"
+              -> coalesce('tasks, 'submitRun_tasks),
+            "job_clusters"
+              -> coalesce('job_clusters, 'submitRun_job_clusters)))
+      }
+    }
+
+
+
+    // val jobRunsLookups = jobRunsInitializeLookups(
+    //   (clusterSpec, clusterSpecNameLookup),
+    //   (clusterSnapshot, clusterSnapNameLookup),
+    //   (jobsStatus, jobStatusMetaLookup),
+    //   (jobsSnapshot, jobSnapNameLookup)
+    // )
 
     // caching before structifying
-    jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
-      .transform(jobRunsAppendClusterName(jobRunsLookups))
-      .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
-      .transform(jobRunsAppendTaskAndClusterDetails)
-      .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
-      //      .transform(jobRunsRollupWorkflowsAndChildren)
-      .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
+    jobRunsLag30D
+      .transformWithDescription( jobRunsDeriveRunsBase( etlUntilTime))
+      .transformWithDescription( jobRunsAppendClusterName)
+      .transformWithDescription( jobRunsAppendJobMeta)
+      .transformWithDescription( jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transformWithDescription( jobRunsAppendTaskAndClusterDetails)
+      .transformWithDescription( jobRunsCleanseCreatedNestedStructures( targetKeys))
+      .drop("timestamp")
+    // `timestamp` could be duplicated to enable `asOf` lookups;
+    // dropping to clean up
   }
 
   protected def notebookSummary()(df: DataFrame): DataFrame = {
