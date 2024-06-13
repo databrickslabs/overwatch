@@ -12,6 +12,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 
 trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
+  import TransformationDescriber._
   import spark.implicits._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
@@ -1372,7 +1373,8 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
     // caching before structifying
     jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
-      .transform(jobRunsAppendClusterName(jobRunsLookups))
+      .transformWithDescription(
+        jobRunsAppendClusterName( jobRunsLookups))
       .transform(jobRunsAppendJobMeta(jobRunsLookups))
       .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
       .transform(jobRunsAppendTaskAndClusterDetails)
