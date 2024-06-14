@@ -1325,10 +1325,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       clusterStateEndOrPipelineEnd.alias("unixTimeMS_state_end"), // if clusterState still open -- close it for calculations
       'timestamp_state_start,
       'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-      $"driverSpecs.API_Name".alias("driver_node_type_id"),
+      coalesce('driver_node_type_id, $"driverSpecs.API_Name").alias("driver_node_type_id"),
       $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
       $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
-      $"workerSpecs.API_Name".alias("node_type_id"),
+      coalesce('node_type_id, $"workerSpecs.API_Name").alias("node_type_id"),
       $"workerSpecs.Compute_Contract_Price".alias("worker_compute_hourly"),
       $"workerSpecs.Hourly_DBUs".alias("worker_dbu_hourly"),
       $"workerSpecs.vCPUs".alias("worker_cores"),
