@@ -562,27 +562,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn(s"gcp_attributes", SchemaTools.structToMap(scrubbedDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
             .drop("spec")
-            .verifyMinimumSchema(clusterSnapMinimumSchema)
-
-//          val finalDF = df.schema.fields.find(_.name == "spec") match {
-//            case Some(field) =>
-//              field.dataType match {
-//                case structType: StructType =>
-//                  val newFields = structType.fields.map { f =>
-//                    f.dataType match {
-//                      case _: StructType => SchemaTools.structToMap(df, s"spec.${f.name}").as(f.name)
-//                      case _ => col(s"spec.${f.name}").as(f.name)
-//                    }
-//                  }
-//                  df.withColumn("spec", struct(newFields: _*))
-//                case _ => df
-//              }
-//            case None => df
-//          }
-
-          df
-            .verifyMinimumSchema(clusterSnapMinimumSchema)
-
+          df.verifyMinimumSchema(clusterSnapMinimumSchema)
         } else {
           throw new NoNewDataException(msg, Level.WARN, true)
         }
