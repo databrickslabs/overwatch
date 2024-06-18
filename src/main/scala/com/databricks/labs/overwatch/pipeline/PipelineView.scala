@@ -19,7 +19,7 @@ case class PipelineView(name: String,
     if (dataSource.exists) {
       val pubStatementSB = new StringBuilder("create or replace view ")
       val dataSourceName = dataSource.name.toLowerCase()
-      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
+      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${config.etlCatalogName}.${config.databaseName}.${dataSource.name}")
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
         val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
@@ -27,10 +27,10 @@ case class PipelineView(name: String,
         } else {
           partitionMapOverrides
         }
-        pubStatementSB.append(s" where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
+        pubStatementSB.append(s" where ${partMap.head._1} = ${config.etlCatalogName}.${config.databaseName}.${dataSource.name}.${partMap.head._2} ")
         if (partMap.keys.toArray.length > 1) {
           partMap.tail.foreach(pCol => {
-            pubStatementSB.append(s"and ${pCol._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${pCol._2} ")
+            pubStatementSB.append(s"and ${pCol._1} = ${config.etlCatalogName}.${config.databaseName}.${dataSource.name}.${pCol._2} ")
           })
         }
         if (workspacesAllowed.nonEmpty){
