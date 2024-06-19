@@ -689,6 +689,46 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  private def getLatestClusterSnapAsSpecSilver(df: DataFrame,deriveClusterType: Column): DataFrame = {
+    val latestClusterSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
+    df.withColumn("rnk", rank().over(latestClusterSnapW))
+      .filter('rnk === 1).drop("rnk")
+      .withColumn("spark_conf", to_json('spark_conf))
+      .withColumn("custom_tags", to_json('custom_tags))
+      .select(
+        'organization_id,
+        'cluster_id,
+        lit("clusters").alias("serviceName"),
+        lit("snapImpute").alias("actionName"),
+        'cluster_name,
+        'driver_node_type_id,
+        'node_type_id,
+        'num_workers,
+        to_json('autoscale).alias("autoscale"),
+        'autotermination_minutes.cast("int").alias("autotermination_minutes"),
+        'enable_elastic_disk,
+        'state.alias("cluster_state"),
+        isAutomated('cluster_name).alias("is_automated"),
+        deriveClusterType,
+        to_json('cluster_log_conf).alias("cluster_log_conf"),
+        to_json('init_scripts).alias("init_scripts"),
+        'custom_tags,
+        'cluster_source,
+        'aws_attributes,
+        'azure_attributes,
+        to_json('spark_env_vars).alias("spark_env_vars"),
+        'spark_conf,
+        'driver_instance_pool_id,
+        'instance_pool_id,
+        coalesce('effective_spark_version, 'spark_version).alias("spark_version"),
+        (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
+        'Pipeline_SnapTS.cast("date").alias("date"),
+        'creator_user_name.alias("createdBy"),
+        'runtime_engine
+      )
+
+  }
+
   protected def buildClusterSpec(
                                   bronze_cluster_snap: PipelineTable,
                                   pools_snapshot: PipelineTable,
@@ -748,45 +788,9 @@ trait SilverTransforms extends SparkSessionWrapper {
             .select('organization_id, 'cluster_id).distinct,
           Seq("organization_id", "cluster_id"), "anti"
         )
-      val latestClusterSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
-      val missingClusterBaseFromSnap = bronzeClusterSnapLatest
+      val missingClusterBaseSnapJoined = bronzeClusterSnapLatest
         .join(missingClusterIds, Seq("organization_id", "cluster_id"))
-        .withColumn("rnk", rank().over(latestClusterSnapW))
-        .filter('rnk === 1).drop("rnk")
-        .withColumn("spark_conf", to_json('spark_conf))
-        .withColumn("custom_tags", to_json('custom_tags))
-        .select(
-          'organization_id,
-          'cluster_id,
-          lit("clusters").alias("serviceName"),
-          lit("snapImpute").alias("actionName"),
-          'cluster_name,
-          'driver_node_type_id,
-          'node_type_id,
-          'num_workers,
-          to_json('autoscale).alias("autoscale"),
-          'autotermination_minutes.cast("int").alias("autotermination_minutes"),
-          'enable_elastic_disk,
-          'state.alias("cluster_state"),
-          isAutomated('cluster_name).alias("is_automated"),
-          deriveClusterType,
-          to_json('cluster_log_conf).alias("cluster_log_conf"),
-          to_json('init_scripts).alias("init_scripts"),
-          'custom_tags,
-          'cluster_source,
-          'aws_attributes,
-          'azure_attributes,
-          'gcp_attributes,
-          to_json('spark_env_vars).alias("spark_env_vars"),
-          'spark_conf,
-          'driver_instance_pool_id,
-          'instance_pool_id,
-          coalesce('effective_spark_version, 'spark_version).alias("spark_version"),
-          (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
-          'Pipeline_SnapTS.cast("date").alias("date"),
-          'creator_user_name.alias("createdBy"),
-          'runtime_engine
-        )
+      val missingClusterBaseFromSnap  = getLatestClusterSnapAsSpecSilver(missingClusterBaseSnapJoined,deriveClusterType)
 
       unionWithMissingAsNull(clusterBaseWMetaDF, missingClusterBaseFromSnap)
     } else clusterBaseWMetaDF
@@ -997,42 +1001,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     //Code added to fill the null columns with cluster snapshot values
     val latestClusterSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
-    val snapLatest = bronze_cluster_snap.asDF.withColumn("rnk", rank().over(latestClusterSnapW))
-      .filter('rnk === 1).drop("rnk")
-      .withColumn("spark_conf", to_json('spark_conf))
-      .withColumn("custom_tags", to_json('custom_tags))
-      .select(
-        'organization_id,
-        'cluster_id,
-        lit("clusters").alias("serviceName"),
-        lit("snapImpute").alias("actionName"),
-        'cluster_name,
-        'driver_node_type_id,
-        'node_type_id,
-        'num_workers,
-        to_json('autoscale).alias("autoscale"),
-        'autotermination_minutes.cast("int").alias("autotermination_minutes"),
-        'enable_elastic_disk,
-        'state.alias("cluster_state"),
-        isAutomated('cluster_name).alias("is_automated"),
-        deriveClusterType,
-        to_json('cluster_log_conf).alias("cluster_log_conf"),
-        to_json('init_scripts).alias("init_scripts"),
-        'custom_tags,
-        'cluster_source,
-        'aws_attributes,
-        'azure_attributes,
-        to_json('spark_env_vars).alias("spark_env_vars"),
-        'spark_conf,
-        'driver_instance_pool_id,
-        'instance_pool_id,
-        coalesce('effective_spark_version, 'spark_version).alias("spark_version"),
-        (unix_timestamp('Pipeline_SnapTS) * 1000).alias("timestamp"),
-        'Pipeline_SnapTS.cast("date").alias("date"),
-        'creator_user_name.alias("createdBy"),
-        'runtime_engine
-      )
-
+    val snapLatest =  getLatestClusterSnapAsSpecSilver(bronze_cluster_snap.asDF,deriveClusterType)
     val commonColumns = clusterSpecSilver.columns.intersect(snapLatest.columns)
     val clusterSpecSilverOnlyColumns = clusterSpecSilver.columns.diff(snapLatest.columns)
     val joinedDF = clusterSpecSilver.as("cs").join(snapLatest.as("sl"), Seq("organization_id", "cluster_id"), "left_outer")
