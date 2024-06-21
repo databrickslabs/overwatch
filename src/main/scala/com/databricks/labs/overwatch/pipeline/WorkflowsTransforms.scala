@@ -908,9 +908,11 @@ object WorkflowsTransforms extends SparkSessionWrapper {
     }
   }
 
-  val jobRunsStructifyLookupMeta = (cacheParts: Int) => NamedTransformation { (df: DataFrame) => {
-    val dfc = df.repartition(cacheParts).cache() // caching to speed up schema inference
-    dfc.count()
+  // val jobRunsStructifyLookupMeta = (cacheParts: Int) => NamedTransformation { (df: DataFrame) => {
+  //   val dfc = df.repartition(cacheParts).cache() // caching to speed up schema inference
+  //   dfc.count()
+
+  val jobRunsStructifyLookupMeta = NamedTransformation { (dfc: DataFrame) => {
     val colsToOverride = Array("tasks", "job_clusters", "tags").toSet
     val dfOrigCols = (dfc.columns.toSet -- colsToOverride).toArray map col
     val colsToAppend: Array[Column] = Array(

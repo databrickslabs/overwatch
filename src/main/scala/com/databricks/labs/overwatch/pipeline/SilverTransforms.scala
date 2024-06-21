@@ -1306,13 +1306,18 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
       "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "repairRun"
     )
     val optimalCacheParts = Math.min(daysToProcess * getTotalCores * 2, 1000)
+    // val optimalCacheParts = Math.min( daysToProcess * 2, getTotalCores * 2)
+
+    logger.log( Level.INFO, s"optimalCacheParts: ${optimalCacheParts}")
+
     val jobRunsLag30D = getJobsBase(auditLogLag30D)
       .filter('actionName.isin(jobRunActions: _*))
       .repartition(optimalCacheParts)
       .cache() // cached df removed at end of module run
 
     // eagerly force this highly reused DF into cache()
-    jobRunsLag30D.count()
+    logger.log( Level.INFO, s"jobRunsLag30D count: ${jobRunsLag30D.count()}")
+    logger.log( Level.INFO, s"jobRunsLag30D.rdd.partitions.size: ${jobRunsLag30D.rdd.partitions.size}")
 
     
     // TODO: remove or comment out or change log level or . . .
@@ -1414,13 +1419,23 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
           .lookupWhen( jobStatusMetaLookup)
           .lookupWhen( jobSnapshotNameLookup)
           .df
-          .withColumns( Map(
-            "jobName"
-              -> coalesce('jobName, 'run_name),
-            "tasks"
-              -> coalesce('tasks, 'submitRun_tasks),
-            "job_clusters"
-              -> coalesce('job_clusters, 'submitRun_job_clusters)))
+          .withColumn( "jobName",
+            coalesce('jobName, 'run_name))
+          .withColumn( "tasks",
+            coalesce('tasks, 'submitRun_tasks))
+          .withColumn( "job_clusters",
+            coalesce('job_clusters, 'submitRun_job_clusters))
+
+        // the following is only valid in Spark > 3.1.2, apparently
+        // (it compiles with 3.3.0)
+
+          // .withColumns( Map(
+          //   "jobName"
+          //     -> coalesce('jobName, 'run_name),
+          //   "tasks"
+          //     -> coalesce('tasks, 'submitRun_tasks),
+          //   "job_clusters"
+          //     -> coalesce('job_clusters, 'submitRun_job_clusters)))
       }
     }
 
@@ -1434,11 +1449,18 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
     // )
 
     // caching before structifying
-    jobRunsLag30D
+    val cachedDF = jobRunsLag30D
       .transformWithDescription( jobRunsDeriveRunsBase( etlUntilTime))
       .transformWithDescription( jobRunsAppendClusterName)
       .transformWithDescription( jobRunsAppendJobMeta)
-      .transformWithDescription( jobRunsStructifyLookupMeta( optimalCacheParts))
+      .repartition( optimalCacheParts)
+      .cache() // to speed up schema inference while "structifying" next
+
+    logger.log( Level.INFO, s"cachedDF count before structifying: ${cachedDF.count()}")
+    logger.log( Level.INFO, s"cachedDF.rdd.partitions.size: ${cachedDF.rdd.partitions.size}")
+
+    cachedDF
+      .transformWithDescription( jobRunsStructifyLookupMeta) // ( optimalCacheParts))
       .transformWithDescription( jobRunsAppendTaskAndClusterDetails)
       .transformWithDescription( jobRunsCleanseCreatedNestedStructures( targetKeys))
       .drop("timestamp")
