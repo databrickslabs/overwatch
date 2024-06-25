@@ -1482,8 +1482,6 @@ trait SilverTransforms extends SparkSessionWrapper {
         .withColumn("row", row_number().over(orderingWindow))
         .filter('state =!= "TERMINATING" && 'row === 1)
 
-//      val exceptClusterEventsDF1 = refinedWarehouseEventsDF.join(refinedClusterEventsDFFiltered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
-
       val jrSilverAgg= jrsilverDF
         .filter('clusterType === "sqlWarehouse")
         .groupBy("clusterID")
