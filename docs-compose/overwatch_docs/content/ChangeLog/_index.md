@@ -3,6 +3,19 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+## 0.8.1.2 (PATCH)
+Patch for 0.8.1.0 and 0.8.1.1. Fixes a [regression introduced in 0.8.1.0](https://github.com/databrickslabs/overwatch/pull/1234)
+for clusterSnapshotBronze.
+This patch also updates the static cloud VM instance details. 
+
+### Upgrading
+We recommend that regardless which version you're upgrading from, you run the following upgrade script to update your instance
+details table.
+  * [HTML](/assets/ChangeLog/0812_upgrade.html) | [DBC](/assets/ChangeLog/0812_upgrade.dbc)
+
+Released June 21st, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/35?closed=1)
+
+------------------------------------------------------------------------------------------------
 
 ## 0.8.1.1 (PATCH)
 Patch for 0.8.1.0. Fixes a [regression introduced in 0.8.1.0](https://github.com/databrickslabs/overwatch/pull/1219)
