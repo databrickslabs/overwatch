@@ -1310,23 +1310,35 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
     logger.log( Level.INFO, s"optimalCacheParts: ${optimalCacheParts}")
 
-    val jobRunsLag30D = getJobsBase(auditLogLag30D)
-      .filter('actionName.isin(jobRunActions: _*))
-      .repartition(optimalCacheParts)
-      .cache() // cached df removed at end of module run
+    val filterAuditLog = NamedTransformation {
+      (df: DataFrame) => {
+        val cachedActions = getJobsBase( df)
+          .filter('actionName.isin( jobRunActions: _*))
+          .repartition( optimalCacheParts)
+          .cache() // cached df removed at end of module run
 
-    // eagerly force this highly reused DF into cache()
-    logger.log( Level.INFO, s"jobRunsLag30D count: ${jobRunsLag30D.count()}")
-    logger.log( Level.INFO, s"jobRunsLag30D.rdd.partitions.size: ${jobRunsLag30D.rdd.partitions.size}")
+        // eagerly force this highly reused DF into cache()
+        val n = cachedActions.count()
 
-    
-    // TODO: remove or comment out or change log level or . . .
+        logger.log( Level.INFO, s"jobRunsLag30D count: ${n}")
+        logger.log( Level.INFO, s"jobRunsLag30D.rdd.partitions.size: ${cachedActions.rdd.partitions.size}")
 
-    logger.log( Level.INFO, "Showing first 5 rows of `jobRunsLag30D`:")
+        cachedActions
+      }
+    }
 
-    jobRunsLag30D
-      .showLines(5, 20, true)
-      .foreach( logger.log( Level.INFO, _))
+    val jobRunsLag30D = auditLogLag30D.transformWithDescription( filterAuditLog)
+
+    /*
+     * keep original usage example of `.showLines()` for reference
+     *
+     *   logger.log( Level.INFO, "Showing first 5 rows of `jobRunsLag30D`:")
+     *   jobRunsLag30D
+     *     .showLines(5, 20, true)
+     *     .foreach( logger.log( Level.INFO, _))
+     *
+     */
+
 
     /**
       * Look up the cluster_name based on id first from
