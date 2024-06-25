@@ -15,7 +15,7 @@ object TransformationDescriber {
 
     final val name: String = _name.value
 
-    override def toString = s"NamedTransformation ${_name.value}"
+    override def toString = s"${_name.value}: NamedTransformation"
 
   }
 

@@ -39,7 +39,7 @@ class TransformationDescriberTest
       info( s"`nt.toString`: ${nt.toString}")
 
       assert( nt.name === "nt")
-      assert( nt.toString === "NamedTransformation nt")
+      assert( nt.toString === "nt: NamedTransformation")
 
     }
 
@@ -75,7 +75,7 @@ class TransformationDescriberTest
 
     info( s"spark.job.description: ${sjd}")
 
-    assert( sjd === "NamedTransformation nt")
+    assert( sjd === "nt: NamedTransformation")
 
     // info( s"""spark.callSite.short: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.short")}""")
     // info( s"""spark.callSite.long: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.long")}""")
