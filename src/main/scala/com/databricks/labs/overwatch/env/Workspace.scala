@@ -422,6 +422,28 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     addReport
   }
 
+  /**
+   * Fetch the warehouse event data from system.compute.warehouse_events
+   * @param fromTime : from time to fetch the data
+   * @param untilTime: until time to fetch the data
+   * @param maxHistoryDays: maximum history days to fetch the data
+   * @return
+   */
+  def getWarehousesEventDF(fromTime: TimeTypes,
+                           untilTime: TimeTypes,
+                           maxHistoryDays: Int = 30
+                           ): DataFrame = {
+    val moduleFromTime = fromTime.asLocalDateTime
+    val moduleUntilTime = untilTime.asLocalDateTime
+    spark.sql(s"""
+        select * from system.compute.warehouse_events
+        WHERE event_time >= DATE_SUB(${moduleFromTime}, ${maxHistoryDays}
+        and event_time <= ${moduleUntilTime}
+        """)
+      .withColumnRenamed("event_type","state")
+      .withColumnRenamed("workspace_id","organization_id")
+      .withColumnRenamed("event_time","timestamp")
+  }
 }
 
 

@@ -1427,4 +1427,226 @@ trait SilverTransforms extends SparkSessionWrapper {
     .transform(deriveWarehouseBase())
       .transform(deriveWarehouseBaseFilled(isFirstRun, bronzeWarehouseSnapLatest, silver_warehouse_spec))
   }
+
+  protected def buildWarehouseStateDetail(
+                                           untilTime: TimeTypes,
+                                           auditLogDF: DataFrame,
+                                           jrsilverDF: DataFrame,
+                                           warehousesSpec: PipelineTable,
+                                         )(warehouseEventsDF: DataFrame): DataFrame = {
+
+    val stateUnboundW = Window.partitionBy('organization_id, 'warehouse_id).orderBy('timestamp)
+    val stateFromCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(1L, 1000L).orderBy('timestamp)
+    val stateUntilCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
+    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+    val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'reset_partition).orderBy('unixTimeMS_state_start)
+    val orderingWindow = Window.partitionBy('organization_id, 'warehouse_id).orderBy(desc("timestamp"))
+    /**
+     * TODO: Take this as an input
+     */
+//    val warehouseEventsDF = spark.sql("""
+//        select * from system.compute.warehouse_events
+//        WHERE event_time >= DATE_SUB(CURRENT_DATE(), 30)
+//        """)
+//      .withColumnRenamed("event_type","state")
+//      .withColumnRenamed("workspace_id","organization_id")
+//      .withColumnRenamed("event_time","timestamp")
+
+    val nonBillableTypes = Array(
+      "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
+      ,"STOPPING","STOPPED" //new states from warehouse_events
+    )
+
+    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because
+    // they occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
+    // goal is to be certain about the 99th percentile
+    val runningStates = Array(
+      "STARTING", "INIT_SCRIPTS_STARTED", "RUNNING", "CREATING",
+      "RESIZING", "UPSIZE_COMPLETED", "DRIVER_HEALTHY"
+      ,"SCALED_UP","SCALED_DOWN" //new states from warehouse_events
+    )
+
+    val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1)
+      .over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
+
+
+//    val refinedWarehouseEventsDF = warehouseEventsDF
+//      .selectExpr("*", "details.*")
+//      .drop("details")
+//      .withColumnRenamed("type", "state")
+
+    val warehouseEventsFinal  = if (jrsilverDF.isEmpty || warehousesSpec.asDF.isEmpty) {
+      warehouseEventsDF // need to add "min_num_clusters","max_num_clusters"
+    }else{
+      val refinedWarehouseEventsDFFiltered = warehouseEventsDF
+        .withColumn("row", row_number().over(orderingWindow))
+        .filter('state =!= "TERMINATING" && 'row === 1)
+
+//      val exceptClusterEventsDF1 = refinedWarehouseEventsDF.join(refinedClusterEventsDFFiltered.select("cluster_id","timestamp","state"),Seq("cluster_id","timestamp","state"),"leftAnti")
+
+      val jrSilverAgg= jrsilverDF
+        .filter('clusterType === "sqlWarehouse")
+        .groupBy("clusterID")
+        .agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
+        .filter('end_run_time.isNotNull)
+
+      val joined = refinedWarehouseEventsDFFiltered.join(jrSilverAgg,
+          refinedWarehouseEventsDFFiltered("warehouse_id") === jrSilverAgg("warehouseId"), "inner")
+        .withColumn("state", lit("TERMINATING_IMPUTED")) // check if STOPPING_IMPUTED can be used ?
+
+
+      // Join with Cluster Spec to get filter on automated cluster
+      val warehousesSpecDF = warehousesSpec.asDF
+        .select("warehouse_id","warehouse_name","min_num_clusters","max_num_clusters")
+        .dropDuplicates()
+
+      val jobClusterImputed = joined.join(warehousesSpecDF,Seq("warehouse_id"),"inner")
+        .drop("row","warehouseId","end_run_time","warehouse_name")
+
+      warehouseEventsDF
+        .withColumn("min_num_clusters",lit(0))
+        .withColumn("max_num_clusters",lit(0))
+        .union(jobClusterImputed)
+        .withColumn("timestamp", unix_timestamp($"timestamp")*1000) // need to add "min_num_clusters","max_num_clusters"
+    }
+
+    val warehouseEventsBaseline = warehouseEventsFinal
+      .withColumn(
+        "runningSwitch",
+        when('state.isin("TERMINATING","TERMINATING_IMPUTED","STOPPING"), lit(false)) //added STOPPING
+          .when('state.isin("CREATING", "STARTING"), lit(true))
+          .otherwise(lit(null).cast("boolean")))
+      .withColumn(
+        "previousSwitch",
+        when('runningSwitch.isNotNull, last('runningSwitch, true).over(stateUntilPreviousRowW))
+      )
+      .withColumn(
+        "invalidEventChainHandler",
+        when(invalidEventChain, array(lit(false), lit(true))).otherwise(array(lit(false)))
+      )
+      .selectExpr("*", "explode(invalidEventChainHandler) as imputedTerminationEvent").drop("invalidEventChainHandler")
+      .withColumn("state", when('imputedTerminationEvent, "STOPPING").otherwise('state)) // replaced TERMINATED with STOPPING
+      .withColumn("timestamp", when('imputedTerminationEvent, lag('timestamp, 1).over(stateUnboundW) + 1L).otherwise('timestamp))
+      .withColumn("lastRunningSwitch", last('runningSwitch, true).over(stateUntilCurrentW)) // previous on/off switch
+      .withColumn("nextRunningSwitch", first('runningSwitch, true).over(stateFromCurrentW)) // next on/off switch
+      // given no anomaly, set on/off state to current state
+      // if no current state use previous state
+      // if no previous state found, assume opposite of next state switch
+      .withColumn("isRunning", coalesce(
+        when('imputedTerminationEvent, lit(false)).otherwise(lit(null).cast("boolean")),
+        'runningSwitch,
+        'lastRunningSwitch,
+        !'nextRunningSwitch
+      ))
+      // if isRunning still undetermined, use guaranteed events to create state anchors to identify isRunning anchors
+      .withColumn("isRunning", when('isRunning.isNull && 'state.isin(runningStates: _*), lit(true)).otherwise('isRunning))
+      // use the anchors to fill in the null gaps between the state changes to determine if running
+      // if ultimately unable to be determined, assume not isRunning
+      .withColumn("isRunning", coalesce(
+        when('isRunning.isNull, last('isRunning, true).over(stateUntilCurrentW)).otherwise('isRunning),
+        when('isRunning.isNull, !first('isRunning, true).over(stateFromCurrentW)).otherwise('isRunning),
+        lit(false)
+      )).drop("lastRunningSwitch", "nextRunningSwitch")
+      .withColumn("previousIsRunning",lag($"isRunning", 1, null).over(stateUnboundW))
+      .withColumn("isRunning",when(col("previousIsRunning") === "false" && col("state") === "EXPANDED_DISK",lit(false)).otherwise('isRunning))
+      .drop("previousIsRunning")
+      .withColumn(
+        "current_num_clusters",
+        coalesce(
+          when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+            .otherwise(
+              coalesce( // get current_num_workers no matter where the value is stored based on business rules
+                'cluster_count,
+                'min_num_clusters,
+                last(coalesce( // look for the last non-null value when current value isn't present
+                  'cluster_count,
+                  'min_num_clusters
+                ), true).over(stateUntilCurrentW)
+              )
+            ),
+          lit(0) // don't allow null returns
+        )
+      )
+      .withColumn(
+        "target_num_clusters", // need to check this logic and rename column
+        coalesce(
+          when(!'isRunning || 'isRunning.isNull, lit(null).cast("long"))
+            .when('state === "CREATING",
+              coalesce('min_num_clusters, 'current_num_clusters))
+            .otherwise(coalesce('max_num_clusters, 'current_num_clusters)),
+          lit(0) // don't allow null returns
+        )
+      )
+      .select(
+        'organization_id, 'warehouse_id, 'isRunning,
+        'timestamp, 'state, 'current_num_clusters, 'target_num_clusters
+      )
+      .withColumn("unixTimeMS_state_start", 'timestamp)
+      .withColumn("unixTimeMS_state_end", coalesce( // if state end open, use pipelineSnapTime, will be merged when state end is received
+        lead('timestamp, 1).over(stateUnboundW) - lit(1), // subtract 1 millis
+        lit(untilTime.asUnixTimeMilli)
+      ))
+
+    // Start changes from here
+    // Get the warehouseID that has been Permenantly_Deleted
+    val warehouseBaseDF = clusterBase(auditLogDF) //need to rewrite warehouseBase function
+    val removedWarehouseID = warehouseBaseDF
+      .filter('actionName.isin("deleteEndpoint"))
+      .select('warehouse_id,'timestamp.alias("deletion_timestamp")).distinct()
+
+    val warehouseEventsBaselineForRemovedCluster = warehouseEventsBaseline.join(removedWarehouseID,Seq("warehouse_id"))
+
+    val window = Window.partitionBy('organization_id, 'warehouse_id).orderBy('timestamp.desc)
+    val stateBeforeRemoval = warehouseEventsBaselineForRemovedCluster
+      .withColumn("rnk",rank().over(window))
+      .withColumn("rn", row_number().over(window))
+      .withColumn("unixTimeMS_state_end",when('state.isin("STOPPING","TERMINATING_IMPUTED"),'unixTimeMS_state_end).otherwise('deletion_timestamp))
+      .filter('rnk === 1 && 'rn === 1).drop("rnk", "rn")
+
+    val stateDuringRemoval = stateBeforeRemoval
+      .withColumn("timestamp",when('state.isin("STOPPING","TERMINATING","TERMINATING_IMPUTED"),'unixTimeMS_state_end+1).otherwise(col("deletion_timestamp")+1))
+      .withColumn("isRunning",lit(false))
+      .withColumn("unixTimeMS_state_start",('timestamp))
+      .withColumn("unixTimeMS_state_end",('timestamp))
+      .withColumn("state",lit("PERMENANT_DELETE"))
+      .withColumn("current_num_clusters",lit(0))
+      .withColumn("target_num_clusters",lit(0))
+      .drop("deletion_timestamp")
+
+    val columns: Array[String] = warehouseEventsBaseline.columns
+    val stateDuringRemovalFinal = stateBeforeRemoval.drop("deletion_timestamp")
+      .unionByName(stateDuringRemoval, allowMissingColumns = true)
+      .select(columns.map(col): _*)
+
+    val warehouseEventsBaselineFinal = warehouseEventsBaseline.join(stateDuringRemovalFinal,Seq("warehouse_id","timestamp"),"anti")
+      .select(columns.map(col): _*)
+      .unionByName(stateDuringRemovalFinal, allowMissingColumns = true)
+
+    warehouseEventsBaselineFinal
+      .withColumn("counter_reset",
+        when(
+          lag('state, 1).over(stateUnboundW).isin("STOPPING","TERMINATING", "RESTARTING", "EDITED","TERMINATING_IMPUTED") ||
+            !'isRunning, lit(1)
+        ).otherwise(lit(0))
+      )
+      .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
+      .withColumn("target_num_clusters", last('target_num_clusters, true).over(stateUnboundW))
+      .withColumn("current_num_clusters", last('current_num_clusters, true).over(stateUnboundW))
+      .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
+      .withColumn("timestamp_state_end", from_unixtime('unixTimeMS_state_end.cast("double") / lit(1000)).cast("timestamp")) // subtract 1.0 millis
+      .withColumn("state_start_date", 'timestamp_state_start.cast("date"))
+      .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
+      .withColumn("uptime_since_restart_S",
+        coalesce(
+          when('counter_reset === 1, lit(0))
+            .otherwise(sum('uptime_in_state_S).over(uptimeW)),
+          lit(0)
+        )
+      )
+      .withColumn("cloud_billable", 'isRunning)
+      .withColumn("databricks_billable", 'isRunning && !'state.isin(nonBillableTypes: _*))
+      .withColumn("uptime_in_state_H", 'uptime_in_state_S / lit(3600))
+      .withColumn("state_dates", sequence('timestamp_state_start.cast("date"), 'timestamp_state_end.cast("date")))
+      .withColumn("days_in_state", size('state_dates))
+  }
 }

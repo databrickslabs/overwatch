@@ -402,6 +402,21 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
     )
   }
 
+  lazy private[overwatch] val warehouseStateDetailModule = Module(2022, "Silver_WarehouseStateDetail", this, Array(1004, 1013))
+  lazy private val appendWarehouseStateDetailProcess: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        workspace.getWarehousesEventDF(warehouseSpecModule.fromTime,warehouseSpecModule.untilTime),
+        Seq(buildWarehouseStateDetail(
+          warehouseStateDetailModule.untilTime,
+          BronzeTargets.auditLogsTarget.asIncrementalDF(warehouseSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1), //Added to get the Removed Cluster,
+          SilverTargets.dbJobRunsTarget.asIncrementalDF(warehouseStateDetailModule, SilverTargets.dbJobRunsTarget.incrementalColumns, 30),
+          SilverTargets.warehousesSpecTarget
+        )),
+        append(SilverTargets.warehousesStateDetailTarget)
+      )
+  }
+
   private def processSparkEvents(): Unit = {
 
     executorsModule.execute(appendExecutorsProcess)
@@ -432,6 +447,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.jobs => {
         jobStatusModule.execute(appendJobStatusProcess)
         jobRunsModule.execute(appendJobRunsProcess)
+      }
+      case OverwatchScope.warehouseEvents => {
+        warehouseStateDetailModule.execute(appendWarehouseStateDetailProcess)
       }
       case _ =>
     }

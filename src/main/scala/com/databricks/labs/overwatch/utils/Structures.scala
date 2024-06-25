@@ -402,7 +402,8 @@ case class SanitizeFieldException(field: StructField, rules: List[SanitizeRule],
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, dbsql, pools, notebookCommands = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts,
+  dbsql, pools, notebookCommands, warehouseEvents = Value
   // Todo Issue_77
 }
 
