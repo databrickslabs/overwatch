@@ -487,6 +487,54 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("gcp_attributes", SchemaTools.structToMap(clusterWithStructs, "gcp_attributes"))
   }
 
+  private def warehouseBase(auditLogDf: DataFrame): DataFrame = {
+
+    val warehouse_id_gen_w = Window.partitionBy('organization_id, 'warehouse_name).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val warehouse_name_gen_w = Window.partitionBy('organization_id, 'warehouse_id).orderBy('timestamp).rowsBetween(Window.currentRow, 1000)
+    val warehouse_id_gen = first('warehouse_id, true).over(warehouse_id_gen_w)
+    val warehouse_name_gen = first('warehouse_name, true).over(warehouse_name_gen_w)
+
+    val warehouseSummaryCols = auditBaseCols ++ Array[Column](
+      deriveWarehouseId.alias("warehouse_id"),
+      'name.alias("warehouse_name"),
+      'cluster_size,
+      'min_num_clusters,
+      'max_num_clusters,
+      'auto_stop_mins,
+      'spot_instance_policy,
+      'enable_photon,
+      get_json_object('channel, "$.name").alias("channel"),
+      'tags,
+      'enable_serverless_compute,
+      'warehouse_type
+    )
+
+    val rawAuditLogDf = auditLogDf
+      .filter('actionName.isin("createEndpoint", "editEndpoint", "createWarehouse",
+        "editWarehouse", "deleteEndpoint", "deleteWarehouse")
+        && responseSuccessFilter
+        && 'serviceName === "databrickssql")
+
+
+    if(rawAuditLogDf.isEmpty)
+      throw new NoNewDataException("No New Data", Level.INFO, allowModuleProgression = true)
+
+    val auditLogDfWithStructs = rawAuditLogDf
+      .selectExpr("*", "requestParams.*").drop("requestParams", "Overwatch_RunID")
+      .select(warehouseSummaryCols: _*)
+      .withColumn("warehouse_id", warehouse_id_gen)
+      .withColumn("warehouse_name", warehouse_name_gen)
+
+    val auditLogDfWithStructsToMap = auditLogDfWithStructs
+      .withColumn("tags", SchemaTools.structFromJson(spark, auditLogDfWithStructs, "tags"))
+      .scrubSchema
+
+    val filteredAuditLogDf = auditLogDfWithStructsToMap
+      .withColumn("tags", SchemaTools.structToMap(auditLogDfWithStructsToMap, "tags"))
+      .withColumn("source_table",lit("audit_log_bronze"))
+    filteredAuditLogDf
+  }
+
   protected def buildPoolsSpec(
                                 poolSnapDF: DataFrame,
                                 isFirstRun: Boolean,
@@ -1441,25 +1489,12 @@ trait SilverTransforms extends SparkSessionWrapper {
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
     val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'reset_partition).orderBy('unixTimeMS_state_start)
     val orderingWindow = Window.partitionBy('organization_id, 'warehouse_id).orderBy(desc("timestamp"))
-    /**
-     * TODO: Take this as an input
-     */
-//    val warehouseEventsDF = spark.sql("""
-//        select * from system.compute.warehouse_events
-//        WHERE event_time >= DATE_SUB(CURRENT_DATE(), 30)
-//        """)
-//      .withColumnRenamed("event_type","state")
-//      .withColumnRenamed("workspace_id","organization_id")
-//      .withColumnRenamed("event_time","timestamp")
 
     val nonBillableTypes = Array(
       "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
       ,"STOPPING","STOPPED" //new states from warehouse_events
     )
 
-    // some states like EXPANDED_DISK and NODES_LOST, etc are excluded because
-    // they occasionally do come after the cluster has been terminated; thus they are not a guaranteed event
-    // goal is to be certain about the 99th percentile
     val runningStates = Array(
       "STARTING", "INIT_SCRIPTS_STARTED", "RUNNING", "CREATING",
       "RESIZING", "UPSIZE_COMPLETED", "DRIVER_HEALTHY"
@@ -1468,12 +1503,6 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val invalidEventChain = lead('runningSwitch, 1).over(stateUnboundW).isNotNull && lead('runningSwitch, 1)
       .over(stateUnboundW) === lead('previousSwitch, 1).over(stateUnboundW)
-
-
-//    val refinedWarehouseEventsDF = warehouseEventsDF
-//      .selectExpr("*", "details.*")
-//      .drop("details")
-//      .withColumnRenamed("type", "state")
 
     val warehouseEventsFinal  = if (jrsilverDF.isEmpty || warehousesSpec.asDF.isEmpty) {
       warehouseEventsDF // need to add "min_num_clusters","max_num_clusters"
@@ -1486,12 +1515,12 @@ trait SilverTransforms extends SparkSessionWrapper {
         .filter('clusterType === "sqlWarehouse")
         .groupBy("clusterID")
         .agg(max("TaskExecutionRunTime.endTS").alias("end_run_time"))
+        .withColumnRenamed("clusterID","warehouseId")
         .filter('end_run_time.isNotNull)
 
       val joined = refinedWarehouseEventsDFFiltered.join(jrSilverAgg,
           refinedWarehouseEventsDFFiltered("warehouse_id") === jrSilverAgg("warehouseId"), "inner")
         .withColumn("state", lit("TERMINATING_IMPUTED")) // check if STOPPING_IMPUTED can be used ?
-
 
       // Join with Cluster Spec to get filter on automated cluster
       val warehousesSpecDF = warehousesSpec.asDF
@@ -1587,7 +1616,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Start changes from here
     // Get the warehouseID that has been Permenantly_Deleted
-    val warehouseBaseDF = clusterBase(auditLogDF) //need to rewrite warehouseBase function
+    val warehouseBaseDF = warehouseBase(auditLogDF) //need to rewrite warehouseBase function
     val removedWarehouseID = warehouseBaseDF
       .filter('actionName.isin("deleteEndpoint"))
       .select('warehouse_id,'timestamp.alias("deletion_timestamp")).distinct()

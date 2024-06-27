@@ -17,6 +17,8 @@ import scala.concurrent.Future
 import scala.concurrent.forkjoin.ForkJoinPool
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 
 /**
@@ -433,12 +435,13 @@ class Workspace(config: Config) extends SparkSessionWrapper {
                            untilTime: TimeTypes,
                            maxHistoryDays: Int = 30
                            ): DataFrame = {
-    val moduleFromTime = fromTime.asLocalDateTime
-    val moduleUntilTime = untilTime.asLocalDateTime
+    val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+    val moduleFromTime = fromTime.asLocalDateTime.format(sysTableFormat)
+    val moduleUntilTime = untilTime.asLocalDateTime.format(sysTableFormat)
     spark.sql(s"""
         select * from system.compute.warehouse_events
-        WHERE event_time >= DATE_SUB(${moduleFromTime}, ${maxHistoryDays}
-        and event_time <= ${moduleUntilTime}
+        WHERE event_time >= DATE_SUB('${moduleFromTime}', ${maxHistoryDays})
+        and event_time <= '${moduleUntilTime}'
         """)
       .withColumnRenamed("event_type","state")
       .withColumnRenamed("workspace_id","organization_id")

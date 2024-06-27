@@ -30,7 +30,8 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       SilverTargets.dbJobsStatusTarget,
       SilverTargets.notebookStatusTarget,
       SilverTargets.sqlQueryHistoryTarget,
-      SilverTargets.warehousesSpecTarget
+      SilverTargets.warehousesSpecTarget,
+      SilverTargets.warehousesStateDetailTarget
     )
   }
 
@@ -57,6 +58,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
         Array(sqlQueryHistoryModule,
           warehouseSpecModule)
       }
+      case OverwatchScope.warehouseEvents => Array(warehouseStateDetailModule)
       case _ => Array[Module]()
     }
   }
@@ -406,7 +408,7 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendWarehouseStateDetailProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getWarehousesEventDF(warehouseSpecModule.fromTime,warehouseSpecModule.untilTime),
+        workspace.getWarehousesEventDF(warehouseStateDetailModule.fromTime,warehouseStateDetailModule.untilTime),
         Seq(buildWarehouseStateDetail(
           warehouseStateDetailModule.untilTime,
           BronzeTargets.auditLogsTarget.asIncrementalDF(warehouseSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1), //Added to get the Removed Cluster,

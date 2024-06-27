@@ -405,6 +405,7 @@ object OverwatchScope extends Enumeration {
   val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts,
   dbsql, pools, notebookCommands, warehouseEvents = Value
   // Todo Issue_77
+  def toArray: Array[String] = values.map(_.toString).toArray
 }
 
 object WriteMode extends Enumeration {
