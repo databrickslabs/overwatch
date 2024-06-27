@@ -410,12 +410,21 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 pipelineSnapTime: Long,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String,
-                                config: Config) = {
+                                config: Config,
+                                isFirstRun: Boolean) = {
     val finalResponseCount = clusterIDs.length
     val clusterEventsEndpoint = "clusters/events"
 
     val lagTime =  86400000 //1 day
-    val lagStartTime = startTime.asUnixTimeMilli - lagTime
+
+    val lagStartTime = if (isFirstRun) {
+      logger.log(Level.INFO, "First run, acquiring all cluster events")
+      0.toLong
+    } else {
+      logger.log(Level.INFO, "Subsequent run, acquiring new cluster events")
+      startTime.asUnixTimeMilli - lagTime
+    }
+
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> "0",
@@ -630,6 +639,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def prepClusterEventLogs(
+                                      isFirstRun : Boolean,
                                       filteredAuditLogDF: DataFrame,
                                       startTime: TimeTypes,
                                       endTime: TimeTypes,
@@ -656,8 +666,8 @@ trait BronzeTransforms extends SparkSessionWrapper {
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
     try{
-      landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
-        tmpClusterEventsErrorPath, config)
+        landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
+          tmpClusterEventsErrorPath, config,isFirstRun)
     }catch {
       case e: Throwable =>
         val errMsg = s"Error in landing cluster events: ${e.getMessage}"
