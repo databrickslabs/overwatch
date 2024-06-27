@@ -15,27 +15,27 @@ import org.apache.spark.sql.DataFrame
  */
 object PipelineValidation extends SparkSessionWrapper {
 
-  def apply(etlDB : String) :Unit = {
-    new PipelineValidation(etlDB)
+  def apply(etlDB : String , allRun: Boolean) :Unit = {
+    new PipelineValidation(etlDB,allRun)
       .setPipelineSnapTime()
       .process()
   }
 
-  def apply(etlDB : String, table : Array[String]) :Unit = {
-    new PipelineValidation(etlDB)
+  def apply(etlDB : String, allRun: Boolean, table : Array[String]) :Unit = {
+    new PipelineValidation(etlDB,allRun)
       .setPipelineSnapTime()
       .process(table)
   }
 
-  def apply(etlDB : String, table : Array[String],crossTableValidation : Boolean) :Unit = {
-    new PipelineValidation(etlDB)
+  def apply(etlDB : String, allRun: Boolean, table : Array[String],crossTableValidation : Boolean) :Unit = {
+    new PipelineValidation(etlDB,allRun)
       .setPipelineSnapTime()
       .process(table,crossTableValidation)
   }
 
 }
 
-class PipelineValidation (_etlDB: String) extends PipelineValidationHelper(_etlDB) with SparkSessionWrapper {
+class PipelineValidation (_etlDB: String, _allRun: Boolean) extends PipelineValidationHelper(_etlDB,_allRun) with SparkSessionWrapper {
 
   import spark.implicits._
 

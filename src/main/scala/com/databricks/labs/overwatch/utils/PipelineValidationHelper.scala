@@ -16,7 +16,7 @@ import scala.collection.mutable.ArrayBuffer
  * This class contains the utility functions for PipelineValidation.scala.
  */
 
-class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
+class PipelineValidationHelper(_etlDB: String ,_allRun: Boolean = true)  extends SparkSessionWrapper {
 
   import spark.implicits._
 
@@ -32,6 +32,7 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
   def quarantineID: String = _quarantine_id
 
   def etlDB: String = _etlDB
+  val allRun: Boolean = _allRun
 
   private var _validations: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
   private var _quarantine: ArrayBuffer[QuarantineReport] = new ArrayBuffer[QuarantineReport]()
@@ -62,9 +63,18 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
   val healthCheckReportPath = s"""$healthCheckBasePath/heathCheck_report"""
   val quarantineReportPath = s"""$healthCheckBasePath/quarantine_report"""
 
-  val Overwatch_RunIDs :Array[String] = if (spark.catalog.tableExists(s"$etlDB.pipeline_report")) {
-    val All_Overwatch_RunID = spark.read.table(s"$etlDB.pipeline_report")
+  private val All_Overwatch_RunID = if (spark.catalog.tableExists(s"$etlDB.pipeline_report")) {
+    spark.read.table(s"$etlDB.pipeline_report")
       .select("Overwatch_RunID").distinct().collect().map(_.getString(0))
+  }else{
+    val errMsg = s"pipeline_report is not present in $etlDB. To proceed with pipeline_validation , pipeline_report table needs to be present in the database.Pipeline Validation aborted!!!"
+    throw new BadConfigException(errMsg)
+  }
+
+  val Overwatch_RunIDs :Array[String] = if (allRun) {
+    println("All Runs are getting validated")
+      All_Overwatch_RunID
+  }else {
     if (Helpers.pathExists(healthCheckReportPath)) {
       val healthCheckDF = spark.read.load(healthCheckReportPath)
       val Validated_Overwatch_RunIDs = healthCheckDF.select("Overwatch_RunID").distinct().collect().map(_.getString(0))
@@ -73,11 +83,6 @@ class PipelineValidationHelper(_etlDB: String)  extends SparkSessionWrapper {
       All_Overwatch_RunID
     }
   }
-    else{
-    val errMsg = s"pipeline_report is not present in $etlDB. To proceed with pipeline_validation , pipeline_report table needs to be present in the database.Pipeline Validation aborted!!!"
-    throw new BadConfigException(errMsg)
-  }
-
 
   private val gold = Gold(workSpace)
   private val goldTargets = gold.GoldTargets
