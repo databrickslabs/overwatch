@@ -12,6 +12,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 
 object WorkflowsTransforms extends SparkSessionWrapper {
 
+  import TransformationDescriber._
   import spark.implicits._
 
   /**
@@ -990,30 +991,37 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   /**
-   * looks up the cluster_name based on id first from job_status_silver and if not present there fallback to latest
-   * snapshot prior to the run
-   */
-  def jobRunsAppendClusterName(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
+    * Look up the cluster_name based on id first from
+    * `job_status_silver`.  If not present there fallback to latest
+    * snapshot prior to the run
+    */
 
-    val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
-      df.toTSDF("timestamp", "organization_id", "clusterId")
-        .lookupWhen(
-          lookups("cluster_spec_silver")
-            .toTSDF("timestamp", "organization_id", "clusterId")
-        ).df
-    } else df
+  val jobRunsAppendClusterName = (lookups: Map[String,DataFrame]) => NamedTransformation {
 
-    val runsWClusterNames2 = if (lookups.contains("clusters_snapshot_bronze")) {
-      runsWClusterNames1
-        .toTSDF("timestamp", "organization_id", "clusterId")
-        .lookupWhen(
-          lookups("clusters_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "clusterId")
-        ).df
-    } else runsWClusterNames1
+    (df: DataFrame) => {
 
-    runsWClusterNames2
+      val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
+        df.toTSDF("timestamp", "organization_id", "clusterId")
+          .lookupWhen(
+            lookups("cluster_spec_silver")
+              .toTSDF("timestamp", "organization_id", "clusterId")
+          ).df
+      } else df
+
+      val runsWClusterNames2 = if (lookups.contains("clusters_snapshot_bronze")) {
+        runsWClusterNames1
+          .toTSDF("timestamp", "organization_id", "clusterId")
+          .lookupWhen(
+            lookups("clusters_snapshot_bronze")
+              .toTSDF("timestamp", "organization_id", "clusterId")
+          ).df
+      } else runsWClusterNames1
+
+      runsWClusterNames2
+    }
+
   }
+
 
   /**
    * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
