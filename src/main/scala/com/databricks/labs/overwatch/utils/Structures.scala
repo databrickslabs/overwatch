@@ -160,6 +160,8 @@ case class ReconReport(
                         deviationPercentage: Option[Double] = None,
                         sourceQuery: Option[String] = None,
                         targetQuery: Option[String] = None,
+                        sourceOnlyColumns: Option[String] = None,
+                        targetOnlyColumns: Option[String] = None,
                         errorMsg: Option[String] = None
                       )
 
