@@ -665,10 +665,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
-    try{
-        landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
-          tmpClusterEventsErrorPath, config,isFirstRun)
-    }catch {
+    try {
+      landClusterEvents(
+        clusterIDs, startTime, endTime,
+        pipelineSnapTS.asUnixTimeMilli,
+        tmpClusterEventsSuccessPath,
+        tmpClusterEventsErrorPath,
+        config,
+        isFirstRun)
+    } catch {
       case e: Throwable =>
         val errMsg = s"Error in landing cluster events: ${e.getMessage}"
         logger.log(Level.ERROR, errMsg)
