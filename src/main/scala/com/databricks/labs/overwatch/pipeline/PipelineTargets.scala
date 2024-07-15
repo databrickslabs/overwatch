@@ -236,6 +236,21 @@ abstract class PipelineTargets(config: Config) {
       masterSchema = Some(Schema.warehouseSnapMinimumSchema)
     )
 
+    lazy private[overwatch] val warehouseDbuDetail: PipelineTable = PipelineTable(
+      name = "warehouseDbuDetails",
+      _keys = Array("driver_size"),
+      config,
+      incrementalColumns = Array("Pipeline_SnapTS"),
+      partitionBy = Seq("organization_id"),
+      masterSchema = Some(Schema.warehouseDbuDetailsMinimumSchema)
+    )
+
+    lazy private[overwatch] val warehouseDbuDetailViewTarget: PipelineView = PipelineView(
+      name = "warehouseDbuDetails",
+      cloudMachineDetail,
+      config
+    )
+
   }
 
   /**
@@ -704,6 +719,23 @@ abstract class PipelineTargets(config: Config) {
     lazy private[overwatch] val warehouseViewTarget: PipelineView = PipelineView(
       name = "warehouse",
       warehouseTarget,
+      config
+    )
+
+    lazy private[overwatch] val warehouseStateFactTarget: PipelineTable = PipelineTable(
+      name = "warehouseStateFact_gold",
+      _keys = Array("warehouse_id", "state", "unixTimeMS_state_start"),
+      config,
+      _mode = WriteMode.merge,
+      partitionBy = Seq("organization_id", "state_start_date", "__overwatch_ctrl_noise"),
+      maxMergeScanDates = 31, // 1 greater than clusterStateDetail
+      incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
+      zOrderBy = Array("warehouse_id", "unixTimeMS_state_start")
+    )
+
+    lazy private[overwatch] val warehouseStateFactViewTarget: PipelineView = PipelineView(
+      name = "warehouseStateFact",
+      warehouseStateFactTarget,
       config
     )
 
