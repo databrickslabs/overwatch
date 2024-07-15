@@ -320,6 +320,24 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
+  lazy private[overwatch] val warehouseStateFactModule = Module(3020, "Gold_WarehouseStateFact", this, Array(2022, 2021), 3.0)
+  lazy private val appendWarehouseStateFactProcess: () => ETLDefinition = {
+    () =>
+      ETLDefinition(
+        SilverTargets.warehousesStateDetailTarget.asIncrementalDF(
+          warehouseStateFactModule,
+          SilverTargets.warehousesStateDetailTarget.incrementalColumns,
+          GoldTargets.warehouseStateFactTarget.maxMergeScanDates
+        ),
+        Seq(buildWarehouseStateFact(
+          BronzeTargets.cloudMachineDetail,
+          SilverTargets.warehousesSpecTarget,
+          pipelineSnapTime
+        )),
+        append(GoldTargets.warehouseStateFactTarget)
+      )
+  }
+
   private def processSparkEvents(): Unit = {
 
     sparkExecutorModule.execute(appendSparkExecutorProcess)
@@ -399,6 +417,10 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.notebookCommands => {
         notebookCommandsFactModule.execute(appendNotebookCommandsFactProcess)
         GoldTargets.notebookCommandsFactViewTarget.publish(notebookCommandsFactViewColumnMapping)
+      }
+      case OverwatchScope.warehouseEvents => {
+        warehouseStateFactModule.execute(appendWarehouseStateFactProcess)
+        GoldTargets.warehouseStateFactViewTarget.publish(warehouseStateFactViewColumnMappings)
       }
       case _ =>
     }

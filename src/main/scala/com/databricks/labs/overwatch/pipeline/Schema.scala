@@ -1144,4 +1144,16 @@ object Schema extends SparkSessionWrapper {
     StructField("source", StringType, nullable = false),
     StructField("workspace_id", StringType, nullable = false)
   ))
+
+  val warehouseDbuDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("cloud", StringType, nullable = false),
+    StructField("cluster_size", StringType, nullable = false),
+    StructField("driver_size", StringType, nullable = false),
+    StructField("worker_count", IntegerType, nullable = false),
+    StructField("total_dbus", IntegerType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true)
+  ))
 }

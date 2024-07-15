@@ -264,6 +264,7 @@ class Pipeline(
   protected def loadStaticDatasets(): this.type = {
     if (!BronzeTargets.cloudMachineDetail.exists(dataValidation = true)) publishInstanceDetails()
     if (!BronzeTargets.dbuCostDetail.exists(dataValidation = true)) publishDBUCostDetails()
+    if (!BronzeTargets.warehouseDbuDetail.exists(dataValidation = true)) publishWarehouseDbuDetails()
     else updateDBUCosts(BronzeTargets.dbuCostDetail)
     this
   }
@@ -486,6 +487,27 @@ class Pipeline(
     )
   }
 
+  private def publishWarehouseDbuDetails(): Unit = {
+    val logMsg = "warehouseDbuDetails does not exist and/or does not contain data for this workspace. BUILDING/APPENDING"
+    logger.log(Level.INFO, logMsg)
+
+    if (getConfig.debugFlag) println(logMsg)
+    val warehouseDbuDetailsDF = Initializer.loadLocalCSVResource(spark, "/Warehouse_DBU_Details.csv")
+      .filter('cloud === s"${config.cloudProvider}")
+
+    val finalWarehouseDbuDetailsDF = warehouseDbuDetailsDF
+      .withColumn("organization_id", lit(config.organizationId))
+      .withColumn("activeFrom", lit(primordialTime.asDTString).cast("date"))
+      .withColumn("activeUntil", lit(null).cast("date"))
+      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
+      .withColumn("activeUntilEpochMillis",
+        coalesce(unix_timestamp('activeUntil) * 1000, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000))
+      .withColumn("isActive", lit(true))
+      .coalesce(1)
+
+    database.writeWithRetry(finalWarehouseDbuDetailsDF, BronzeTargets.warehouseDbuDetail, pipelineSnapTime.asColumnTS)
+    if (config.databaseName != config.consumerDatabaseName) BronzeTargets.warehouseDbuDetailViewTarget.publish("*")
+  }
 }
 
 object Pipeline {
