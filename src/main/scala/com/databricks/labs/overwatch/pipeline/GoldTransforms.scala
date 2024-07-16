@@ -953,46 +953,18 @@ trait GoldTransforms extends SparkSessionWrapper {
 
   protected def buildWarehouseStateFact(
                                        instanceDetailsTarget: PipelineTable,
-                                       warehouseSpec: PipelineTable,
-                                       pipelineSnapTime: TimeTypes
+                                       warehouseDbuDetailsTarget: PipelineTable,
+                                       warehouseSpec: PipelineTable
                                      )(warehouseStateDetail: DataFrame): DataFrame = {
-    val data = Seq(
-      ("AWS","2X-Small", "i3.2xlarge", 1, 4),
-      ("AWS","X-Small", "i3.2xlarge", 2, 6),
-      ("AWS","Small", "i3.4xlarge", 4, 12),
-      ("AWS","Medium", "i3.8xlarge", 8, 24),
-      ("AWS","Large", "i3.8xlarge", 16, 40),
-      ("AWS","X-Large", "i3.16xlarge", 32, 80),
-      ("AWS","2X-Large", "i3.16xlarge", 64, 144),
-      ("AWS","3X-Large", "i3.16xlarge", 128, 272),
-      ("AWS","4X-Large", "i3.16xlarge", 256, 528),
-      ("AZURE","2X-Small","E8ds v4",1,4),
-      ("AZURE","X-Small","E8ds v4",2,6),
-      ("AZURE","Small","E16ds v4",4,12),
-      ("AZURE","Medium","E32ds v4",8,24),
-      ("AZURE","Large","E32ds v4",16,40),
-      ("AZURE","X-Large","E64ds v4",32,80),
-      ("AZURE","2X-Large","E64ds v4",64,144),
-      ("AZURE","3X-Large","E64ds v4",128,272),
-      ("AZURE","4X-Large","E64ds v4",256,528)
-    )
+    val warehouseDbuDetails = warehouseDbuDetailsTarget.asDF()
 
-    val warehouseDbuDetails = data.toDF("cloud","cluster_size", "driver_size", "worker_count", "total_dbus")
-      .withColumn("organization_id",lit("2556758628403379"))
-      .withColumn("activeFrom",lit("2024-06-13").cast(DateType))
-      .withColumn("activeUntil",lit(null).cast(DateType))
-      .withColumn("Pipeline_SnapTS",lit("2024-06-27T10:48:07.000+00:00"))
-      .withColumn("activeFromEpochMillis", unix_timestamp('activeFrom) * 1000)
-      .withColumn("activeUntilEpochMillis",
-        coalesce(unix_timestamp('activeUntil) * 1000, unix_timestamp(pipelineSnapTime.asColumnTS) * 1000))
-
-    val selectedColumns = warehouseDbuDetails.columns.map(colName => col(s"warehouseDbuDetails.$colName"))
+    val warehouseDbuDetailsColumns = warehouseDbuDetails.columns.map(colName => col(s"warehouseDbuDetails.$colName"))
 
     val warehouseClustersDetails = warehouseDbuDetails.alias("warehouseDbuDetails")
       .join(instanceDetailsTarget.asDF.alias("instanceDetails"),
         $"warehouseDbuDetails.organization_id" === $"instanceDetails.organization_id" &&
           $"warehouseDbuDetails.driver_size" === $"instanceDetails.API_Name")
-      .select(selectedColumns :+ col("instanceDetails.vCPUs"): _*)
+      .select(warehouseDbuDetailsColumns :+ col("instanceDetails.vCPUs"): _*)
 
     val warehousePotMetaToFill = Array(
       "warehouse_name", "channel", "warehouse_type","cluster_size","driver_size"
@@ -1012,8 +984,10 @@ trait GoldTransforms extends SparkSessionWrapper {
       .join( // estimated node type details at start time of run. If contract changes during state, not handled but very infrequent and negligible impact
         warehouseClustersDetails
           .withColumnRenamed("organization_id","warehouse_organization_id")
+          .withColumnRenamed("workspace_name","warehouse_workspace_name")
           .withColumnRenamed("cluster_size","warehouse_cluster_size")
           .withColumnRenamed("Pipeline_SnapTS","warehouse_Pipeline_SnapTS")
+          .withColumnRenamed("Overwatch_RunID","warehouse_Overwatch_RunID")
           .alias("warehouseClustersDetails"),
         $"warehousePotential.organization_id" === $"warehouseClustersDetails.warehouse_organization_id" &&
           trim(lower($"warehousePotential.cluster_size")) === trim(lower($"warehouseClustersDetails.warehouse_cluster_size"))

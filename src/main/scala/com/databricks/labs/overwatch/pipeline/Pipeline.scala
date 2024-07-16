@@ -493,7 +493,7 @@ class Pipeline(
 
     if (getConfig.debugFlag) println(logMsg)
     val warehouseDbuDetailsDF = Initializer.loadLocalCSVResource(spark, "/Warehouse_DBU_Details.csv")
-      .filter('cloud === s"${config.cloudProvider}")
+      .filter(lower('cloud) === s"${config.cloudProvider}".toLowerCase)
 
     val finalWarehouseDbuDetailsDF = warehouseDbuDetailsDF
       .withColumn("organization_id", lit(config.organizationId))

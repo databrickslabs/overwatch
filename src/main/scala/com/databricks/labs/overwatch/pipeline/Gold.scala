@@ -331,8 +331,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
         ),
         Seq(buildWarehouseStateFact(
           BronzeTargets.cloudMachineDetail,
-          SilverTargets.warehousesSpecTarget,
-          pipelineSnapTime
+          BronzeTargets.warehouseDbuDetail,
+          SilverTargets.warehousesSpecTarget
         )),
         append(GoldTargets.warehouseStateFactTarget)
       )
