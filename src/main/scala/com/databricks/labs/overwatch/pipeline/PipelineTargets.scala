@@ -247,7 +247,7 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val warehouseDbuDetailViewTarget: PipelineView = PipelineView(
       name = "warehouseDbuDetails",
-      cloudMachineDetail,
+      warehouseDbuDetail,
       config
     )
 
