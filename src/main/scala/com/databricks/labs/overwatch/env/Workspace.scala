@@ -438,6 +438,11 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     val moduleFromTime = fromTime.asLocalDateTime.format(sysTableFormat)
     val moduleUntilTime = untilTime.asLocalDateTime.format(sysTableFormat)
+    val message = "Table system.compute.warehouse_events does not exists"
+
+    if(!spark.catalog.tableExists("system.compute.warehouse_events"))
+      throw new NoNewDataException(message, Level.WARN, allowModuleProgression = false)
+
     spark.sql(s"""
         select * from system.compute.warehouse_events
         WHERE event_time >= DATE_SUB('${moduleFromTime}', ${maxHistoryDays})
