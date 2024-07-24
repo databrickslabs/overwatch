@@ -433,15 +433,20 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWarehousesEventDF(fromTime: TimeTypes,
                            untilTime: TimeTypes,
-                           maxHistoryDays: Int = 30
+                           maxHistoryDays: Int = 30,
+                           config: Config
                            ): DataFrame = {
     val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     val moduleFromTime = fromTime.asLocalDateTime.format(sysTableFormat)
     val moduleUntilTime = untilTime.asLocalDateTime.format(sysTableFormat)
-    val message = "Table system.compute.warehouse_events does not exists"
+    val useSystemTableMessage = "Use system tables as a source to audit logs"
+    val tableDoesNotExistsMessage = "Table system.compute.warehouse_events does not exists"
+
+    if(config.auditLogConfig.systemTableName.isEmpty)
+      throw new NoNewDataException(useSystemTableMessage, Level.WARN, allowModuleProgression = false)
 
     if(!spark.catalog.tableExists("system.compute.warehouse_events"))
-      throw new NoNewDataException(message, Level.WARN, allowModuleProgression = false)
+      throw new NoNewDataException(tableDoesNotExistsMessage, Level.WARN, allowModuleProgression = false)
 
     spark.sql(s"""
         select * from system.compute.warehouse_events
