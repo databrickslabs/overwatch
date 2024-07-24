@@ -1229,7 +1229,7 @@ for the given module plus one millisecond. If the module has never been executed
 used which is defined as current_date - 60 days, by default. This can be overridden in the
 <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/">config</a>. Some modules can be very slow / time-consuming on the
 first run due to the data volume and/or trickle loads from APIs. Best practice is to set your primordialDateString
-(if desired &gt; 60d) AND set &ldquo;<em>maxDaysToLoad</em>&rdquo; to a low number like 5. It&rsquo;s important to balance sufficient data to
+(if desired &gt; 60d) AND set &ldquo;<em>max_days</em>&rdquo; to a low number like 5. It&rsquo;s important to balance sufficient data to
 fully build out the implicit schemas and small enough data to get through an initial valid test.</p>
 <p>More best practices can be found in the <a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics/#best-practices">Best Practices</a>
 section; these are especially important to reference when getting started.</p>
