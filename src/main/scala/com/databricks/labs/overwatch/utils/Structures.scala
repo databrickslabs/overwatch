@@ -160,6 +160,8 @@ case class ReconReport(
                         deviationPercentage: Option[Double] = None,
                         sourceQuery: Option[String] = None,
                         targetQuery: Option[String] = None,
+                        sourceOnlyColumns: Option[String] = None,
+                        targetOnlyColumns: Option[String] = None,
                         errorMsg: Option[String] = None
                       )
 
@@ -443,6 +445,7 @@ private[overwatch] class ApiCallFailure(
                                          val httpResponse: HttpResponse[String],
                                          apiCallDetail: String,
                                          t: Throwable = null,
+                                         responseWithMeta: String = null,
                                          debugFlag: Boolean = false
                                        ) extends Exception (httpResponse.body) {
   private val logger = Logger.getLogger("ApiCall")
@@ -457,6 +460,8 @@ private[overwatch] class ApiCallFailure(
       s"API CALL DETAILS: \n " +
       s"$apiCallDetail"
   }
+
+  val responseMeta = responseWithMeta //Contains the api request details
 
   if (hardFailErrors.contains(httpResponse.code)) failPipeline = true
   private val logLevel = if (failPipeline) Level.ERROR else Level.WARN

@@ -238,6 +238,68 @@ object DeploymentValidation extends SparkSessionWrapper {
   }
 
   /**
+   * This function retrieves the source of a given path.
+   * If the path is a mount point, it returns the source of the mount point.
+   * If the path is not a mount point, it returns the path itself.
+   *
+   * @param path The path for which the source is to be retrieved.
+   * @return The source of the path if it's a mount point, otherwise the path itself.
+   */
+  private def getSource(path: String): String = {
+    val mounts = dbutils.fs.mounts
+    val storagePath = if (mounts.exists(_.mountPoint == path)) //check whether its a mount point
+    {
+      mounts.find(_.mountPoint == path).head.source
+    } else {
+      path
+    }
+    storagePath
+  }
+
+  /**
+   * This function validates the storage path for the Azure Blob Storage (WASBS).
+   * It checks if the storage path starts with "wasbs" and if it does, it returns a DeploymentValidationReport with a failure status.
+   * Overwatch does not support "wasbs" in the path.
+   *
+   * @param conf The configuration object of type MultiWorkspaceConfig which contains the storage_prefix.
+   * @return A DeploymentValidationReport object which contains the status of the validation (true if the validation passed, false otherwise),
+   *         a human-readable message for the validation, details about the test, a message about the validation result, and the workspace ID.
+   * @throws Exception if there is an error while checking the storage prefix for the wasbs path.
+   */
+
+  private def validateWasbs(conf: MultiWorkspaceConfig): DeploymentValidationReport = {
+    val testDetails = "Wasbs path check"
+    val storagePath = getSource(conf.storage_prefix)
+    try {
+      if (storagePath.startsWith("wasbs")) {
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Wasbs"),
+          testDetails,
+          Some("Overwatch doesn't support wasbs in path" + storagePath),
+          Some(conf.workspace_id)
+        )
+      } else {
+        DeploymentValidationReport(true,
+          getSimpleMsg("Validate_Wasbs"),
+          testDetails,
+          Some("SUCCESS"),
+          Some(conf.workspace_id)
+        )
+      }
+    } catch {
+      case e: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(e, s"""Exception while checking the storage prefix for wasbs path:${conf.auditlogprefix_source_path.get}""")
+        logger.log(Level.ERROR, fullMsg)
+        DeploymentValidationReport(false,
+          getSimpleMsg("Validate_Wasbs"),
+          testDetails,
+          Some(fullMsg),
+          Some(conf.workspace_id)
+        )
+    }
+  }
+
+  /**
    * Performs clusters/list api call to check the access to the workspace
    * @param conf
    * @return
@@ -363,11 +425,11 @@ object DeploymentValidation extends SparkSessionWrapper {
    * @param config
    * @return
    */
-  private def cloudSpecificValidation(config: MultiWorkspaceConfig): DeploymentValidationReport = {
+  private def cloudSpecificValidation(config: MultiWorkspaceConfig, currentOrgID: String): DeploymentValidationReport = {
     if(config.auditlogprefix_source_path.getOrElse("").toLowerCase.equals("system")) {
       val tableName = fetchTableName(config.auditlogprefix_source_path)
       validateSystemTableAudit(tableName, config.workspace_id, config.sql_endpoint.getOrElse(""),
-        config.workspace_url, config.secret_scope, config.secret_key_dbpat)
+        config.workspace_url, config.secret_scope, config.secret_key_dbpat, currentOrgID)
     }
     else
     config.cloud.toLowerCase match {
@@ -710,6 +772,8 @@ object DeploymentValidation extends SparkSessionWrapper {
       case "Storage_Access" => "ETL_STORAGE_PREFIX should have read,write and create access"
       case "Validate_Mount" => "Number of mount points in the workspace should not exceed 50"
       case "Validate_SystemTablesAudit" => "System table name should be system.access.audit"
+      case "Validate_Wasbs" => "Wasbs path should not be provided"
+      case "Validate_SqlEndpoint_Config" => "SqlEndpoint is not required for Driver Workspace"
     }
   }
 
@@ -778,11 +842,11 @@ object DeploymentValidation extends SparkSessionWrapper {
       validateRuleAndUpdateStatus(groupedRuleSet,parallelism) ++
         validateRuleAndUpdateStatus(nonGroupedRuleSet,parallelism)++
         configToValidate.map(validateApiUrlConnectivity) ++ //Make request to each API and check the response
-        configToValidate.map(cloudSpecificValidation)++ //Connection check for audit logs s3/EH
+        configToValidate.map(cloudSpecificValidation(_, currentOrgID))++ //Connection check for audit logs s3/EH
         configToValidate.map(validateMountCount(_,currentOrgID))
     //Access validation for etl_storage_prefix
     validationStatus.append(storagePrefixAccessValidation(configToValidate.head)) //Check read/write/create/list access for etl_storage_prefix
-
+    validationStatus.append(validateWasbs(configToValidate.head))
     configDF.unpersist()
     validationStatus.toArray
   }
@@ -799,14 +863,25 @@ object DeploymentValidation extends SparkSessionWrapper {
                                        sql_endpoint: String,
                                        workspace_host: String,
                                        workspace_token_key: String,
-                                       workspace_scope:String
+                                       workspace_scope:String,
+                                       currentOrgID: String
                                       ): DeploymentValidationReport = {
-    val testDetails = s"Testing for System table - ${table_name} and workspace_id - ${workspace_id}"
+    val testDetails = s"Testing for System table - ${table_name}/sql-endpoint and workspace_id - ${workspace_id}"
     val ifDataExists = if(sql_endpoint.trim.isEmpty)
       verifySystemTableAudit(table_name, workspace_id)
-    else
+    else {
+      if(currentOrgID == workspace_id) {
+       return DeploymentValidationReport(false,
+          getSimpleMsg("Validate_SqlEndpoint_Config"),
+          testDetails,
+          Some(s"No need to configure sql-endpoint for Driver workspace workspace_id - ${workspace_id}"),
+          Some(workspace_id)
+        )
+      }
+      else
       verifyAuditLogFromExternalAccount(table_name,workspace_id, workspace_host,
         sql_endpoint, workspace_scope, workspace_token_key)
+    }
 
     if(spark.catalog.tableExists(table_name) && !ifDataExists) {
       DeploymentValidationReport(true,
