@@ -182,7 +182,7 @@ Here we can see from the above screenshot that:
 ![All Run](/images/DeployOverwatch/allRun.png)
 * By Default Pipeline_Report_Validation would be performed.If allRun is false then only the recent runs which are yet to be validated would be validated.
 * Cross Table Validation would be performed
-* Single table validation would be performed for all the tables as mentioned above.
+* Single table validation would be perfor                                                                                                         +;;; vv;med for all the tables as mentioned above.
 
 ### Validation Framework run with specific tables mentioned in tableArray
 ![Table_Array](/images/DeployOverwatch/Table_Array.png)
