@@ -20,7 +20,7 @@ Here is the high level design of the framework
 
 1. Overwatch Deployment is finished as per the usual process.
 2. Trigger the Validation Framework and aS per the rules defined in Validation Framework the data in tables would be validated.
-3. This decision point checks the results of the pipeline validation
+3. This decision point checks the results of the pipeline validation.
 4. After validation framework is executed, a health check report for the pipeline is generated. This report likely
    contains details on the validation checks and indicates that the pipeline is healthy and functioning as expected. 
 5. If any validation check fails, the snapshot of rows that got failed are moved to a quarantine zone. This would be used for 
@@ -165,6 +165,7 @@ Execution would be started upon calling `PipelineValidation()` function. Below a
 | Param                | Type    | Optional | Default Value | Description                                                                 |
 |----------------------|---------|----------|---------------|-----------------------------------------------------------------------------|
 | etlDB                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
+| allRun               | Boolean | Yes      | Yes           | Boolean flag act on and off switch for validation of all overwatch_runID in pipeline_report. By Default all overwatchRun_IDs are validated.|
 | tableArray           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
 | crossTableValidation | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
 
@@ -172,9 +173,14 @@ Here are the screenshots of Validation Framework run with default setting and wi
 
 ### Default Run
 ![Default Run](/images/DeployOverwatch/Default_Validation_Run.png)
-
 Here we can see from the above screenshot that:
 * By Default Pipeline_Report_Validation would be performed.
+* Cross Table Validation would be performed
+* Single table validation would be performed for all the tables as mentioned above.
+
+### All_run is False
+![All Run](/images/DeployOverwatch/allRun.png)
+* By Default Pipeline_Report_Validation would be performed.If allRun is false then only the recent runs which are yet to be validated would be validated.
 * Cross Table Validation would be performed
 * Single table validation would be performed for all the tables as mentioned above.
 
