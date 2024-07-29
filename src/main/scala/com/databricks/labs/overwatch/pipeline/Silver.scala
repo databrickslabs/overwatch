@@ -408,7 +408,9 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
   lazy private val appendWarehouseStateDetailProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
-        workspace.getWarehousesEventDF(warehouseStateDetailModule.fromTime,warehouseStateDetailModule.untilTime),
+        workspace.getWarehousesEventDF(warehouseStateDetailModule.fromTime,
+                                       warehouseStateDetailModule.untilTime,
+                                       config),
         Seq(buildWarehouseStateDetail(
           warehouseStateDetailModule.untilTime,
           BronzeTargets.auditLogsTarget.asIncrementalDF(warehouseSpecModule, BronzeTargets.auditLogsTarget.incrementalColumns,1), //Added to get the Removed Cluster,

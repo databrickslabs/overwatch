@@ -433,8 +433,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
    */
   def getWarehousesEventDF(fromTime: TimeTypes,
                            untilTime: TimeTypes,
-                           maxHistoryDays: Int = 30,
-                           config: Config
+                           config: Config,
+                           maxHistoryDays: Int = 30
                            ): DataFrame = {
     val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     val moduleFromTime = fromTime.asLocalDateTime.format(sysTableFormat)
@@ -450,7 +450,8 @@ class Workspace(config: Config) extends SparkSessionWrapper {
 
     spark.sql(s"""
         select * from system.compute.warehouse_events
-        WHERE event_time >= DATE_SUB('${moduleFromTime}', ${maxHistoryDays})
+        WHERE workspace_id = '${config.organizationId}'
+        and event_time >= DATE_SUB('${moduleFromTime}', ${maxHistoryDays})
         and event_time <= '${moduleUntilTime}'
         """)
       .withColumnRenamed("event_type","state")
