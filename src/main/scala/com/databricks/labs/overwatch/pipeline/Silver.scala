@@ -268,7 +268,11 @@ class Silver(_workspace: Workspace, _database: Database, _config: Config)
       )
   }
 
-  lazy private[overwatch] val jobRunsModule = Module(2011, "Silver_JobsRuns", this, Array(1004, 2010, 2014), shuffleFactor = 12.0)
+  lazy private[overwatch] val jobRunsModule =
+    Module( 2011, "Silver_JobsRuns", this, Array(1004, 2010, 2014), shuffleFactor = 12.0)
+      .withSparkOverrides( Map(
+        "spark.databricks.adaptive.autoOptimizeShuffle.enabled" -> "true"))
+
   lazy private val appendJobRunsProcess: () => ETLDefinition = {
     () =>
       ETLDefinition(
