@@ -28,8 +28,8 @@ Here is the high level design of the framework
 
 ## Validation Framework Reports
 Upon running validation framework you would get 2 types of records.
-1. HeathCheck_Report.
-2. Quarantine_Report.
+1. `HeathCheck_Report`.
+2. `Quarantine_Report`.
 
 ### HeathCheck_Report
 For every run the snapshot of the run for every table for each rule would be updated to pipeline healthcheck report.
@@ -69,9 +69,9 @@ of the validation framework run like below
 
 As mentioned above in HeathCheck_Report structure currently,there are 3 rule_type available in validation framework. They are
 
-1. Pipeline_Report_Validation
-2. Single_Table_Validation
-3. Cross_Table_Validation
+1. `Pipeline_Report_Validation`
+2. `Single_Table_Validation`
+3. `Cross_Table_Validation`
 
 By Default when we execute validation_Framework healthcheck_rules of all these 3 rule_types would be executed. 
 But through input arguments we can configure our framework run. More on this would be discussed in later section.
@@ -89,72 +89,72 @@ This rule type is only for Pipeline_Report Validation. In this rule type we basi
 The healthCheck_rules with this rule_type would be applied to single table. Basically it will check data quality of single tables.
 Currently, below tables are in scope of this rule type:
 
-* clusterstatefact_gold
-* jobruncostpotentialfact_gold
-* cluster_gold
-* sparkjob_gold
-* sql_query_history_gold
-* jobrun_gold
-* job_gold
+* `clusterstatefact_gold`
+* `jobruncostpotentialfact_gold`
+* `cluster_gold`
+* `sparkjob_gold`
+* `sql_query_history_gold`
+* `jobrun_gold`
+* `job_gold`
 
 Different healthCheck_rules would be applied on each of these tables.
 #### clusterstatefact_gold
-* Cluster_ID_Should_Not_be_NULL
-* Driver_Node_Type_ID_Should_Not_be_NULL
-* Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster
-* DBU_Rate_Should_Be_Greater_Than_Zero_for_Runtime_Engine_is_Standard_Or_Photon
-* Total_Cost_Should_Be_Greater_Than_Zero_for_Databricks_Billable
-* Check_Whether_Any_Single_Cluster_State_is_Running_For_Multiple_Days
+* `Cluster_ID_Should_Not_be_NULL`
+* `Driver_Node_Type_ID_Should_Not_be_NULL`
+* `Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster`
+* `DBU_Rate_Should_Be_Greater_Than_Zero_for_Runtime_Engine_is_Standard_Or_Photon`
+* `Total_Cost_Should_Be_Greater_Than_Zero_for_Databricks_Billable`
+* `Check_Whether_Any_Single_Cluster_State_is_Running_For_Multiple_Days`
 
 
 #### jobruncostpotentialfact_gold
-* Job_ID_Should_Not_be_NULL
-* Driver_Node_Type_ID_Should_Not_be_NULL
-* Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One
-* Check_Whether_Any_Job_is_Running_For_Multiple_Days
+* `Job_ID_Should_Not_be_NULL`
+* `Driver_Node_Type_ID_Should_Not_be_NULL`
+* `Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One`
+* `Check_Whether_Any_Job_is_Running_For_Multiple_Days`
 
 #### cluster_gold
-* Cluster_ID_Should_Not_be_NULL
-* Driver_Node_Type_ID_Should_Not_be_NULL
-* Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster
-* Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency
+* `Cluster_ID_Should_Not_be_NULL`
+* `Driver_Node_Type_ID_Should_Not_be_NULL`
+* `Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster`
+* `Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency`
 * 
 
 #### sparkjob_gold
-* Cluster_ID_Should_Not_be_NULL
-* Job_ID_Should_Not_be_NULL
-* db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL
+* `Cluster_ID_Should_Not_be_NULL`
+* `Job_ID_Should_Not_be_NULL`
+* `db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL`
 
 #### sql_query_history_gold
-* Warehouse_ID_Should_Not_be_NULL
-* Query_ID_Should_Not_be_NULL
+* `Warehouse_ID_Should_Not_be_NULL`
+* `Query_ID_Should_Not_be_NULL`
 
 #### jobrun_gold
-* Job_ID_Should_Not_be_NULL
-* Run_ID_Should_Not_be_NULL
-* Job_Run_ID_Should_Not_be_NULL
-* Task_Run_ID_Should_Not_be_NULL
-* Cluster_ID_Should_Not_be_NULL
+* `Job_ID_Should_Not_be_NULL`
+* `Run_ID_Should_Not_be_NULL`
+* `Job_Run_ID_Should_Not_be_NULL`
+* `Task_Run_ID_Should_Not_be_NULL`
+* `Cluster_ID_Should_Not_be_NULL`
 
 #### job_gold
-* Job_ID_Should_Not_be_NULL
-* Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl
+* `Job_ID_Should_Not_be_NULL`
+* `Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl`
 
 ### Cross_Table_Validation
 The healthCheck_rules with this rule_type would be applied to 2 or more tables. This rule type is basically used to 
 validated data consistency across tables.
 
 HealthCheck_rules of this rule_type are as below:
-* JOB_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold
-* JOB_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold
-* CLUSTER_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold
-* CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold
-* NOTEBOOK_ID_Present_In_notebook_gold_But_Not_In_notebookCommands_gold
-* NOTEBOOK_ID_Present_In_notebookCommands_gold_But_Not_In_notebook_gold
-* CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_jobRunCostPotentialFact_gold
-* CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_clusterStateFact_gold
-* CLUSTER_ID_Present_In_cluster_gold_But_Not_In_clusterStateFact_gold
-* CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_cluster_gold
+* `JOB_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold`
+* `JOB_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold`
+* `CLUSTER_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold`
+* `CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold`
+* `NOTEBOOK_ID_Present_In_notebook_gold_But_Not_In_notebookCommands_gold`
+* `NOTEBOOK_ID_Present_In_notebookCommands_gold_But_Not_In_notebook_gold`
+* `CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_jobRunCostPotentialFact_gold`
+* `CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_clusterStateFact_gold`
+* `CLUSTER_ID_Present_In_cluster_gold_But_Not_In_clusterStateFact_gold`
+* `CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_cluster_gold`
 
 
 ## How to Run Validation Framework
@@ -164,10 +164,10 @@ would be added in the future.
 Execution would be started upon calling `PipelineValidation()` function. Below are the input arguments of this function:
 | Param                | Type    | Optional | Default Value | Description                                                                 |
 |----------------------|---------|----------|---------------|-----------------------------------------------------------------------------|
-| etlDB                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
-| allRun               | Boolean | Yes      | Yes           | Boolean flag act on and off switch for validation of all overwatch_runID in pipeline_report. By Default all overwatchRun_IDs are validated.|
-| tableArray           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
-| crossTableValidation | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
+| `etlDB`                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
+| `allRun`               | Boolean | Yes      | Yes           | Boolean flag act on and off switch for validation of all overwatch_runID in pipeline_report. By Default all overwatchRun_IDs are validated.|
+| `tableArray`           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
+| `crossTableValidation` | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
 
 Here are the screenshots of Validation Framework run with default setting and with custom configuration using input arguments:
 
