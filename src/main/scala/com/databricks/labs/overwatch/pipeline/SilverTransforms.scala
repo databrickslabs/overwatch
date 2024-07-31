@@ -1506,6 +1506,9 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     val warehouseEventsFinal  = if (jrsilverDF.isEmpty || warehousesSpec.asDF.isEmpty) {
       warehouseEventsDF // need to add "min_num_clusters","max_num_clusters"
+        .withColumn("min_num_clusters",lit(0))
+        .withColumn("max_num_clusters",lit(0))
+        .withColumn("timestamp", unix_timestamp($"timestamp")*1000)
     }else{
       val refinedWarehouseEventsDFFiltered = warehouseEventsDF
         .withColumn("row", row_number().over(orderingWindow))
@@ -1531,13 +1534,29 @@ trait SilverTransforms extends SparkSessionWrapper {
         .drop("row","warehouseId","end_run_time","warehouse_name")
 
       warehouseEventsDF
-        .withColumn("min_num_clusters",lit(0))
-        .withColumn("max_num_clusters",lit(0))
-        .union(jobClusterImputed)
+//        .withColumn("min_num_clusters",lit(0))
+//        .withColumn("max_num_clusters",lit(0))
+        .unionByName(jobClusterImputed, allowMissingColumns = true)
         .withColumn("timestamp", unix_timestamp($"timestamp")*1000) // need to add "min_num_clusters","max_num_clusters"
     }
 
-    val warehouseEventsBaseline = warehouseEventsFinal
+    val warehouseBaseDF = warehouseBase(auditLogDF)
+
+    val warehouseBaseDF_latest = warehouseBaseDF
+      .withColumn("row_num",row_number().over(stateUnboundW))
+      .filter('row_num === 1).dropDupColumnByAlias("row_num")
+      .select("organization_id","warehouse_id","max_num_clusters","min_num_clusters")
+      .withColumnRenamed("max_num_clusters","warehouse_max_num_clusters")
+      .withColumnRenamed("min_num_clusters","warehouse_min_num_clusters")
+
+    val warehouseEventsDerived = warehouseEventsFinal.join(
+        warehouseBaseDF_latest
+        ,Seq("organization_id","warehouse_id"),"left"
+      )
+      .withColumn("max_num_clusters",when('max_num_clusters === 0,'warehouse_max_num_clusters).otherwise('max_num_clusters))
+    // .withColumn("min_num_clusters",when('min_num_clusters === 0,'cluster_count).otherwise('min_num_clusters))
+
+    val warehouseEventsBaseline = warehouseEventsDerived //warehouseEventsFinal
       .withColumn(
         "runningSwitch",
         when('state.isin("TERMINATING","TERMINATING_IMPUTED","STOPPING"), lit(false)) //added STOPPING
@@ -1616,7 +1635,7 @@ trait SilverTransforms extends SparkSessionWrapper {
 
     // Start changes from here
     // Get the warehouseID that has been Permenantly_Deleted
-    val warehouseBaseDF = warehouseBase(auditLogDF) //need to rewrite warehouseBase function
+
     val removedWarehouseID = warehouseBaseDF
       .filter('actionName.isin("deleteEndpoint"))
       .select('warehouse_id,'timestamp.alias("deletion_timestamp")).distinct()
