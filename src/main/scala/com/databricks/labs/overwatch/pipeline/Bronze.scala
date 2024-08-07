@@ -171,6 +171,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget.asDF,
         Seq(
           prepClusterEventLogs(
+            clusterEventLogsModule.isFirstRun,
             BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records
             clusterEventLogsModule.fromTime,
             clusterEventLogsModule.untilTime,
