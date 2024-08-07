@@ -342,6 +342,24 @@ case class MultiWSDeploymentReport(
                                     deploymentId: Option[String]
                                   )
 
+case class HealthCheckReport(
+                              etl_database: String,
+                              table_name:  String,
+                              healthCheck_rule: String,
+                              rule_type : String,
+                              healthCheckMsg: Option[String] = None,
+                              Overwatch_RunID: String
+                            )
+
+case class QuarantineReport(
+                             etl_database: String,
+                             table_name : String,
+                             healthcheck_rule_failed : String,
+                             rule_type : String,
+                             healthcheck_type : String,
+                             keys : String
+                           )
+
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 
 
