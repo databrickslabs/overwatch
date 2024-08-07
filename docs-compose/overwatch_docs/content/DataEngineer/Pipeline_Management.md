@@ -191,6 +191,7 @@ progression of the "until" time as no data is not considered an error. Below are
 | 2019      | Silver_ClusterStateDetail           | cluster_state_detail_silver       | 1005                     | 0.6.0   |
 | 2020      | Silver_SQLQueryHistory              | sql_query_history_silver          | 1004                     | 0.7.0   |
 | 2021      | Silver_WarehouseSpec                | warehouse_spec_silver             | 1004,1013                | 0.7.2   |
+| 2022      | Silver_WarehouseStateDetail         | warehouse_state_detail_silver     | 1004,1013                | 0.8.2   |
 | 3001      | Gold_Cluster                        | cluster_gold                      | 2014                     | 0.6.0   |
 | 3002      | Gold_Job                            | job_gold                          | 2010                     | 0.6.0   |
 | 3003      | Gold_JobRun                         | jobrun_gold                       | 2011                     | 0.6.0   |
@@ -209,6 +210,7 @@ progression of the "until" time as no data is not considered an error. Below are
 | 3017      | Gold_Sql_QueryHistory               | sql_query_history_gold            | 2020                     | 0.7.0   |
 | 3018      | Gold_Warehouse                      | warehouse_gold                    | 2021                     | 0.7.2.1 |
 | 3019      | Gold_NotebookCommands               | notebookCommands_gold             | 1004,3004,3005           | 0.7.2.1 |
+| 3020      | Gold_WarehouseStateFact             | warehousestatefact_gold           | 2021, 2022               | 0.8.2   |
 
 
 \* **Bronze_Job_Runs_Snapshot** is experimental as of 0711. The module works as expected but the API can only pull 
