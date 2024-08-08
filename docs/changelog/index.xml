@@ -2,11 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>ChangeLog on Overwatch</title>
-    <link>https://databrickslabs.github.io/overwatch/changelog/</link>
+    <link>http://localhost:1313/overwatch/changelog/</link>
     <description>Recent content in ChangeLog on Overwatch</description>
     <generator>Hugo</generator>
     <language>en</language>
     <lastBuildDate></lastBuildDate>
-    <atom:link href="https://databrickslabs.github.io/overwatch/changelog/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:1313/overwatch/changelog/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
