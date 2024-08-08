@@ -505,6 +505,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val auditDF_base = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
 
     if (auditDF_base.columns.contains("executionTime")){
