@@ -5,7 +5,7 @@ import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
 import com.databricks.labs.overwatch.pipeline.DbsqlTransforms._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.expressions.{Window, WindowSpec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 
@@ -737,6 +737,29 @@ trait SilverTransforms extends SparkSessionWrapper {
 
   }
 
+  /**
+   * Function to create window spec for window functions
+   * @param partitionCols
+   * @param orderByColumn
+   * @param boundaryStart
+   * @param boundaryEnd
+   * @return
+   */
+  private def createWindowSpec(partitionCols: String*)
+                              (orderByColumn: Column)
+                              (boundaryStart: Option[Long] = None, boundaryEnd: Option[Long] = None)
+  : WindowSpec = {
+    if (partitionCols.isEmpty)
+      throw new IllegalArgumentException("partitionCols cannot be empty")
+    if (orderByColumn.toString().isEmpty)
+      throw new IllegalArgumentException("orderByColumn cannot be empty")
+    val baseWindow = Window.partitionBy(partitionCols.map(col): _*)
+    if (boundaryStart.isEmpty && boundaryEnd.isEmpty)
+      baseWindow.orderBy(orderByColumn)
+    else
+      baseWindow.rowsBetween(boundaryStart.get, boundaryEnd.get).orderBy(orderByColumn)
+  }
+
   private def getLatestClusterSnapAsSpecSilver(df: DataFrame,deriveClusterType: Column): DataFrame = {
     val latestClusterSnapW = Window.partitionBy('organization_id, 'cluster_id).orderBy('Pipeline_SnapTS.desc)
     df.withColumn("rnk", rank().over(latestClusterSnapW))
@@ -1063,18 +1086,26 @@ trait SilverTransforms extends SparkSessionWrapper {
     resultDF
   }
 
+
   def buildClusterStateDetail(
                                untilTime: TimeTypes,
                                auditLogDF: DataFrame,
                                jrsilverDF: DataFrame,
                                clusterSpec: PipelineTable,
                              )(clusterEventsDF: DataFrame): DataFrame = {
-    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
-    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
-    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
-    val orderingWindow = Window.partitionBy('organization_id, 'cluster_id).orderBy(desc("timestamp"))
+//    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
+//    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
+//    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
+//    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+//    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
+//    val orderingWindow = Window.partitionBy('organization_id, 'cluster_id).orderBy(desc("timestamp"))
+
+    val stateUnboundW = createWindowSpec("organization_id", "cluster_id")('timestamp)()
+    val stateFromCurrentW = createWindowSpec("organization_id", "cluster_id")('timestamp)(Some(1L), Some(1000L))
+    val stateUntilCurrentW =  createWindowSpec("organization_id", "cluster_id")('timestamp)(Some(-1000L), Some(-1L))
+    val stateUntilPreviousRowW = createWindowSpec("organization_id", "cluster_id")('timestamp)(Some(Window.unboundedPreceding), Some(-1L))
+    val uptimeW = createWindowSpec("organization_id", "cluster_id", "reset_partition")('unixTimeMS_state_start)()
+    val orderingWindow = createWindowSpec("organization_id", "cluster_id")(col("timestamp").desc)()
 
     val nonBillableTypes = Array(
       "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
@@ -1483,12 +1514,20 @@ trait SilverTransforms extends SparkSessionWrapper {
                                            warehousesSpec: PipelineTable,
                                          )(warehouseEventsDF: DataFrame): DataFrame = {
 
-    val stateUnboundW = Window.partitionBy('organization_id, 'warehouse_id).orderBy('timestamp)
-    val stateFromCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(1L, 1000L).orderBy('timestamp)
-    val stateUntilCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
-    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'state_transition_flag_sum).orderBy('unixTimeMS_state_start)
-    val orderingWindow = Window.partitionBy('organization_id, 'warehouse_id).orderBy(desc("timestamp"))
+//    val stateUnboundW = Window.partitionBy('organization_id, 'warehouse_id).orderBy('timestamp)
+//    val stateFromCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(1L, 1000L).orderBy('timestamp)
+//    val stateUntilCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
+//    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
+//    val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'state_transition_flag_sum).orderBy('unixTimeMS_state_start)
+//    val orderingWindow = Window.partitionBy('organization_id, 'warehouse_id).orderBy(desc("timestamp"))
+
+    val stateUnboundW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))()
+    val stateFromCurrentW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))(Some(1L), Some(1000L))
+    val stateUntilCurrentW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))(Some(-1000L), Some(-1L))
+    val stateUntilPreviousRowW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))(Some(Window.unboundedPreceding), Some(-1L))
+    val uptimeW = createWindowSpec("organization_id", "warehouse_id", "state_transition_flag_sum")(col("unixTimeMS_state_start"))()
+    val orderingWindow = createWindowSpec("organization_id", "warehouse_id")(col("timestamp").desc)()
+
 
     val nonBillableTypes = Array(
       "STARTING", "TERMINATING", "CREATING", "RESTARTING" , "TERMINATING_IMPUTED"
