@@ -1487,7 +1487,7 @@ trait SilverTransforms extends SparkSessionWrapper {
     val stateFromCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(1L, 1000L).orderBy('timestamp)
     val stateUntilCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
     val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-    val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'reset_partition).orderBy('unixTimeMS_state_start)
+    val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'state_transition_flag_sum).orderBy('unixTimeMS_state_start)
     val orderingWindow = Window.partitionBy('organization_id, 'warehouse_id).orderBy(desc("timestamp"))
 
     val nonBillableTypes = Array(
@@ -1669,13 +1669,13 @@ trait SilverTransforms extends SparkSessionWrapper {
       .unionByName(stateDuringRemovalFinal, allowMissingColumns = true)
 
     warehouseEventsBaselineFinal
-      .withColumn("counter_reset",
+      .withColumn("state_transition_flag",
         when(
           lag('state, 1).over(stateUnboundW).isin("STOPPING","TERMINATING", "RESTARTING", "EDITED","TERMINATING_IMPUTED") ||
             !'isRunning, lit(1)
         ).otherwise(lit(0))
       )
-      .withColumn("reset_partition", sum('counter_reset).over(stateUnboundW))
+      .withColumn("state_transition_flag_sum", sum('state_transition_flag).over(stateUnboundW))
       .withColumn("target_num_clusters", last('target_num_clusters, true).over(stateUnboundW))
       .withColumn("current_num_clusters", last('current_num_clusters, true).over(stateUnboundW))
       .withColumn("timestamp_state_start", from_unixtime('unixTimeMS_state_start.cast("double") / lit(1000)).cast("timestamp"))
@@ -1684,7 +1684,7 @@ trait SilverTransforms extends SparkSessionWrapper {
       .withColumn("uptime_in_state_S", ('unixTimeMS_state_end - 'unixTimeMS_state_start) / lit(1000))
       .withColumn("uptime_since_restart_S",
         coalesce(
-          when('counter_reset === 1, lit(0))
+          when('state_transition_flag === 1, lit(0))
             .otherwise(sum('uptime_in_state_S).over(uptimeW)),
           lit(0)
         )
