@@ -400,6 +400,16 @@ abstract class PipelineTargets(config: Config) {
       excludedReconColumn = Array("Timestamp") //Timestamp is the pipelineSnapTs in epoc
     )
 
+    lazy private[overwatch] val warehousesStateDetailTarget: PipelineTable = PipelineTable(
+      name = "warehouse_state_detail_silver",
+      _keys = Array("warehouse_id", "state", "unixTimeMS_state_start"),
+      config,
+      _mode = WriteMode.merge,
+      incrementalColumns = Array("state_start_date", "unixTimeMS_state_start"),
+      partitionBy = Seq("organization_id", "state_start_date"),
+      maxMergeScanDates = 30, // 1 less than warehouseStateFact
+    )
+
   }
 
   object GoldTargets {
