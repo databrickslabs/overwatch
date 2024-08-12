@@ -30,148 +30,147 @@ Here is the high level design of the framework
 
 Running the validation framework produces two types of records:
 
-1. `HeathCheck_Report`
-2. `Quarantine_Report`
+1. HeathCheck_Report
+2. Quarantine_Report
 
 
-### `HeathCheck_Report`
+### HeathCheck_Report
 
 Each validation run produces one or more records in the pipeline healthcheck reportfor each healthcheck rule according to the number of Overwatch ETL tables associated with that rule.  Each record contains a reference to the corresponding Overwatch ETL run and its snapshot timestamp.
 
 Structure for the HealthCheck Report is
 | Column Name             | Type   | Description                                                                                      | Example Value                                                              |
 |-------------------------|----------|--------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| `healthcheck_id`        | `uuid`   | Unique ID for this `Healthcheck_Report` record                 | `'272b83eb-1362-456a-8dae-26c3083181ac'` |
-| `etl_database`          | `string` | Overwatch ETL database name                                    | `'ow_etl_azure_0721'` |
-| `table_name`            | `string` | Overwatch ETL table name                                       | `'clusterstatefact_gold'` |
-| `healthcheck_rule`      | `string` | Description of healthcheck rule applied to the table data      | `'Driver_Node_Type_ID Should Not be NULL'` |
-| `rule_type`             | `string` | Type of validation rule (See enumerated values below.)         | `'Pipeline_Report_Validation'` |
-| `healthcheckMsg`        | `string` | Healthcheck status of the table data for this healthcheck rule | `'HealthCheck Failed: got 63 driver_node_type_ids which are null'` |
-| `overwatch_runID`       | `string` | Overwatch run ID of the corresponding snapshot                 | `'b8985023d6ae40fa88bb6daef7f46725'` |
-| `snap_ts`               | `long`   | Snapshot timestamp in `yyyy-mm-dd hh:mm:ss` format             | `'2023-09-27 07:43:39'` |
-| `quarantine_id`         | `uuid`   | Unique ID for Quarantine Report                                | `'cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c'` |
+| healthcheck_id        | uuid   | Unique ID for this Healthcheck_Report record                 | 272b83eb-1362-456a-8dae-26c3083181ac |
+| etl_database          | string | Overwatch ETL database name                                    | ow_etl_azure_0721 |
+| table_name            | string | Overwatch ETL table name                                       | clusterstatefact_gold |
+| healthcheck_rule      | string | Description of healthcheck rule applied to the table data      | Driver_Node_Type_ID Should Not be NULL |
+| rule_type             | string | Type of validation rule (See enumerated values below.)         | Pipeline_Report_Validation |
+| healthcheckMsg        | string | Healthcheck status of the table data for this healthcheck rule | HealthCheck Failed: got 63 driver_node_type_ids which are null |
+| overwatch_runID       | string | Overwatch run ID of the corresponding snapshot                 | b8985023d6ae40fa88bb6daef7f46725 |
+| snap_ts               | long   | Snapshot timestamp in yyyy-mm-dd hh:mm:ss format             | 2023-09-27 07:43:39 |
+| quarantine_id         | uuid   | Unique ID for Quarantine Report                                | cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c |
 
-### `Quarantine_Report`
+### Quarantine_Report
 Rows which would fail as per the rules configured in validation framework would be updated to quarantine report
 | Column Name             | Type         | Description                                                                                                         | Example Value                                                                                       |
 |-------------------------|--------------|---------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
-| `quarantine_id`         | `uuid`   | Unique ID for this `Quarantine_Report` record              | `'cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c'` |
-| `etl_database`          | `string` | Overwatch ETL database name                                | `'ow_etl_azure_0721'` |
-| `table_name`            | `string` | Overwatch table name                                       | `'clusterstatefact_gold'` |
-| `healthcheck_rule_failed` | `string` | Description of healthcheck rule causing the row having `keys` to be quarantined | `'Driver_Node_Type_ID Should Not be NULL'` |
-| `rule_type`             | `string` | Type of validation rule (See enumerated values below.)     | `'Pipeline_Report_Validation'` |
-| `healthcheck_type`      | `string` | Denote the failure type of the health check rule.          | `'Warning'` or `'Failure'` |
-| `keys`                  | `string` | JSON of primary (possibly compound) key value              | `'{"cluster_id":"0831-200003-6bhv8y0u","state":"TERMINATING","unixTimeMS_state_start":1693514245329}'` |
-| `snap_ts`               | `long`   | Snapshot timestamp in `yyyy-mm-dd hh:mm:ss` format         | `'2023-09-27 07:43:39'` |
+| quarantine_id         | uuid   | Unique ID for this Quarantine_Report record              | cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c |
+| etl_database          | string | Overwatch ETL database name                                | ow_etl_azure_0721 |
+| table_name            | string | Overwatch table name                                       | clusterstatefact_gold |
+| healthcheck_rule_failed | string | Description of healthcheck rule causing the row having keys to be quarantined | Driver_Node_Type_ID Should Not be NULL |
+| rule_type             | string | Type of validation rule (See enumerated values below.)     | Pipeline_Report_Validation |
+| healthcheck_type      | string | Denote the failure type of the health check rule.          | Warning or Failure |
+| keys                  | string | JSON of primary (possibly compound) key value              | {"cluster_id":"0831-200003-6bhv8y0u","state":"TERMINATING","unixTimeMS_state_start":1693514245329} |
+| snap_ts               | long   | Snapshot timestamp in yyyy-mm-dd hh:mm:ss format         | 2023-09-27 07:43:39 |
 
 After the execution of the validation framework would be completed both the above-mentioned report would be 
 created as delta file in dbfs location. You can get the information of the delta path in the stacktrace
 of the validation framework run like below
-![Report StackTrace](/images/DeployOverwatch/Validation_Trace.png)
-
+![Report StackTrace](/images/DeployOverwatch/StackTrace.png)
 
 ## Validation Framework Rule Types
 
-As mentioned above in HeathCheck_Report structure currently,there are 3 `rule_type` values available in validation framework. They are
+As mentioned above in HeathCheck_Report structure currently,there are 3 rule_type values available in validation framework. They are
 
-1. `'Pipeline_Report_Validation'`
-2. `'Single_Table_Validation'`
-3. `'Cross_Table_Validation'`
+1. Pipeline_Report_Validation
+2. Single_Table_Validation
+3. Cross_Table_Validation
 
 By default, execution of the validation framework applies healthcheckrules of all three rule types, but input arguments can configure a
 framework run.  More on this will be discussed in a later section.
 
-Let's see how in detail how these rule types are different from each other.
+Lets see how in detail how these rule types are different from each other.
 
 
-### `'Pipeline_Report_Validation'`
+### Pipeline_Report_Validation
 
-This rule type is validation of records in the Overwatch `pipeline_report` table.
+This rule type is validation of records in the Overwatch pipeline_report table.
 
-This rule type has two `healthcheck_rule` values:
+This rule type has two healthcheck_rule values:
 
-* `'Check If Any Module is EMPTY'`
-* `'Check If Any Module is FAILED'`
+* Check If Any Module is EMPTY
+* Check If Any Module is FAILED
 
 
-### `'Single_Table_Validation'`
+### Single_Table_Validation
 
 The healthCheck_rules with this rule_type would be applied to single table. Basically it will check data quality of single tables.
 Currently, below tables are in scope of this rule type:
 
-* `clusterstatefact_gold`
-* `jobruncostpotentialfact_gold`
-* `cluster_gold`
-* `sparkjob_gold`
-* `sql_query_history_gold`
-* `jobrun_gold`
-* `job_gold`
+* clusterstatefact_gold
+* jobruncostpotentialfact_gold
+* cluster_gold
+* sparkjob_gold
+* sql_query_history_gold
+* jobrun_gold
+* job_gold
 
 Different healthcheck rules are defined for the following tables:
 
 
-#### `clusterstatefact_gold`
+#### clusterstatefact_gold
 
-* `'Cluster_ID_Should_Not_be_NULL'`
-* `'Driver_Node_Type_ID_Should_Not_be_NULL'`
-* `'Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster'`
-* `DBU_Rate_Should_Be_Greater_Than_Zero_for_Runtime_Engine_is_Standard_Or_Photon`
-* `Total_Cost_Should_Be_Greater_Than_Zero_for_Databricks_Billable`
-* `Check_Whether_Any_Single_Cluster_State_is_Running_For_Multiple_Days`
+* Cluster_ID_Should_Not_be_NULL
+* Driver_Node_Type_ID_Should_Not_be_NULL
+* Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster
+* DBU_Rate_Should_Be_Greater_Than_Zero_for_Runtime_Engine_is_Standard_Or_Photon
+* Total_Cost_Should_Be_Greater_Than_Zero_for_Databricks_Billable
+* Check_Whether_Any_Single_Cluster_State_is_Running_For_Multiple_Days
 
 
-#### `jobruncostpotentialfact_gold`
+#### jobruncostpotentialfact_gold
 
-* `'Job_ID_Should_Not_be_NULL'`
-* `Driver_Node_Type_ID_Should_Not_be_NULL`
-* `Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One`
-* `Check_Whether_Any_Job_is_Running_For_Multiple_Days`
+* Job_ID_Should_Not_be_NULL
+* Driver_Node_Type_ID_Should_Not_be_NULL
+* Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One
+* Check_Whether_Any_Job_is_Running_For_Multiple_Days
 
 #### cluster_gold
-* `Cluster_ID_Should_Not_be_NULL`
-* `Driver_Node_Type_ID_Should_Not_be_NULL`
-* `Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster`
-* `Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency`
+* Cluster_ID_Should_Not_be_NULL
+* Driver_Node_Type_ID_Should_Not_be_NULL
+* Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster
+* Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency
 * 
 
 #### sparkjob_gold
-* `Cluster_ID_Should_Not_be_NULL`
-* `Job_ID_Should_Not_be_NULL`
-* `db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL`
+* Cluster_ID_Should_Not_be_NULL
+* Job_ID_Should_Not_be_NULL
+* db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL
 
 #### sql_query_history_gold
-* `Warehouse_ID_Should_Not_be_NULL`
-* `Query_ID_Should_Not_be_NULL`
+* Warehouse_ID_Should_Not_be_NULL
+* Query_ID_Should_Not_be_NULL
 
 #### jobrun_gold
-* `Job_ID_Should_Not_be_NULL`
-* `Run_ID_Should_Not_be_NULL`
-* `Job_Run_ID_Should_Not_be_NULL`
-* `Task_Run_ID_Should_Not_be_NULL`
-* `Cluster_ID_Should_Not_be_NULL`
+* Job_ID_Should_Not_be_NULL
+* Run_ID_Should_Not_be_NULL
+* Job_Run_ID_Should_Not_be_NULL
+* Task_Run_ID_Should_Not_be_NULL
+* Cluster_ID_Should_Not_be_NULL
 
 #### job_gold
-* `Job_ID_Should_Not_be_NULL`
-* `Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl`
+* Job_ID_Should_Not_be_NULL
+* Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl
 
 
-### `'Cross_Table_Validation'`
+### Cross_Table_Validation
 
 The healthcheck rules for this rule type are applied to two or more tables. This rule type is used to 
 validate data consistency across tables.
 
-This rule type has the following `healthcheck_rule` values:
+This rule type has the following healthcheck_rule values:
 
-* `'JOB_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold'`
-* `JOB_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold`
-* `CLUSTER_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold`
-* `CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold`
-* `NOTEBOOK_ID_Present_In_notebook_gold_But_Not_In_notebookCommands_gold`
-* `NOTEBOOK_ID_Present_In_notebookCommands_gold_But_Not_In_notebook_gold`
-* `CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_jobRunCostPotentialFact_gold`
-* `CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_clusterStateFact_gold`
-* `CLUSTER_ID_Present_In_cluster_gold_But_Not_In_clusterStateFact_gold`
-* `CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_cluster_gold`
+* JOB_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold
+* JOB_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold
+* CLUSTER_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold
+* CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold
+* NOTEBOOK_ID_Present_In_notebook_gold_But_Not_In_notebookCommands_gold
+* NOTEBOOK_ID_Present_In_notebookCommands_gold_But_Not_In_notebook_gold
+* CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_jobRunCostPotentialFact_gold
+* CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_clusterStateFact_gold
+* CLUSTER_ID_Present_In_cluster_gold_But_Not_In_clusterStateFact_gold
+* CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_cluster_gold
 
 
 ## How to run the Validation Framework
@@ -179,13 +178,13 @@ This rule type has the following `healthcheck_rule` values:
 Currently we can execute the validation framework only running notebook.  Running through databricks workflow
 would be added in the future.
 
-Execution would be started upon calling `PipelineValidation()` function. Below are the input arguments of this function:
+Execution would be started upon calling PipelineValidation() function. Below are the input arguments of this function:
 | Param                | Type    | Optional | Default Value | Description                                                                 |
 |----------------------|---------|----------|---------------|-----------------------------------------------------------------------------|
-| `etlDB`                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
-| `allRun`               | Boolean | Yes      | Yes           | Boolean flag act on and off switch for validation of all overwatch_runID in pipeline_report. By Default all overwatchRun_IDs are validated.|
-| `tableArray`           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
-| `crossTableValidation` | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
+| etlDB                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
+| allRun               | Boolean | Yes      | Yes           | Boolean flag act on and off switch for validation of all overwatch_runID in pipeline_report. By Default all overwatchRun_IDs are validated.|
+| tableArray           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
+| crossTableValidation | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
 
 Here are the screenshots of Validation Framework run with default setting and with custom configuration using input arguments:
 
@@ -207,12 +206,12 @@ Here we can see from the above screenshot that:
 Here we can see from the above screenshot that:
 * By Default Pipeline_Report_Validation would be performed.
 * Cross Table Validation would be performed
-* Single table validation is performed on clusterstatefact_gold,jobruncostpotentialfact_gold as mentioned in `tableArray` param.
+* Single table validation is performed on clusterstatefact_gold,jobruncostpotentialfact_gold as mentioned in tableArray param.
 
 ### Validation Framework run with specific tables mentioned in tableArray and Disable Cross Validation
 ![cross_validation](/images/DeployOverwatch/cross_validation.png)
 Here we can see from the above screenshot that:
 * By Default Pipeline_Report_Validation would be performed.
-* Single table validation is performed on clusterstatefact_gold,jobruncostpotentialfact_gold as mentioned in `tableArray` param.
-* Cross Table Validation would not be performed as `crossTableValidation` flag us `False` here.
+* Single table validation is performed on clusterstatefact_gold,jobruncostpotentialfact_gold as mentioned in tableArray param.
+* Cross Table Validation would not be performed as crossTableValidation flag us False here.
 
