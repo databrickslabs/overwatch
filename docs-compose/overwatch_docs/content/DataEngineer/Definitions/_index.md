@@ -16,7 +16,7 @@ to work with Databricks platform teams to publish and simplify this data. The gr
 released soon but rather that we are aware of the missing component, and we hope to enable gold-level data here in 
 the future.
 
-![OverwatchERD](/images/_index/Overwatch_Gold_0.7.2.1.png)
+![OverwatchERD](/images/_index/Overwatch_Gold_0.8.2.0.png)
 
 ## Consumption Layer "Tables" (Views)
 All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex.
@@ -68,6 +68,7 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkStream](#sparkstream)
 * [warehouse](#warehouse)
 * [notebookCommands](#notebookcommands)
+* [warehouseDbuDetails](#warehousedbudetails)
 * [warehouseStateFact](#warehousestatefact)
 * [Common Meta Fields](#common-meta-fields)
 
@@ -943,32 +944,57 @@ to improve performance.
 NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
 {{% /notice %}}
 
-| Column             | Type   | Description                                                                               |
-|:-------------------|:-------|:------------------------------------------------------------------------------------------|
-| organization_id    | string | Canonical workspace id                                                                    |
-| workspace_name     | string | Customizable human-legible name of the workspace, should be globally unique within the organization|
-| date               | date   | unixTimeMS as a date type                                                                 |
-| timestamp          | long   | unixTimeMS as a timestamp type in milliseconds                                            |
-| notebook_id        | string | id for the notebook in the workspace                                                      |
-| notebook_path      | string | Notebook path in the workspace                                                            |
-| notebook_name      | string | Canonical notebook name for the workspace                                                 |
-| command_id         | string | id of the notebook command                                                                |
-| command_text       | string | The actual text of the command
-| execution_time_s   | double | Notebook command execution time in second                                                 |
-| source_ip_address  | string | Origin IP of action requested                                                             |
-| user_identity      | struct | User information as available. Will include userid and email address                      |
-| estimated_dbu_cost | double | dbu cost per second for the command runtime                                               |
-| status             | string | Status of the notebook command run                                                        |
-| cluster_id         | string | Canonical workspace cluster id                                                            |
-| cluster_name       | string | The name of the compute asset used to execute the task run                                |
-| custom_tags        | string | JSON string of key/value pairs for all cluster associated custom tags give to the cluster |
-| node_type_id       | string | Worker Node type for the compute asset (not supported for Warehouses yet)                 |
-| node_count         | long   | Cluster worker node count                                                                 |
-| response           | struct | HTTP response including errorMessage, result, and statusCode                              |
-| user_agent         | string | Request origin such as browser, terraform, api, etc                                      |
-| unixTimeMS         | long   | Unix time epoch as a long in milliseconds                                                 |
-| Pipeline_SnapTS    | string | Snapshot timestamp of Overwatch run that added the record                                 |
-| Overwatch_RunID    | string | Overwatch canonical ID that resulted in the record load                                   |
+| Column             | Type   | Description                                                                                         |
+|:-------------------|:-------|:----------------------------------------------------------------------------------------------------|
+| organization_id    | string | Canonical workspace id                                                                              |
+| workspace_name     | string | Customizable human-legible name of the workspace, should be globally unique within the organization |
+| date               | date   | unixTimeMS as a date type                                                                           |
+| timestamp          | long   | unixTimeMS as a timestamp type in milliseconds                                                      |
+| notebook_id        | string | id for the notebook in the workspace                                                                |
+| notebook_path      | string | Notebook path in the workspace                                                                      |
+| notebook_name      | string | Canonical notebook name for the workspace                                                           |
+| command_id         | string | id of the notebook command                                                                          |
+| command_text       | string | The actual text of the command                                                                      
+| execution_time_s   | double | Notebook command execution time in second                                                           |
+| source_ip_address  | string | Origin IP of action requested                                                                       |
+| user_identity      | struct | User information as available. Will include userid and email address                                |
+| estimated_dbu_cost | double | dbu cost per second for the command runtime                                                         |
+| status             | string | Status of the notebook command run                                                                  |
+| cluster_id         | string | Canonical workspace cluster id                                                                      |
+| cluster_name       | string | The name of the compute asset used to execute the task run                                          |
+| custom_tags        | string | JSON string of key/value pairs for all cluster associated custom tags give to the cluster           |
+| node_type_id       | string | Worker Node type for the compute asset (not supported for Warehouses yet)                           |
+| node_count         | long   | Cluster worker node count                                                                           |
+| response           | struct | HTTP response including errorMessage, result, and statusCode                                        |
+| user_agent         | string | Request origin such as browser, terraform, api, etc                                                 |
+| unixTimeMS         | long   | Unix time epoch as a long in milliseconds                                                           |
+| Pipeline_SnapTS    | string | Snapshot timestamp of Overwatch run that added the record                                           |
+| Overwatch_RunID    | string | Overwatch canonical ID that resulted in the record load                                             |
+
+#### warehouseDbuDetails
+**KEY** -- Organization_ID + cloud + cluster_size
+
+**Incremental Columns** -- activeFrom
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Append
+
+This table tracks DBU contract costs by workspace and cluster size over time. It should rarely 
+need editing, except for situations like correcting historical costs. Keep in mind that 
+changing these prices won't update past pricing in tables like warehouseStateFact. 
+To apply the new prices, the gold pipeline modules must be rolled back and costs recalculated.
+
+| Column       | Type    | Description                                                                                                                                                                                                                                                         |
+|:-------------|:--------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| cloud        | string  | AWS or Azure or GCP.                                                                                                                                                                                                                                                |
+| cluster_size | string  | Size of the DBSQL warehouse.                                                                                                                                                                                                                                        |
+| driver_size  | string  | Driver size/type running behind the DBSQL warehouse                                                                                                                                                                                                                 |
+| worker_count | long    | Total number of clusters in the DBSQL warehouse                                                                                                                                                                                                                     |
+| total_dbu    | long    | Total dbus charged for the cluster per hour                                                                                                                                                                                                                         | 
+| is_active    | boolean | whether the contract price is currently active. This must be true for each key where activeUntil is null                                                                                                                                                            |
+| activeFrom*  | date    | The start date for the costs in this record. **NOTE** this MUST be equal to one other record's activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.                                                        |
+| activeUntil* | date    | The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active) |
 
 #### WarehouseStateFact
 [**SAMPLE**](/assets/TableSamples/clusterstatefact.tab)

@@ -12,21 +12,21 @@
     <title>Data Dictionary (Latest) :: Overwatch</title>
 
     
-    <link href="http://localhost:1313/overwatch/css/nucleus.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/fontawesome-all.min.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/hybrid.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/featherlight.min.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/perfect-scrollbar.min.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/auto-complete.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/atom-one-dark-reasonable.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/theme.css?1723055834" rel="stylesheet">
-    <link href="http://localhost:1313/overwatch/css/hugo-theme.css?1723055834" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/nucleus.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/fontawesome-all.min.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/hybrid.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/featherlight.min.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/perfect-scrollbar.min.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/auto-complete.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/atom-one-dark-reasonable.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/theme.css?1723459390" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/hugo-theme.css?1723459390" rel="stylesheet">
     
-    <link href="http://localhost:1313/overwatch/css/theme-blue.css?1723055834" rel="stylesheet">
+    <link href="http://localhost:1313/overwatch/css/theme-blue.css?1723459390" rel="stylesheet">
     
     
 
-    <script src="http://localhost:1313/overwatch/js/jquery-3.3.1.min.js?1723055834"></script>
+    <script src="http://localhost:1313/overwatch/js/jquery-3.3.1.min.js?1723459390"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="http://localhost:1313/overwatch/js/lunr.min.js?1723055834"></script>
-<script type="text/javascript" src="http://localhost:1313/overwatch/js/auto-complete.js?1723055834"></script>
+<script type="text/javascript" src="http://localhost:1313/overwatch/js/lunr.min.js?1723459390"></script>
+<script type="text/javascript" src="http://localhost:1313/overwatch/js/auto-complete.js?1723459390"></script>
 <script type="text/javascript">
     
         var baseurl = "http:\/\/localhost:1313\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="http://localhost:1313/overwatch/js/search.js?1723055834"></script>
+<script type="text/javascript" src="http://localhost:1313/overwatch/js/search.js?1723459390"></script>
 
     
   </div>
@@ -1242,7 +1242,7 @@ to work with Databricks platform teams to publish and simplify this data. The gr
 &ldquo;Backlog/Research&rdquo; are simply a known gap, and a pursuit of the Overwatch dev team, it does NOT mean it&rsquo;s going to be
 released soon but rather that we are aware of the missing component, and we hope to enable gold-level data here in
 the future.</p>
-<p><img src="http://localhost:1313/overwatch/images/_index/Overwatch_Gold_0.7.2.1.png" alt="OverwatchERD"></p>
+<p><img src="http://localhost:1313/overwatch/images/_index/Overwatch_Gold_0.8.2.0.png" alt="OverwatchERD"></p>
 <h2 id="consumption-layer-tables-views">Consumption Layer &ldquo;Tables&rdquo; (Views)</h2>
 <p>All end users should be hitting consumer tables first. Digging into lower layers gets significantly more complex.
 Below is the data model for the consumption layer. The consumption layer is often in a stand-alone database apart
@@ -1332,6 +1332,9 @@ tirelessly to expose additional SparkUI data and will publish as soon as it&rsqu
 </li>
 <li>
 <p><a href="#notebookcommands">notebookCommands</a></p>
+</li>
+<li>
+<p><a href="#warehousedbudetails">warehouseDbuDetails</a></p>
 </li>
 <li>
 <p><a href="#warehousestatefact">warehouseStateFact</a></p>
@@ -3891,6 +3894,66 @@ to improve performance.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="warehousedbudetails">warehouseDbuDetails</h4>
+<p><strong>KEY</strong> &ndash; Organization_ID + cloud + cluster_size</p>
+<p><strong>Incremental Columns</strong> &ndash; activeFrom</p>
+<p><strong>Partition Columns</strong> &ndash; organization_id</p>
+<p><strong>Write Mode</strong> &ndash; Append</p>
+<p>This table tracks DBU contract costs by workspace and cluster size over time. It should rarely
+need editing, except for situations like correcting historical costs. Keep in mind that
+changing these prices won&rsquo;t update past pricing in tables like warehouseStateFact.
+To apply the new prices, the gold pipeline modules must be rolled back and costs recalculated.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Column</th>
+<th style="text-align:left">Type</th>
+<th style="text-align:left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">cloud</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">AWS or Azure or GCP.</td>
+</tr>
+<tr>
+<td style="text-align:left">cluster_size</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Size of the DBSQL warehouse.</td>
+</tr>
+<tr>
+<td style="text-align:left">driver_size</td>
+<td style="text-align:left">string</td>
+<td style="text-align:left">Driver size/type running behind the DBSQL warehouse</td>
+</tr>
+<tr>
+<td style="text-align:left">worker_count</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total number of clusters in the DBSQL warehouse</td>
+</tr>
+<tr>
+<td style="text-align:left">total_dbu</td>
+<td style="text-align:left">long</td>
+<td style="text-align:left">Total dbus charged for the cluster per hour</td>
+</tr>
+<tr>
+<td style="text-align:left">is_active</td>
+<td style="text-align:left">boolean</td>
+<td style="text-align:left">whether the contract price is currently active. This must be true for each key where activeUntil is null</td>
+</tr>
+<tr>
+<td style="text-align:left">activeFrom*</td>
+<td style="text-align:left">date</td>
+<td style="text-align:left">The start date for the costs in this record. <strong>NOTE</strong> this MUST be equal to one other record&rsquo;s activeUntil unless this is the first record for these costs. There may be no overlap in time or gaps in time.</td>
+</tr>
+<tr>
+<td style="text-align:left">activeUntil*</td>
+<td style="text-align:left">date</td>
+<td style="text-align:left">The end date for the costs in this record. Must be null to indicate the active record. Only one record can be active at all times. The key (API_name) must have zero gaps and zero overlaps from the Overwatch primordial date until now indicated by null (active)</td>
+</tr>
+</tbody>
+</table>
 <h4 id="warehousestatefact">WarehouseStateFact</h4>
 <p><a href="http://localhost:1313/overwatch/assets/TableSamples/clusterstatefact.tab"><strong>SAMPLE</strong></a></p>
 <p><strong>KEY</strong> &ndash; organization_id + warehouse_id + state + unixTimeMS_state_start</p>
@@ -5169,19 +5232,19 @@ all tables. Users should always reference Consumption and Gold layers unless the
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="http://localhost:1313/overwatch/js/clipboard.min.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.min.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.jquery.min.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/jquery.sticky.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/featherlight.min.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/highlight.pack.js?1723055834"></script>
+    <script src="http://localhost:1313/overwatch/js/clipboard.min.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.min.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/perfect-scrollbar.jquery.min.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/jquery.sticky.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/featherlight.min.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/highlight.pack.js?1723459390"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="http://localhost:1313/overwatch/js/modernizr.custom-3.6.0.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/learn.js?1723055834"></script>
-    <script src="http://localhost:1313/overwatch/js/hugo-learn.js?1723055834"></script>
+    <script src="http://localhost:1313/overwatch/js/modernizr.custom-3.6.0.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/learn.js?1723459390"></script>
+    <script src="http://localhost:1313/overwatch/js/hugo-learn.js?1723459390"></script>
 
-    <link href="http://localhost:1313/overwatch/mermaid/mermaid.css?1723055834" rel="stylesheet" />
-    <script src="http://localhost:1313/overwatch/mermaid/mermaid.js?1723055834"></script>
+    <link href="http://localhost:1313/overwatch/mermaid/mermaid.css?1723459390" rel="stylesheet" />
+    <script src="http://localhost:1313/overwatch/mermaid/mermaid.js?1723459390"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

@@ -159,7 +159,7 @@ when they occur. Sometimes, there will truly be no new data in an upstream Modul
 progression of the "until" time as no data is not considered an error. Below are the ETL Modules and their dependencies
 
 ### Module Dependencies Diagram
-![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies_0721.png)
+![ModuleDepDiagram](/images/DataEngineer/Overwatch_Entity_Dependencies_0820.png)
 
 | Module ID | Module Name                         | Target Table Name                 | Module ID Dependencies   | As Of   |
 |:----------|:------------------------------------|:----------------------------------|:-------------------------|---------|
