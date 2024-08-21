@@ -12,6 +12,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 
 object WorkflowsTransforms extends SparkSessionWrapper {
 
+  import TransformationDescriber._
   import spark.implicits._
 
   /**
@@ -41,6 +42,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def getJobsBase(df: DataFrame): DataFrame = {
     val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode", 'runId).orderBy('timestamp)
     df.filter(col("serviceName") === "jobs")
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumn("rnk", rank().over(onlyOnceJobRecW))
       .withColumn("rn", row_number.over(onlyOnceJobRecW))
@@ -990,30 +992,37 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   }
 
   /**
-   * looks up the cluster_name based on id first from job_status_silver and if not present there fallback to latest
-   * snapshot prior to the run
-   */
-  def jobRunsAppendClusterName(lookups: Map[String, DataFrame])(df: DataFrame): DataFrame = {
+    * Look up the cluster_name based on id first from
+    * `job_status_silver`.  If not present there fallback to latest
+    * snapshot prior to the run
+    */
 
-    val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
-      df.toTSDF("timestamp", "organization_id", "clusterId")
-        .lookupWhen(
-          lookups("cluster_spec_silver")
-            .toTSDF("timestamp", "organization_id", "clusterId")
-        ).df
-    } else df
+  val jobRunsAppendClusterName = (lookups: Map[String,DataFrame]) => NamedTransformation {
 
-    val runsWClusterNames2 = if (lookups.contains("clusters_snapshot_bronze")) {
-      runsWClusterNames1
-        .toTSDF("timestamp", "organization_id", "clusterId")
-        .lookupWhen(
-          lookups("clusters_snapshot_bronze")
-            .toTSDF("timestamp", "organization_id", "clusterId")
-        ).df
-    } else runsWClusterNames1
+    (df: DataFrame) => {
 
-    runsWClusterNames2
+      val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
+        df.toTSDF("timestamp", "organization_id", "clusterId")
+          .lookupWhen(
+            lookups("cluster_spec_silver")
+              .toTSDF("timestamp", "organization_id", "clusterId")
+          ).df
+      } else df
+
+      val runsWClusterNames2 = if (lookups.contains("clusters_snapshot_bronze")) {
+        runsWClusterNames1
+          .toTSDF("timestamp", "organization_id", "clusterId")
+          .lookupWhen(
+            lookups("clusters_snapshot_bronze")
+              .toTSDF("timestamp", "organization_id", "clusterId")
+          ).df
+      } else runsWClusterNames1
+
+      runsWClusterNames2
+    }
+
   }
+
 
   /**
    * looks up the job name based on id first from job_status_silver and if not present there fallback to latest
@@ -1325,10 +1334,10 @@ object WorkflowsTransforms extends SparkSessionWrapper {
       clusterStateEndOrPipelineEnd.alias("unixTimeMS_state_end"), // if clusterState still open -- close it for calculations
       'timestamp_state_start,
       'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-      $"driverSpecs.API_Name".alias("driver_node_type_id"),
+      coalesce('driver_node_type_id, $"driverSpecs.API_Name").alias("driver_node_type_id"),
       $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
       $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
-      $"workerSpecs.API_Name".alias("node_type_id"),
+      coalesce('node_type_id, $"workerSpecs.API_Name").alias("node_type_id"),
       $"workerSpecs.Compute_Contract_Price".alias("worker_compute_hourly"),
       $"workerSpecs.Hourly_DBUs".alias("worker_dbu_hourly"),
       $"workerSpecs.vCPUs".alias("worker_cores"),
