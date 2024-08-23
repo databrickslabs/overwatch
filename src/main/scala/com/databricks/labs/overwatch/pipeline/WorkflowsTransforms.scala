@@ -15,6 +15,7 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
   private val logger = Logger.getLogger(this.getClass)
 
+  import TransformationDescriber._
   import spark.implicits._
   import TransformationDescriber._
 
@@ -45,6 +46,7 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
   def getJobsBase(df: DataFrame): DataFrame = {
     val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode", 'runId).orderBy('timestamp)
     df.filter(col("serviceName") === "jobs")
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumn("rnk", rank().over(onlyOnceJobRecW))
       .withColumn("rn", row_number.over(onlyOnceJobRecW))
@@ -1248,6 +1250,7 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
     */
 
   val jobRunsAppendClusterName = (lookups: Map[String,DataFrame]) => NamedTransformation {
+
     (df: DataFrame) => {
 
       val runsWClusterNames1 = if (lookups.contains("cluster_spec_silver")) {
@@ -1269,7 +1272,9 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
 
       runsWClusterNames2
     }
+
   }
+
 
   /**
     * Looks up the job name based on id first from job_status_silver.
@@ -1555,10 +1560,10 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
       clusterStateEndOrPipelineEnd.alias("unixTimeMS_state_end"), // if clusterState still open -- close it for calculations
       'timestamp_state_start,
       'timestamp_state_end, 'state, 'cloud_billable, 'databricks_billable, 'uptime_in_state_H, 'current_num_workers, 'target_num_workers,
-      $"driverSpecs.API_Name".alias("driver_node_type_id"),
+      coalesce('driver_node_type_id, $"driverSpecs.API_Name").alias("driver_node_type_id"),
       $"driverSpecs.Compute_Contract_Price".alias("driver_compute_hourly"),
       $"driverSpecs.Hourly_DBUs".alias("driver_dbu_hourly"),
-      $"workerSpecs.API_Name".alias("node_type_id"),
+      coalesce('node_type_id, $"workerSpecs.API_Name").alias("node_type_id"),
       $"workerSpecs.Compute_Contract_Price".alias("worker_compute_hourly"),
       $"workerSpecs.Hourly_DBUs".alias("worker_dbu_hourly"),
       $"workerSpecs.vCPUs".alias("worker_cores"),

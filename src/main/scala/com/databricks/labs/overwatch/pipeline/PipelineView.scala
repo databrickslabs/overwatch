@@ -16,10 +16,37 @@ case class PipelineView(name: String,
   else dbTargetOverride.getOrElse(config.consumerDatabaseName)
 
   def publish(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false,workspacesAllowed: Array[String] = Array()): Unit = {
+
+    if (spark.catalog.tableExists(s"${config.etlCatalogName}.${config.databaseName}.${dataSource.name}")) {
+      createView(colDefinition, sorted, reverse,workspacesAllowed)
+    } else {
+      val dataSourceName = dataSource.name.toLowerCase()
+      val path = s"${config.etlDataPathPrefix}/${dataSourceName}"
+      if (Helpers.pathExists(path)) {
+        val query = s"CREATE TABLE ${config.etlCatalogName}.${config.databaseName}.${dataSource.name} USING DELTA LOCATION '${path}'"
+        val queryStatement = query.toString()
+        try {
+          setCurrentCatalog(spark, config.etlCatalogName)
+          spark.sql(queryStatement)
+          createView(colDefinition, sorted, reverse,workspacesAllowed)
+        } catch {
+          case e: Throwable =>
+            println(s"GOLD VIEW: CREATE VIEW FAILED: Cannot create view: ${dataSource.tableFullName} --> ${e.getMessage}")
+        }
+      } else {
+        val msgLog = s"GOLD VIEW: CREATE VIEW FAILED: Source path: ${path}  does not exist"
+        logger.log(Level.INFO, msgLog)
+        if (config.debugFlag) println(msgLog)
+      }
+    }
+  }
+
+  private def createView(colDefinition: String, sorted: Boolean = false, reverse: Boolean = false, workspacesAllowed: Array[String] = Array()): Unit = {
+
     if (dataSource.exists) {
       val pubStatementSB = new StringBuilder("create or replace view ")
       val dataSourceName = dataSource.name.toLowerCase()
-      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from delta.`${config.etlDataPathPrefix}/${dataSourceName}`")
+      pubStatementSB.append(s"${dbTarget}.${name} as select ${colDefinition} from ${config.etlCatalogName}.${config.databaseName}.${dataSource.name}")
       // link partition columns
       if (dataSource.partitionBy.nonEmpty) {
         val partMap: Map[String, String] = if (partitionMapOverrides.isEmpty) {
@@ -27,10 +54,10 @@ case class PipelineView(name: String,
         } else {
           partitionMapOverrides
         }
-        pubStatementSB.append(s" where ${partMap.head._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${partMap.head._2} ")
+        pubStatementSB.append(s" where ${partMap.head._1} = ${config.etlCatalogName}.${config.databaseName}.${dataSource.name}.${partMap.head._2} ")
         if (partMap.keys.toArray.length > 1) {
           partMap.tail.foreach(pCol => {
-            pubStatementSB.append(s"and ${pCol._1} = ${s"delta.`${config.etlDataPathPrefix}/${dataSourceName}`"}.${pCol._2} ")
+            pubStatementSB.append(s"and ${pCol._1} = ${config.etlCatalogName}.${config.databaseName}.${dataSource.name}.${pCol._2} ")
           })
         }
         if (workspacesAllowed.nonEmpty){

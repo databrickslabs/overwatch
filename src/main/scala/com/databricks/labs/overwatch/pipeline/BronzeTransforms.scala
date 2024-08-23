@@ -410,12 +410,21 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 pipelineSnapTime: Long,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String,
-                                config: Config) = {
+                                config: Config,
+                                isFirstRun: Boolean) = {
     val finalResponseCount = clusterIDs.length
     val clusterEventsEndpoint = "clusters/events"
 
     val lagTime =  86400000 //1 day
-    val lagStartTime = startTime.asUnixTimeMilli - lagTime
+
+    val lagStartTime = if (isFirstRun) {
+      logger.log(Level.INFO, "First run, acquiring all cluster events")
+      0.toLong
+    } else {
+      logger.log(Level.INFO, "Subsequent run, acquiring new cluster events")
+      startTime.asUnixTimeMilli - lagTime
+    }
+
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> "0",
@@ -549,20 +558,20 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     if (Helpers.pathExists(tmpClusterSnapshotSuccessPath)) {
       try {
+
         val rawDF = deriveRawApiResponseDF(spark.read.json(tmpClusterSnapshotSuccessPath))
         if (rawDF.columns.contains("cluster_id")) {
-          val outputDF = SchemaScrubber.scrubSchema(rawDF)
-          val finalDF = outputDF.withColumn("default_tags", SchemaTools.structToMap(outputDF, "default_tags"))
-            .withColumn("custom_tags", SchemaTools.structToMap(outputDF, "custom_tags"))
-            .withColumn("spark_conf", SchemaTools.structToMap(outputDF, "spark_conf"))
-            .withColumn("spark_env_vars", SchemaTools.structToMap(outputDF, "spark_env_vars"))
-            .withColumn(s"aws_attributes", SchemaTools.structToMap(outputDF, s"aws_attributes"))
-            .withColumn(s"azure_attributes", SchemaTools.structToMap(outputDF, s"azure_attributes"))
-            .withColumn(s"gcp_attributes", SchemaTools.structToMap(outputDF, s"gcp_attributes"))
+          val scrubbedDF = SchemaScrubber.scrubSchema(rawDF)
+          val df = scrubbedDF.withColumn("default_tags", SchemaTools.structToMap(scrubbedDF, "default_tags"))
+            .withColumn("custom_tags", SchemaTools.structToMap(scrubbedDF, "custom_tags"))
+            .withColumn("spark_conf", SchemaTools.structToMap(scrubbedDF, "spark_conf"))
+            .withColumn("spark_env_vars", SchemaTools.structToMap(scrubbedDF, "spark_env_vars"))
+            .withColumn(s"aws_attributes", SchemaTools.structToMap(scrubbedDF, s"aws_attributes"))
+            .withColumn(s"azure_attributes", SchemaTools.structToMap(scrubbedDF, s"azure_attributes"))
+            .withColumn(s"gcp_attributes", SchemaTools.structToMap(scrubbedDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
-            .verifyMinimumSchema(clusterSnapMinimumSchema)
-          finalDF
-
+            .drop("spec")
+          df.verifyMinimumSchema(clusterSnapMinimumSchema)
         } else {
           throw new NoNewDataException(msg, Level.WARN, true)
         }
@@ -601,6 +610,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def prepClusterEventLogs(
+                                      isFirstRun : Boolean,
                                       filteredAuditLogDF: DataFrame,
                                       startTime: TimeTypes,
                                       endTime: TimeTypes,
@@ -626,10 +636,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
-    try{
-      landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
-        tmpClusterEventsErrorPath, config)
-    }catch {
+    try {
+      landClusterEvents(
+        clusterIDs, startTime, endTime,
+        pipelineSnapTS.asUnixTimeMilli,
+        tmpClusterEventsSuccessPath,
+        tmpClusterEventsErrorPath,
+        config,
+        isFirstRun)
+    } catch {
       case e: Throwable =>
         val errMsg = s"Error in landing cluster events: ${e.getMessage}"
         logger.log(Level.ERROR, errMsg)
