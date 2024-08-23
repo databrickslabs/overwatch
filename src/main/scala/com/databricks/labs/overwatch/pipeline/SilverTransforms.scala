@@ -1094,12 +1094,6 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
                                jrsilverDF: DataFrame,
                                clusterSpec: PipelineTable,
                              )(clusterEventsDF: DataFrame): DataFrame = {
-//    val stateUnboundW = Window.partitionBy('organization_id, 'cluster_id).orderBy('timestamp)
-//    val stateFromCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(1L, 1000L).orderBy('timestamp)
-//    val stateUntilCurrentW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
-//    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'cluster_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-//    val uptimeW = Window.partitionBy('organization_id, 'cluster_id, 'reset_partition).orderBy('unixTimeMS_state_start)
-//    val orderingWindow = Window.partitionBy('organization_id, 'cluster_id).orderBy(desc("timestamp"))
 
     val stateUnboundW = createWindowSpec("organization_id", "cluster_id")('timestamp)()
     val stateFromCurrentW = createWindowSpec("organization_id", "cluster_id")('timestamp)(Some(1L), Some(1000L))
@@ -1525,13 +1519,6 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
                                            warehousesSpec: PipelineTable,
                                          )(warehouseEventsDF: DataFrame): DataFrame = {
 
-//    val stateUnboundW = Window.partitionBy('organization_id, 'warehouse_id).orderBy('timestamp)
-//    val stateFromCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(1L, 1000L).orderBy('timestamp)
-//    val stateUntilCurrentW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(-1000L, -1L).orderBy('timestamp)
-//    val stateUntilPreviousRowW = Window.partitionBy('organization_id, 'warehouse_id).rowsBetween(Window.unboundedPreceding, -1L).orderBy('timestamp)
-//    val uptimeW = Window.partitionBy('organization_id, 'warehouse_id, 'state_transition_flag_sum).orderBy('unixTimeMS_state_start)
-//    val orderingWindow = Window.partitionBy('organization_id, 'warehouse_id).orderBy(desc("timestamp"))
-
     val stateUnboundW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))()
     val stateFromCurrentW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))(Some(1L), Some(1000L))
     val stateUntilCurrentW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))(Some(-1000L), Some(-1L))
@@ -1584,8 +1571,6 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
         .drop("row","warehouseId","end_run_time","warehouse_name")
 
       warehouseEventsDF
-//        .withColumn("min_num_clusters",lit(0))
-//        .withColumn("max_num_clusters",lit(0))
         .unionByName(jobClusterImputed, allowMissingColumns = true)
         .withColumn("timestamp", unix_timestamp($"timestamp")*1000) // need to add "min_num_clusters","max_num_clusters"
     }
@@ -1604,7 +1589,6 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
         ,Seq("organization_id","warehouse_id"),"left"
       )
       .withColumn("max_num_clusters",when('max_num_clusters === 0,'warehouse_max_num_clusters).otherwise('max_num_clusters))
-    // .withColumn("min_num_clusters",when('min_num_clusters === 0,'cluster_count).otherwise('min_num_clusters))
 
     val warehouseEventsBaseline = warehouseEventsDerived //warehouseEventsFinal
       .withColumn(
