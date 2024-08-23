@@ -10,7 +10,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 
 
-trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
+trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSessionWrapper] {
 
   import TransformationDescriber._
   import spark.implicits._
