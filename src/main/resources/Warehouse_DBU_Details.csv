@@ -1,0 +1,19 @@
+cloud,cluster_size,driver_size,worker_count,total_dbus
+AWS,2X-Small,i3.2xlarge,1,4
+AWS,X-Small,i3.2xlarge,2,6
+AWS,Small,i3.4xlarge,4,12
+AWS,Medium,i3.8xlarge,8,24
+AWS,Large,i3.8xlarge,16,40
+AWS,X-Large,i3.16xlarge,32,80
+AWS,2X-Large,i3.16xlarge,64,144
+AWS,3X-Large,i3.16xlarge,128,272
+AWS,4X-Large,i3.16xlarge,256,528
+AZURE,2X-Small,E8ds v4,1,4
+AZURE,X-Small,E8ds v4,2,6
+AZURE,Small,E16ds v4,4,12
+AZURE,Medium,E32ds v4,8,24
+AZURE,Large,E32ds v4,16,40
+AZURE,X-Large,E64ds v4,32,80
+AZURE,2X-Large,E64ds v4,64,144
+AZURE,3X-Large,E64ds v4,128,272
+AZURE,4X-Large,E64ds v4,256,528
