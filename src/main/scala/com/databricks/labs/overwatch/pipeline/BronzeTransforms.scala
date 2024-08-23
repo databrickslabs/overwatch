@@ -410,12 +410,21 @@ trait BronzeTransforms extends SparkSessionWrapper {
                                 pipelineSnapTime: Long,
                                 tmpClusterEventsSuccessPath: String,
                                 tmpClusterEventsErrorPath: String,
-                                config: Config) = {
+                                config: Config,
+                                isFirstRun: Boolean) = {
     val finalResponseCount = clusterIDs.length
     val clusterEventsEndpoint = "clusters/events"
 
     val lagTime =  86400000 //1 day
-    val lagStartTime = startTime.asUnixTimeMilli - lagTime
+
+    val lagStartTime = if (isFirstRun) {
+      logger.log(Level.INFO, "First run, acquiring all cluster events")
+      0.toLong
+    } else {
+      logger.log(Level.INFO, "Subsequent run, acquiring new cluster events")
+      startTime.asUnixTimeMilli - lagTime
+    }
+
     // creating Json input for parallel API calls
     val jsonInput = Map(
       "start_value" -> "0",
@@ -562,27 +571,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
             .withColumn(s"gcp_attributes", SchemaTools.structToMap(scrubbedDF, s"gcp_attributes"))
             .withColumn("organization_id", lit(config.organizationId))
             .drop("spec")
-            .verifyMinimumSchema(clusterSnapMinimumSchema)
-
-//          val finalDF = df.schema.fields.find(_.name == "spec") match {
-//            case Some(field) =>
-//              field.dataType match {
-//                case structType: StructType =>
-//                  val newFields = structType.fields.map { f =>
-//                    f.dataType match {
-//                      case _: StructType => SchemaTools.structToMap(df, s"spec.${f.name}").as(f.name)
-//                      case _ => col(s"spec.${f.name}").as(f.name)
-//                    }
-//                  }
-//                  df.withColumn("spec", struct(newFields: _*))
-//                case _ => df
-//              }
-//            case None => df
-//          }
-
-          df
-            .verifyMinimumSchema(clusterSnapMinimumSchema)
-
+          df.verifyMinimumSchema(clusterSnapMinimumSchema)
         } else {
           throw new NoNewDataException(msg, Level.WARN, true)
         }
@@ -621,6 +610,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
   }
 
   protected def prepClusterEventLogs(
+                                      isFirstRun : Boolean,
                                       filteredAuditLogDF: DataFrame,
                                       startTime: TimeTypes,
                                       endTime: TimeTypes,
@@ -646,10 +636,15 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     val tmpClusterEventsSuccessPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/success_" + pipelineSnapTS.asUnixTimeMilli
     val tmpClusterEventsErrorPath = s"${config.tempWorkingDir}/${apiEndpointTempDir}/error_" + pipelineSnapTS.asUnixTimeMilli
-    try{
-      landClusterEvents(clusterIDs, startTime, endTime, pipelineSnapTS.asUnixTimeMilli, tmpClusterEventsSuccessPath,
-        tmpClusterEventsErrorPath, config)
-    }catch {
+    try {
+      landClusterEvents(
+        clusterIDs, startTime, endTime,
+        pipelineSnapTS.asUnixTimeMilli,
+        tmpClusterEventsSuccessPath,
+        tmpClusterEventsErrorPath,
+        config,
+        isFirstRun)
+    } catch {
       case e: Throwable =>
         val errMsg = s"Error in landing cluster events: ${e.getMessage}"
         logger.log(Level.ERROR, errMsg)
@@ -657,7 +652,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
     }
      if (Helpers.pathExists(tmpClusterEventsErrorPath)) {
       persistErrors(
-        deriveRawApiResponseDF(spark.read.json(tmpClusterEventsErrorPath))
+        spark.read.json(tmpClusterEventsErrorPath)
           .withColumn("from_ts", toTS(col("from_epoch")))
           .withColumn("until_ts", toTS(col("until_epoch"))),
         database,

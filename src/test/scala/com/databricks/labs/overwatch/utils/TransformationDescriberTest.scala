@@ -39,61 +39,64 @@ class TransformationDescriberTest
       info( s"`nt.toString`: ${nt.toString}")
 
       assert( nt.name === "nt")
-      assert( nt.toString === "NamedTransformation nt")
+      assert( nt.toString === "nt: NamedTransformation")
 
     }
 
-    it( "modifies the `spark.job.description` local property") {
+    Given( "a Spark `Dataset` (including `DataFrame`s)")
 
-      Given( "a Spark `Dataset` (including `DataFrame`s)")
+    val in = Seq( ("foo", "bar")).toDF( "foo", "bar")
 
-      val in = Seq( ("foo", "bar")).toDF( "foo", "bar")
-
-      Console.withOut( s) {
-        in.show(numRows= 1, truncate= 0, vertical= true)
-      }
-      // info( s.toString)
-      s.toString.linesIterator.foreach( info(_))
-      s.reset
-
-      When( "a `NamedTransformation` is applied")
-
-      val out = in.transformWithDescription( nt)
-
-      // val s = new ByteArrayOutputStream
-      Console.withOut( s) {
-        out.show(numRows= 1, truncate= 0, vertical= true)
-      }
-      // info( s.toString)
-      s.toString.linesIterator.foreach( info(_))
-
-
-
-      Then( "the resulting Spark jobs have a matching description (pending)")
-
-      // info( s"""spark.jobGroup.id: ${out.sparkSession.sparkContext.getLocalProperty( "spark.jobGroup.id")}""")
-
-      val sjd = out.sparkSession.sparkContext.getLocalProperty( "spark.job.description")
-
-      info( s"spark.job.description: ${sjd}")
-
-      assert( sjd === "NamedTransformation nt")
-
-      // INFO( s"""spark.callSite.short: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.short")}""")
-      // info( s"""spark.callSite.long: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.long")}""")
-
-      And( "the result of the transformation is correct")
-
-      assertResult( "foo STRING") {
-        out.schema.toDDL
-      }
-
-      assertResult( "foo") {
-        out.first.getString(0)
-      }
-
+    Console.withOut( s) {
+      in.show(numRows= 1, truncate= 0, vertical= true)
     }
+    // info( s.toString)
+    s.toString.linesIterator.foreach( info(_))
+    s.reset
+
+    When( "a `NamedTransformation` is applied")
+
+    val out = in.transformWithDescription( nt)
+
+    // val s = new ByteArrayOutputStream
+    Console.withOut( s) {
+      out.show(numRows= 1, truncate= 0, vertical= true)
+    }
+    // info( s.toString)
+    s.toString.linesIterator.foreach( info(_))
+
+
+
+    Then( "the resulting Spark jobs have a matching description (pending)")
+
+    // info( s"""spark.jobGroup.id: ${out.sparkSession.sparkContext.getLocalProperty( "spark.jobGroup.id")}""")
+
+    val sjd = out.sparkSession.sparkContext.getLocalProperty( "spark.job.description")
+
+    info( s"spark.job.description: ${sjd}")
+
+    assert( sjd === "nt: NamedTransformation")
+
+    // info( s"""spark.callSite.short: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.short")}""")
+    // info( s"""spark.callSite.long: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.long")}""")
+
+    
+
+
+
+
+    And( "the result of the transformation is correct")
+
+    assertResult( "`foo` STRING") {
+      out.schema.toDDL
+    }
+
+    assertResult( "foo") {
+      out.first.getString(0)
+    }
+
 
   }
+
 
 }
