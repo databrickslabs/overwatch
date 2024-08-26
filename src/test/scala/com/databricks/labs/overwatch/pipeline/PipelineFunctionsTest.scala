@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config}
 import com.github.mrpowers.spark.fast.tests.DataFrameComparer
 import io.delta.tables.DeltaTable

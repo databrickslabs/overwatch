@@ -10,7 +10,8 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame}
 
 
-trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
+
+trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSessionWrapper] {
 
   import TransformationDescriber._
   import spark.implicits._
@@ -1411,6 +1412,15 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
     // eagerly force this highly reused DF into cache()
     jobRunsLag30D.count()
 
+    
+    // TODO: remove or comment out or change log level or . . .
+
+    logger.log( Level.INFO, "Showing first 5 rows of `jobRunsLag30D`:")
+
+    jobRunsLag30D
+      .showLines(5, 20, true)
+      .foreach( logger.log( Level.INFO, _))
+
     // Lookup to populate the clusterID/clusterName where missing from jobs
     lazy val clusterSpecNameLookup = clusterSpec.asDF
       .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
@@ -1515,7 +1525,6 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax {
                                            jrsilverDF: DataFrame,
                                            warehousesSpec: PipelineTable,
                                          )(warehouseEventsDF: DataFrame): DataFrame = {
-
 
     val stateUnboundW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))()
     val stateFromCurrentW = createWindowSpec("organization_id", "warehouse_id")(col("timestamp"))(Some(1L), Some(1000L))
