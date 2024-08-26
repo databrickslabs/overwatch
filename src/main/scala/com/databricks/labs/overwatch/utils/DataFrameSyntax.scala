@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-
 import org.apache.log4j.{Level,Logger}
 import org.apache.spark.sql.Dataset
 import java.io.ByteArrayOutputStream
@@ -100,8 +99,6 @@ trait DataFrameSyntax[ SPARK <: SparkSessionWrapper] {
 
   private val logger: Logger = Logger.getLogger(this.getClass)
 
-  val dataFrameLoggerSparkConfKey = "overwatch.dataframelogger.level"
-
   implicit class DataFrameShower[T]( val df: Dataset[T]) {
 
     def showLines(): Iterator[String] =
@@ -133,6 +130,8 @@ trait DataFrameSyntax[ SPARK <: SparkSessionWrapper] {
 
     }
   }
+  
+  val dataFrameLoggerSparkConfKey = "overwatch.dataframelogger.level"
 
   def getDataFrameLoggerSparkConfValue(): Option[ String] =
       spark.conf.getOption( dataFrameLoggerSparkConfKey)
