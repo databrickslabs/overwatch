@@ -42,6 +42,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   def getJobsBase(df: DataFrame): DataFrame = {
     val onlyOnceJobRecW = Window.partitionBy('organization_id, 'timestamp, 'actionName, 'requestId, $"response.statusCode", 'runId).orderBy('timestamp)
     df.filter(col("serviceName") === "jobs")
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
       .withColumn("rnk", rank().over(onlyOnceJobRecW))
       .withColumn("rn", row_number.over(onlyOnceJobRecW))
@@ -1033,6 +1034,7 @@ object WorkflowsTransforms extends SparkSessionWrapper {
   // }
 
   val jobRunsAppendTaskAndClusterDetails = NamedTransformation { (df: DataFrame) => {
+
     val computeIsSQLWarehouse = $"task_detail.sql_task.warehouse_id".isNotNull
 
     val dfHasTasks = SchemaTools.nestedColExists(df.schema, "tasks")

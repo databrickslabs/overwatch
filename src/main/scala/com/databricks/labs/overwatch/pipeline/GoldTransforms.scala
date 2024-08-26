@@ -6,6 +6,7 @@ import com.databricks.labs.overwatch.utils.{ModuleDisabled, NoNewDataException, 
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.DateType
 import org.apache.spark.sql.{Column, DataFrame}
 
 trait GoldTransforms extends SparkSessionWrapper {
@@ -505,6 +506,7 @@ trait GoldTransforms extends SparkSessionWrapper {
 
     val auditDF_base = auditIncrementalDF
       .filter(col("serviceName") === "notebook" && col("actionName") === "runCommand")
+      .verifyMinimumSchema(Schema.auditMasterSchema)
       .selectExpr("*", "requestParams.*").drop("requestParams")
 
     if (auditDF_base.columns.contains("executionTime")){
@@ -950,6 +952,87 @@ trait GoldTransforms extends SparkSessionWrapper {
     df.select(warehouseCols: _*)
   }
 
+  protected def buildWarehouseStateFact(
+                                       instanceDetailsTarget: PipelineTable,
+                                       warehouseDbuDetailsTarget: PipelineTable,
+                                       warehouseSpec: PipelineTable
+                                     )(warehouseStateDetail: DataFrame): DataFrame = {
+    val warehouseDbuDetails = warehouseDbuDetailsTarget.asDF()
+
+    val warehouseDbuDetailsColumns = warehouseDbuDetails.columns.map(colName => col(s"warehouseDbuDetails.$colName"))
+
+    val warehouseClustersDetails = warehouseDbuDetails.alias("warehouseDbuDetails")
+      .join(instanceDetailsTarget.asDF.alias("instanceDetails"),
+        $"warehouseDbuDetails.organization_id" === $"instanceDetails.organization_id" &&
+          $"warehouseDbuDetails.driver_size" === $"instanceDetails.API_Name")
+      .select(warehouseDbuDetailsColumns :+ col("instanceDetails.vCPUs"): _*)
+
+    val warehousePotMetaToFill = Array(
+      "warehouse_name", "channel", "warehouse_type","cluster_size","driver_size"
+    )
+    val warehousePotKeys = Seq("organization_id", "warehouse_id")
+    val warehousePotIncrementals = Seq("state_start_date", "unixTimeMS_state_start")
+
+    val warehousePotential = warehouseStateDetail
+      .withColumn("timestamp", 'unixTimeMS_state_start) // time control temporary column
+      .toTSDF("timestamp", "organization_id", "warehouse_id")
+      .lookupWhen(
+        warehouseSpec.asDF.toTSDF("timestamp", "organization_id", "warehouse_id"),
+        maxLookAhead = Window.unboundedFollowing,maxLookback = 0L,
+        tsPartitionVal = 4
+      ).df
+      .alias("warehousePotential")
+      .join( // estimated node type details at start time of run. If contract changes during state, not handled but very infrequent and negligible impact
+        warehouseClustersDetails
+          .withColumnRenamed("organization_id","warehouse_organization_id")
+          .withColumnRenamed("workspace_name","warehouse_workspace_name")
+          .withColumnRenamed("cluster_size","warehouse_cluster_size")
+          .withColumnRenamed("Pipeline_SnapTS","warehouse_Pipeline_SnapTS")
+          .withColumnRenamed("Overwatch_RunID","warehouse_Overwatch_RunID")
+          .alias("warehouseClustersDetails"),
+        $"warehousePotential.organization_id" === $"warehouseClustersDetails.warehouse_organization_id" &&
+          trim(lower($"warehousePotential.cluster_size")) === trim(lower($"warehouseClustersDetails.warehouse_cluster_size"))
+         &&
+         $"warehousePotential.unixTimeMS_state_start"
+           .between($"warehouseClustersDetails.activeFromEpochMillis", $"warehouseClustersDetails.activeUntilEpochMillis"),
+        "left"
+      ).drop("warehouse_organization_id","warehouse_cluster_size","warehouse_Pipeline_SnapTS")
+      .fillMeta(warehousePotMetaToFill, warehousePotKeys, warehousePotIncrementals, noiseBuckets = getTotalCores)
+
+    val workerPotentialCoreS = when('databricks_billable, 'vCPUs * 'current_num_clusters * 'uptime_in_state_S)
+      .otherwise(lit(0))
+    val warehouseDBUs = when('databricks_billable, 'total_dbus * 'uptime_in_state_H ).otherwise(lit(0)).alias("driver_dbus")
+
+    val warehouseStateFactCols: Array[Column] = Array(
+      'organization_id,
+      'warehouse_id,
+      'warehouse_name,
+      'tags,
+      'state_start_date,
+      'unixTimeMS_state_start,
+      'unixTimeMS_state_end,
+      'timestamp_state_start,
+      'timestamp_state_end,
+      'state,
+      'cluster_size,
+      'current_num_clusters,
+      'target_num_clusters,
+      'uptime_since_restart_S,
+      'uptime_in_state_S,
+      'uptime_in_state_H,
+      'cloud_billable,
+      'databricks_billable,
+      'warehouse_type,
+      'state_dates,
+      'days_in_state,
+      (workerPotentialCoreS / lit(3600)).alias("worker_potential_core_H"),
+      warehouseDBUs
+    )
+
+    warehousePotential
+      .select(warehouseStateFactCols: _*)
+  }
+
   protected val clusterViewColumnMapping: String =
     """
       |organization_id, workspace_name, cluster_id, action, unixTimeMS, timestamp, date, cluster_name, driver_node_type,
@@ -1090,6 +1173,14 @@ trait GoldTransforms extends SparkSessionWrapper {
       |user_email,cluster_size,min_num_clusters,max_num_clusters,auto_stop_mins,spot_instance_policy,enable_photon,
       |channel,enable_serverless_compute,warehouse_type,warehouse_state,size,auto_resume,creator_id,tags,num_clusters,
       |num_active_sessions,jdbc_url,unixTimeMS,date,created_by
+      |""".stripMargin
+
+  protected val warehouseStateFactViewColumnMappings: String =
+    """
+      |organization_id,workspace_name,warehouse_id,warehouse_name,unixTimeMS_state_start, tags, state_start_date,
+      |unixTimeMS_state_end, timestamp_state_start, timestamp_state_end, state, cluster_size, current_num_clusters,
+      |target_num_clusters, uptime_since_restart_S, uptime_in_state_S, uptime_in_state_H, cloud_billable,
+      |databricks_billable, warehouse_type, state_dates, days_in_state, worker_potential_core_H, driver_dbus
       |""".stripMargin
 
 }

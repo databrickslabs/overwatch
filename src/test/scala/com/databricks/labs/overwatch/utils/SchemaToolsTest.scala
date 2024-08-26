@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.SparkSessionTestWrapper
+// import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.functions.{col, lit, size, struct}

@@ -27,7 +27,7 @@ class ETLDefinition(
 
     val transformedDF = transforms.foldLeft(verifiedSourceDF) {
       case (df, transform) =>
-	    
+      
 	/* 
  	 * reverting Spark UI Job Group labels for now
    	 *
@@ -40,6 +40,7 @@ class ETLDefinition(
 	 */
 	    
         df.transform( transform)
+
     }
     write(transformedDF, module)
   }

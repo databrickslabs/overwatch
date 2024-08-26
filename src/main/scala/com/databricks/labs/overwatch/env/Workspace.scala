@@ -17,6 +17,8 @@ import scala.concurrent.Future
 import scala.concurrent.forkjoin.ForkJoinPool
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 
 /**
@@ -422,6 +424,40 @@ class Workspace(config: Config) extends SparkSessionWrapper {
     addReport
   }
 
+  /**
+   * Fetch the warehouse event data from system.compute.warehouse_events
+   * @param fromTime : from time to fetch the data
+   * @param untilTime: until time to fetch the data
+   * @param maxHistoryDays: maximum history days to fetch the data
+   * @return
+   */
+  def getWarehousesEventDF(fromTime: TimeTypes,
+                           untilTime: TimeTypes,
+                           config: Config,
+                           maxHistoryDays: Int = 30
+                           ): DataFrame = {
+    val sysTableFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+    val moduleFromTime = fromTime.asLocalDateTime.format(sysTableFormat)
+    val moduleUntilTime = untilTime.asLocalDateTime.format(sysTableFormat)
+    val useSystemTableMessage = "Use system tables as a source to audit logs"
+    val tableDoesNotExistsMessage = "Table system.compute.warehouse_events does not exists"
+
+    if(config.auditLogConfig.systemTableName.isEmpty)
+      throw new NoNewDataException(useSystemTableMessage, Level.WARN, allowModuleProgression = false)
+
+    if(!spark.catalog.tableExists("system.compute.warehouse_events"))
+      throw new NoNewDataException(tableDoesNotExistsMessage, Level.WARN, allowModuleProgression = false)
+
+    spark.sql(s"""
+        select * from system.compute.warehouse_events
+        WHERE workspace_id = '${config.organizationId}'
+        and event_time >= DATE_SUB('${moduleFromTime}', ${maxHistoryDays})
+        and event_time <= '${moduleUntilTime}'
+        """)
+      .withColumnRenamed("event_type","state")
+      .withColumnRenamed("workspace_id","organization_id")
+      .withColumnRenamed("event_time","timestamp")
+  }
 }
 
 

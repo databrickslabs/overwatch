@@ -104,8 +104,6 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
 
   }
 
-
-
   lazy private[overwatch] val jobsSnapshotModule = Module(1001, "Bronze_Jobs_Snapshot", this)
   lazy private val appendJobsProcess: () => ETLDefinition = {
     () =>
@@ -171,6 +169,7 @@ class Bronze(_workspace: Workspace, _database: Database, _config: Config)
         BronzeTargets.clustersSnapshotTarget.asDF,
         Seq(
           prepClusterEventLogs(
+            clusterEventLogsModule.isFirstRun,
             BronzeTargets.auditLogsTarget.asIncrementalDF(clusterEventLogsModule, BronzeTargets.auditLogsTarget.incrementalColumns, additionalLagDays = 1), // 1 lag day to get laggard records
             clusterEventLogsModule.fromTime,
             clusterEventLogsModule.untilTime,

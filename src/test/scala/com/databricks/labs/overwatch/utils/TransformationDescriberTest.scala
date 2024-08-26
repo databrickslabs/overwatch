@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import org.apache.spark.sql.DataFrame
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.GivenWhenThen

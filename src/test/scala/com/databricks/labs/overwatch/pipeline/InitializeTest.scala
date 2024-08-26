@@ -1,6 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
-import com.databricks.labs.overwatch.SparkSessionTestWrapper
+import com.databricks.labs.overwatch.utils.SparkSessionTestWrapper
 import com.databricks.labs.overwatch.env.Database
 import com.databricks.labs.overwatch.utils.OverwatchScope._
 import com.databricks.labs.overwatch.utils.{BadConfigException, Config, OverwatchScope, TokenSecret}
