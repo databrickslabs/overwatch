@@ -8,10 +8,11 @@ import java.io.ByteArrayOutputStream
 class TransformationDescriberTest
     extends AnyFunSpec
     with GivenWhenThen
-    with SparkSessionTestWrapper {
+    with SparkSessionTestWrapper
+    with TransformationDescriber {
 
-  import TransformationDescriber._
   import spark.implicits._
+
   spark.conf.set("spark.sql.session.timeZone", "UTC")
 
   val t = (df: DataFrame) => df.select( $"foo")

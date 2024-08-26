@@ -2,12 +2,8 @@ package com.databricks.labs.overwatch.utils
 
 import org.apache.spark.sql.Dataset
 
-// TODO: implement this as a `trait`.  Initial attempts would not
-// compile because of the dependencies among other `trait`s and
-// `object`s that would have to be refactored.
 
-object TransformationDescriber {
-
+trait TransformationDescriber {
 
   class NamedTransformation[T,U](
     val transformation: Dataset[T] => Dataset[U])(

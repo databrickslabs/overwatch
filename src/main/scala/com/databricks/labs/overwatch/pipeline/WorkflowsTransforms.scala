@@ -11,14 +11,14 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame}
 
 
-object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
+trait WorkflowsTransforms
+    extends SparkSessionWrapper
+    with DataFrameSyntax[ SparkSessionWrapper]
+    with TransformationDescriber {
 
   private val logger = Logger.getLogger(this.getClass)
 
-  import TransformationDescriber._
   import spark.implicits._
-  import TransformationDescriber._
-
   
   /**
    * BEGIN Workflow generic functions

@@ -10,6 +10,9 @@ import org.apache.spark.sql.{AnalysisException, Column, DataFrame, Dataset}
 
 import java.time.LocalDate
 
+
+// TODO: implement this as a `trait`.
+
 object TransformFunctions {
 
   implicit class DataFrameTransforms(df: DataFrame) {

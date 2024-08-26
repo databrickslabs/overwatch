@@ -201,32 +201,6 @@ trait ApiMeta {
     jsonObject.toString
   }
 
-  /**
-   * Function will add the meta info to the api response.
-   *
-   * @param response
-   * @param jsonQuery
-   * @param queryMap
-   * @return a string containing the api response and the meta for the api call.
-   */
-  private[overwatch] def enrichAPIResponse(response: String, resopnseCode : Int, jsonQuery: String, queryMap: Map[String, String]): String = {
-    val filter: String = if (apiCallType.equals("POST")) jsonQuery else {
-      val mapper = new ObjectMapper()
-      mapper.registerModule(DefaultScalaModule)
-      mapper.writeValueAsString(queryMap)
-    }
-    val jsonObject = new JSONObject();
-    val apiTraceabilityMeta = new JSONObject();
-    apiTraceabilityMeta.put("endPoint", apiName)
-    apiTraceabilityMeta.put("type", apiCallType)
-    apiTraceabilityMeta.put("apiVersion", apiV)
-    apiTraceabilityMeta.put("responseCode", resopnseCode)
-    apiTraceabilityMeta.put("batchKeyFilter", filter)
-    jsonObject.put("rawResponse", response.trim)
-    jsonObject.put("apiTraceabilityMeta", apiTraceabilityMeta)
-    jsonObject.toString
-  }
-
 }
 
 /**

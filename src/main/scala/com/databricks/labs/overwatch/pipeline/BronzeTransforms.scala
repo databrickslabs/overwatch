@@ -5,7 +5,6 @@ import com.databricks.labs.overwatch.api.{ApiCall, ApiCallV2}
 import com.databricks.labs.overwatch.env.{Database, Workspace}
 import com.databricks.labs.overwatch.eventhubs.AadAuthInstance
 import com.databricks.labs.overwatch.pipeline.Schema.{clusterSnapMinimumSchema}
-import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms.{getJobsBase, workflowsCleanseJobClusters, workflowsCleanseTasks}
 import com.databricks.labs.overwatch.utils.Helpers.{deriveApiTempDir, deriveRawApiResponseDF, getDatesGlob, removeTrailingSlashes}
 import com.databricks.labs.overwatch.utils.SchemaTools.structFromJson
 import com.databricks.labs.overwatch.utils._
@@ -30,7 +29,9 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
 
-trait BronzeTransforms extends SparkSessionWrapper {
+trait BronzeTransforms
+    extends SparkSessionWrapper
+    with WorkflowsTransforms {
 
   import TransformFunctions._
   import spark.implicits._

@@ -1,7 +1,6 @@
 package com.databricks.labs.overwatch.pipeline
 
 import com.databricks.labs.overwatch.pipeline.TransformFunctions._
-import com.databricks.labs.overwatch.pipeline.WorkflowsTransforms._
 import com.databricks.labs.overwatch.pipeline.DbsqlTransforms._
 import com.databricks.labs.overwatch.utils._
 import org.apache.log4j.{Level, Logger}
@@ -11,11 +10,13 @@ import org.apache.spark.sql.{Column, DataFrame}
 
 
 
-trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSessionWrapper] {
+trait SilverTransforms
+    extends SparkSessionWrapper
+    with WorkflowsTransforms
+    with DataFrameSyntax[ SparkSessionWrapper]
+    with TransformationDescriber {
 
-  import TransformationDescriber._
   import spark.implicits._
-  import TransformationDescriber._
 
   private val logger: Logger = Logger.getLogger(this.getClass)
   private val responseSuccessFilter: Column = $"response.statusCode" === 200
@@ -1471,13 +1472,17 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
     )
 
     // caching before structifying
-    jobRunsDeriveRunsBase(jobRunsLag30D, etlUntilTime)
+    jobRunsDeriveRunsBase(jobRunsLag30D)
       .transformWithDescription(
         jobRunsAppendClusterName( jobRunsLookups))
-      .transform(jobRunsAppendJobMeta(jobRunsLookups))
-      .transform(jobRunsStructifyLookupMeta(optimalCacheParts))
-      .transform(jobRunsAppendTaskAndClusterDetails)
-      .transform(jobRunsCleanseCreatedNestedStructures(targetKeys))
+      .transformWithDescription(
+        jobRunsAppendJobMeta( jobRunsLookups))
+      .transformWithDescription(
+        jobRunsStructifyLookupMeta( optimalCacheParts))
+      .transformWithDescription(
+        jobRunsAppendTaskAndClusterDetails)
+      .transformWithDescription(
+        jobRunsCleanseCreatedNestedStructures( targetKeys))
       //      .transform(jobRunsRollupWorkflowsAndChildren)
       .drop("timestamp") // could be duplicated to enable asOf Lookups, dropping to clean up
   }
