@@ -81,6 +81,10 @@ trait DataFrameSyntax[ SPARK <: SparkSessionWrapper] {
     * }}}
     */
 
+  private val logger: Logger = Logger.getLogger(this.getClass)
+
+  val dataFrameLoggerSparkConfKey = "overwatch.dataframelogger.level"
+
   implicit class DataFrameShower[T]( val df: Dataset[T]) {
 
     def showLines(): Iterator[String] =

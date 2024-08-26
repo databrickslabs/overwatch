@@ -27,7 +27,7 @@ class ETLDefinition(
 
     val transformedDF = transforms.foldLeft(verifiedSourceDF) {
       case (df, transform) =>
-        /* 
+        /*
          * reverting Spark UI Job Group labels for now
          *
          * TODO: enumerate the regressions this would introduce
@@ -37,7 +37,7 @@ class ETLDefinition(
          *    s"${module.pipeline.config.workspaceName}:${module.moduleName}",
          *    transform.toString)
          */
-         
+
         df.transform( transform)
     }
     write(transformedDF, module)

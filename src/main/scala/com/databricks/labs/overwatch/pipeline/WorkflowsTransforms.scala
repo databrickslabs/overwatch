@@ -19,6 +19,7 @@ object WorkflowsTransforms extends SparkSessionWrapper with DataFrameSyntax {
   import spark.implicits._
   import TransformationDescriber._
 
+  
   /**
    * BEGIN Workflow generic functions
    */

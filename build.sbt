@@ -2,7 +2,6 @@ name := "overwatch"
 
 organization := "com.databricks.labs"
 
-
 version := "0.8.2.0"
 
 scalaVersion := "2.12.12"
