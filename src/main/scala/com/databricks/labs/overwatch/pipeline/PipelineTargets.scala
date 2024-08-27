@@ -321,10 +321,15 @@ abstract class PipelineTargets(config: Config) {
 
     lazy private[overwatch] val dbJobRunsTarget: PipelineTable = PipelineTable(
       name = "jobrun_silver",
-      _keys = Array("runId", "startEpochMS"),
+      _keys = Array(
+        "runId",
+        "startEpochMS",                 // was incorrectly equal to `$"timeDetails.startTime"` through 0.8.1.2
+                                        // via incorrect expression for `'TaskRunTime`; now `$"timeDetails.submissionTime"`
+        "startTaskEpochMS"              // added to make key for task runs complete; can be null
+      ),
       config,
       _mode = WriteMode.merge,
-      incrementalColumns = Array("startEpochMS"), // don't load into gold until run is terminated
+      incrementalColumns = Array("startEpochMS"),
       zOrderBy = Array("runId", "jobId"),
       partitionBy = Seq("organization_id", "__overwatch_ctrl_noise"),
       persistBeforeWrite = true,

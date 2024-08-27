@@ -78,6 +78,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       'git_source,
       'timeout_seconds,
       'max_concurrent_runs,
+      'queue,
       'max_retries,
       'retry_on_timeout,
       'min_retry_interval_millis,
@@ -141,8 +142,6 @@ trait GoldTransforms extends SparkSessionWrapper {
       'min_retry_interval_millis,
       'max_concurrent_runs,
       'run_as_user_name,
-//      'children,
-//      'workflow_children,
       'workflow_context,
       'task_detail_legacy,
       'submitRun_details,
@@ -150,8 +149,9 @@ trait GoldTransforms extends SparkSessionWrapper {
       'last_edited_by,
       'requestDetails.alias("request_detail"),
       'timeDetails.alias("time_detail"),
-      'startEpochMS
-    )
+      'startEpochMS,
+      'startTaskEpochMS)
+
     jobRunsLag30D
       .select(jobRunCols: _*)
   }
@@ -1053,7 +1053,7 @@ trait GoldTransforms extends SparkSessionWrapper {
   protected val jobViewColumnMapping: String =
     """
       |organization_id, workspace_name, job_id, action, date, timestamp, job_name, tags, tasks, job_clusters,
-      |libraries, timeout_seconds, max_concurrent_runs, max_retries, retry_on_timeout, min_retry_interval_millis,
+      |libraries, timeout_seconds, max_concurrent_runs, queue, max_retries, retry_on_timeout, min_retry_interval_millis,
       |schedule, existing_cluster_id, new_cluster, git_source, task_detail_legacy, is_from_dlt, aclPermissionSet,
       |targetUserId, session_id, request_id, user_agent, response, source_ip_address, created_by, created_ts,
       |deleted_by, deleted_ts, last_edited_by, last_edited_ts
@@ -1065,7 +1065,7 @@ trait GoldTransforms extends SparkSessionWrapper {
       |task_run_id, repair_id, task_key, cluster_type, cluster_id, cluster_name, job_cluster_key, job_cluster,
       |new_cluster, tags, task_detail, task_dependencies, task_runtime, task_execution_runtime, task_type,
       |terminal_state, job_trigger_type, schedule, libraries, manual_override_params, repair_details, timeout_seconds,
-      |retry_on_timeout, max_retries, min_retry_interval_millis, max_concurrent_runs, run_as_user_name, parent_run_id,
+      |retry_on_timeout, max_retries, min_retry_interval_millis, max_concurrent_runs, queue, run_as_user_name, parent_run_id,
       |workflow_context, task_detail_legacy, submitRun_details, created_by, last_edited_by, request_detail, time_detail
       |""".stripMargin
 

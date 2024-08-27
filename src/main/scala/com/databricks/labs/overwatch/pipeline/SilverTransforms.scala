@@ -1324,6 +1324,7 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
       NamedColumn("tasks", lit(null).cast(Schema.minimumTasksSchema)),
       NamedColumn("job_clusters", lit(null).cast(Schema.minimumJobClustersSchema)),
       NamedColumn("libraries", lit(null).cast(Schema.minimumLibrariesSchema)),
+      NamedColumn("queue", lit(null).cast(Schema.minimumQueueSchema)),
       NamedColumn("access_control_list", lit(null).cast(Schema.minimumAccessControlListSchema)),
       NamedColumn("grants", lit(null).cast(Schema.minimumGrantsSchema)),
     )
@@ -1399,60 +1400,6 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
       "runSucceeded", "runFailed", "runTriggered", "runNow", "runStart", "submitRun", "cancel", "repairRun"
     )
     val optimalCacheParts = Math.min(daysToProcess * getTotalCores * 2, 1000)
-
-    val jobRunsLag30D = getJobsBase(auditLogLag30D)
-      .filter('actionName.isin(jobRunActions: _*))
-      .repartition(optimalCacheParts)
-      .cache() // cached df removed at end of module run
-
-    // eagerly force this highly reused DF into cache()
-    jobRunsLag30D.count()
-
-    
-    // TODO: remove or comment out or change log level or . . .
-
-    logger.log( Level.INFO, "Showing first 5 rows of `jobRunsLag30D`:")
-
-    jobRunsLag30D
-      .showLines(5, 20, true)
-      .foreach( logger.log( Level.INFO, _))
-
-    // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSpecNameLookup = clusterSpec.asDF
-      .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
-      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
-
-    // Lookup to populate the clusterID/clusterName where missing from jobs
-    lazy val clusterSnapNameLookup = clusterSnapshot.asDF
-      .withColumn("timestamp", unix_timestamp('Pipeline_SnapTS) * lit(1000))
-      .select('organization_id, 'timestamp, 'cluster_name, 'cluster_id.alias("clusterId"))
-      .filter('clusterId.isNotNull && 'cluster_name.isNotNull)
-
-    // Lookup to populate the existing_cluster_id where missing from jobs -- it can be derived from name
-    lazy val jobStatusMetaLookup = jobsStatus.asDF
-      .verifyMinimumSchema(Schema.minimumJobStatusSilverMetaLookupSchema)
-      .select(
-        'organization_id,
-        'timestamp,
-        'jobId,
-        'jobName,
-        to_json('tags).alias("tags"),
-        'schedule,
-        'max_concurrent_runs,
-        'run_as_user_name,
-        'timeout_seconds,
-        'created_by,
-        'last_edited_by,
-        to_json('tasks).alias("tasks"),
-        to_json('job_clusters).alias("job_clusters"),
-        to_json($"task_detail_legacy.notebook_task").alias("notebook_task"),
-        to_json($"task_detail_legacy.spark_python_task").alias("spark_python_task"),
-        to_json($"task_detail_legacy.python_wheel_task").alias("python_wheel_task"),
-        to_json($"task_detail_legacy.spark_jar_task").alias("spark_jar_task"),
-        to_json($"task_detail_legacy.spark_submit_task").alias("spark_submit_task"),
-        to_json($"task_detail_legacy.shell_command_task").alias("shell_command_task"),
-        to_json($"task_detail_legacy.pipeline_task").alias("pipeline_task")
-      )
 
     logger.log( Level.INFO, s"optimalCacheParts: ${optimalCacheParts}")
 
@@ -1549,6 +1496,7 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
             to_json('tags).alias("tags"),
             'schedule,
             'max_concurrent_runs,
+            'queue,
             'run_as_user_name,
             'timeout_seconds,
             'created_by,
@@ -1597,20 +1545,15 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
       }
     }
 
-
-
-    // val jobRunsLookups = jobRunsInitializeLookups(
-    //   (clusterSpec, clusterSpecNameLookup),
-    //   (clusterSnapshot, clusterSnapNameLookup),
-    //   (jobsStatus, jobStatusMetaLookup),
-    //   (jobsSnapshot, jobSnapNameLookup)
-    // )
+    val cancelAllQueuedRunsIntervals =
+      jobRunsLag30D.transform( jobRunsDeriveCancelAllQueuedRunsIntervals)
 
     // caching before structifying
     val cachedDF = jobRunsLag30D
       .transformWithDescription( jobRunsDeriveRunsBase( etlUntilTime))
       .transformWithDescription( jobRunsAppendClusterName)
       .transformWithDescription( jobRunsAppendJobMeta)
+      .transform( jobRunsCancelAllQueuedRuns( cancelAllQueuedRunsIntervals))
       .repartition( optimalCacheParts)
       .cache() // to speed up schema inference while "structifying" next
 
@@ -1618,7 +1561,7 @@ trait SilverTransforms extends SparkSessionWrapper with DataFrameSyntax[ SparkSe
     logger.log( Level.INFO, s"cachedDF.rdd.partitions.size: ${cachedDF.rdd.partitions.size}")
 
     cachedDF
-      .transformWithDescription( jobRunsStructifyLookupMeta) // ( optimalCacheParts))
+      .transformWithDescription( jobRunsStructifyLookupMeta)
       .transformWithDescription( jobRunsAppendTaskAndClusterDetails)
       .transformWithDescription( jobRunsCleanseCreatedNestedStructures( targetKeys))
       .drop("timestamp")
