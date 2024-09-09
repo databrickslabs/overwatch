@@ -448,6 +448,11 @@ trait BronzeTransforms extends SparkSessionWrapper {
     logger.log(Level.INFO, "COMPLETE: Cluster Events acquisition, building data")
     if (Helpers.pathExists(tmpClusterEventsSuccessPath)) {
       val baseDF = spark.read.json(tmpClusterEventsSuccessPath)
+      if (baseDF.isEmpty) {
+        logger.info("EMPTY MODULE: Cluster Events")
+        throw new NoNewDataException(s"EMPTY: No New Cluster Events. Progressing module but it's recommended you " +
+          s"validate there no api call errors in ${erroredBronzeEventsTarget.tableFullName}", Level.WARN, allowModuleProgression = true)
+      }
       val rawDf = deriveRawApiResponseDF(baseDF)
       if (rawDf.columns.contains("events")) {
         try {
