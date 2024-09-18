@@ -10,7 +10,12 @@ scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 Test / fork  := true
 Test / envVars := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH" -> " ")
 
+
+logBuffered in Test := false
+// parallelExecution in Test := false
+
 val sparkVersion = "3.3.0"
+
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided

@@ -222,6 +222,7 @@ object Schema extends SparkSessionWrapper {
         StructField("shardName", NullType, nullable = true),
         StructField("orgId", NullType, nullable = true),
         StructField("version", NullType, nullable = true),
+        StructField("accountId", NullType, nullable = true),
         //adding schema used for photon evolution
         StructField("effective_spark_version", StringType, nullable = true),
         StructField("runtime_engine", StringType, nullable = true),
@@ -1143,5 +1144,17 @@ object Schema extends SparkSessionWrapper {
     StructField("mountPoint", StringType, nullable = false),
     StructField("source", StringType, nullable = false),
     StructField("workspace_id", StringType, nullable = false)
+  ))
+
+  val warehouseDbuDetailsMinimumSchema: StructType = StructType(Seq(
+    StructField("organization_id", StringType, nullable = false),
+    StructField("workspace_name", StringType, nullable = false),
+    StructField("cloud", StringType, nullable = false),
+    StructField("cluster_size", StringType, nullable = false),
+    StructField("driver_size", StringType, nullable = false),
+    StructField("worker_count", IntegerType, nullable = false),
+    StructField("total_dbus", IntegerType, nullable = false),
+    StructField("activeFrom", DateType, nullable = false),
+    StructField("activeUntil", DateType, nullable = true)
   ))
 }

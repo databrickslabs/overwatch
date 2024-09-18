@@ -1,6 +1,5 @@
 package com.databricks.labs.overwatch.utils
 
-import com.databricks.labs.overwatch.SparkSessionTestWrapper
 import org.apache.spark.sql.DataFrame
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.GivenWhenThen
@@ -39,11 +38,11 @@ class TransformationDescriberTest
       info( s"`nt.toString`: ${nt.toString}")
 
       assert( nt.name === "nt")
-      assert( nt.toString === "NamedTransformation nt")
+      assert( nt.toString === "nt: NamedTransformation")
 
     }
 
-    it( "modifies the `spark.job.description` local property") {
+    it( "appears in the Spark UI") {
 
       Given( "a Spark `Dataset` (including `DataFrame`s)")
 
@@ -77,14 +76,15 @@ class TransformationDescriberTest
 
       info( s"spark.job.description: ${sjd}")
 
-      assert( sjd === "NamedTransformation nt")
+      assert( sjd === "nt: NamedTransformation")
 
-      // INFO( s"""spark.callSite.short: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.short")}""")
+      // info( s"""spark.callSite.short: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.short")}""")
       // info( s"""spark.callSite.long: ${out.sparkSession.sparkContext.getLocalProperty( "spark.callSite.long")}""")
 
-      And( "the result of the transformation is correct")
 
-      assertResult( "foo STRING") {
+      And( "it applies the transformation correctly")
+
+      assertResult( "`foo` STRING") {
         out.schema.toDDL
       }
 

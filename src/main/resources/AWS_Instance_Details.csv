@@ -259,7 +259,6 @@ C6I 32xlarge,c6i.32xlarge,256.0,128,12.2375,12.2375,22.25,0,None,0,Intel Xeon 83
 C6I Quadruple Extra Large,c6i.4xlarge,32.0,16,1.529,1.529,2.78,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,5000,625,TRUE,TRUE,0.4498,0
 C6I Eight Extra Large,c6i.8xlarge,64.0,32,3.058,3.058,5.56,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,10000,1250,TRUE,TRUE,0.8996,0
 C6I Extra Large,c6i.xlarge,8.0,4,0.385,0.385,0.70,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.1125,0
-C6ID 12xlarge,c6id.12xlarge,96.0,48,4.587,4.587,8.34,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),18.75 Gigabit,15000,1875,TRUE,TRUE,1.5246,0
 C6ID 16xlarge,c6id.16xlarge,128.0,64,6.1215,6.1215,11.13,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,3800 GB (2 * 1900 GB NVMe SSD),25 Gigabit,20000,2500,TRUE,TRUE,2.0328,0
 C6ID 24xlarge,c6id.24xlarge,192.0,96,9.1795,9.1795,16.69,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,5700 GB (4 * 1425 GB NVMe SSD),37.5 Gigabit,30000,3750,TRUE,TRUE,3.0492,0
 C6ID Double Extra Large,c6id.2xlarge,16.0,8,0.7645,0.7645,1.39,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,474 GB NVMe SSD,12.5 Gigabit,2500,312.5,TRUE,TRUE,0.2541,0
@@ -367,3 +366,27 @@ R7G Quadruple Extra Large,r7g.4xlarge,128.0,16,2.772,2.772,5.04,0,None,0,AWS Gra
 R7G Eight Extra Large,r7g.8xlarge,256.0,32,5.544,5.544,10.08,0,None,0,AWS Graviton3 Processor,2.5,EBS only,15 Gigabit,10000,1250,TRUE,TRUE,1.1335,0
 R7G Large,r7g.large,16.0,2,0.3465,0.3465,0.63,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,630,78.75,TRUE,TRUE,0.0708,0
 R7G Extra Large,r7g.xlarge,32.0,4,0.693,0.693,1.26,0,None,0,AWS Graviton3 Processor,2.5,EBS only,12.5 Gigabit,1250,156.25,TRUE,TRUE,0.1417,0
+M7GD Large,m7gd.large,8.0,2,0.07,0.07,0.48,0,None,0,AWS Graviton3 Processor,2.5,118 GB NVMe SSD,Up to 12.5 Gigabit,10000,1250,TRUE,TRUE,0.07,0
+M7GD Extra Large,m7gd.xlarge,16.0,4,0.13,0.13,0.96,0,None,0,AWS Graviton3 Processor,2.5,237 GB NVMe SSD,Up to 12.5 Gigabit,10000,1250,TRUE,TRUE,0.13,0
+M7GD Double Extra Large,m7gd.2xlarge,32.0,8,0.27,0.27,1.92,0,None,0,AWS Graviton3 Processor,2.5,474 GB NVMe SSD,Up to 15 Gigabit,10000,1250,TRUE,TRUE,0.27,0
+M7GD Quadruple Extra Large,m7gd.4xlarge,64.0,16,0.54,0.54,3.84,0,None,0,AWS Graviton3 Processor,2.5,950 GB NVMe SSD,Up to 15 Gigabit,10000,1250,TRUE,TRUE,0.54,0
+M7GD Eight Extra Large,m7gd.8xlarge,128.0,32,1.08,1.08,7.68,0,None,0,AWS Graviton3 Processor,2.5,1900 GB NVMe SSD,15 Gigabit,10000,1250,TRUE,TRUE,1.08,0
+M7GD 12xlarge,m7gd.12xlarge,192.0,48,1.61,1.61,11.52,0,None,0,AWS Graviton3 Processor,2.5,2850 GB (2 * 1425 GB NVMe SSD),22.5 Gigabit,15000,1875,TRUE,TRUE,1.61,0
+M7GD 16xlarge,m7gd.16xlarge,256.0,64,2.15,2.15,15.36,0,None,0,AWS Graviton3 Processor,2.5,3800 GB (2 * 1900 GB NVMe SSD),30 Gigabit,20000,2500,TRUE,TRUE,2.15,0
+R7GD Large,r7gd.large,16.0,2,0.09,0.09,0.630,0,None,0,AWS Graviton3 Processor,2.5,118 GB NVMe SSD,Up to 12.5 Gigabit,10000,1250,TRUE,TRUE,0.09,0
+R7GD Extra Large,r7gd.xlarge,32.0,4,0.17,0.17,1.260,0,None,0,AWS Graviton3 Processor,2.5,237 GB NVMe SSD,Up to 12.5 Gigabit,10000,1250,TRUE,TRUE,0.17,0
+R7GD Double Extra Large,r7gd.2xlarge,64.0,8,0.34,0.34,2.520,0,None,0,AWS Graviton3 Processor,2.5,474 GB NVMe SSD,Up to 15 Gigabit,10000,1250,TRUE,TRUE,0.34,0
+R7GD Quadruple Extra Large,r7gd.4xlarge,128.0,16,0.68,0.68,5.040,0,None,0,AWS Graviton3 Processor,2.5,950 GB NVMe SSD,Up to 15 Gigabit,10000,1250,TRUE,TRUE,0.68,0
+R7GD Eight Extra Large,r7gd.8xlarge,256.0,32,1.37,1.37,10.080,0,None,0,AWS Graviton3 Processor,2.5,1900 GB NVMe SSD,15 Gigabit,10000,1250,TRUE,TRUE,1.37,0
+R7GD 12xlarge,r7gd.12xlarge,384.0,48,2.05,2.05,15.12,0,None,0,AWS Graviton3 Processor,2.5,2850 GB (2 * 1425 GB NVMe SSD),22.5 Gigabit,15000,1875,TRUE,TRUE,2.05,0
+R7GD 16xlarge,r7gd.16xlarge,512.0,64,2.74,2.74,20.16,0,None,0,AWS Graviton3 Processor,2.5,3800 GB (2 * 1900 GB NVMe SSD),30 Gigabit,20000,2500,TRUE,TRUE,2.74,0
+C7GD Extra Large,c7gd.xlarge,8.0,4,0.11,0.11,0.900,0,None,0,AWS Graviton3 Processor,2.5,237 GB NVMe SSD,Up to 12.5 Gigabit,10000,1250,TRUE,TRUE,0.11,0
+C7GD Double Extra Large,c7gd.2xlarge,16.0,8,0.23,0.23,1.810,0,None,0,AWS Graviton3 Processor,2.5,474 GB NVMe SSD,Up to 15 Gigabit,10000,1250,TRUE,TRUE,0.23,0
+C7GD Quadruple Extra Large,c7gd.4xlarge,32.0,16,0.46,0.46,3.620,0,None,0,AWS Graviton3 Processor,2.5,950 GB NVMe SSD,Up to 15 Gigabit,10000,1250,TRUE,TRUE,0.46,0
+C7GD Eight Extra Large,c7gd.8xlarge,64.0,32,0.91,0.91,7.24,0,None,0,AWS Graviton3 Processor,2.5,1900 GB NVMe SSD,15 Gigabit,10000,1250,TRUE,TRUE,0.91,0
+C7GD 12xlarge,c7gd.12xlarge,96.0,48,1.37,1.37,10.860,0,None,0,AWS Graviton3 Processor,2.5,2850 GB (2 * 1425 GB NVMe SSD),22.5 Gigabit,15000,1875,TRUE,TRUE,1.37,0
+C7GD 16xlarge,c7gd.16xlarge,128.0,64,1.83,1.83,14.480,0,None,0,AWS Graviton3 Processor,2.5,3800 GB (2 * 1900 GB NVMe SSD),30 Gigabit,20000,2500,TRUE,TRUE,1.83,0
+C6ID 12xlarge,c6id.12xlarge,96.0,48,1.52,1.52,8.340,0,None,0,Intel Xeon 8375C (Ice Lake),3.5,2850 GB (2 * 1425 GB NVMe SSD),18.75 Gigabit,15000,1875,TRUE,TRUE,1.52,0
+P4DE 24xlarge,p4de.24xlarge,1152.0,96,25.22,25.22,55.570,8,NVIDIA A100,640,Intel Xeon Platinum 8275L,3,EBS only,400 Gigabit,19000,2375,FALSE,TRUE,25.22,0
+P5 48xlarge,p5.48xlarge,2048.0,192,5.67,5.67,88.910,8,NVIDIA H100,640,AMD EPYC 7R13 Processor,2.95,30400 GB (8 * 3800 GB NVMe SSD),3200 Gigabit,80000,10000,TRUE,TRUE,5.67,0
+

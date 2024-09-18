@@ -27,10 +27,19 @@ class ETLDefinition(
 
     val transformedDF = transforms.foldLeft(verifiedSourceDF) {
       case (df, transform) =>
-	df.sparkSession.sparkContext.setJobGroup(
-          s"${module.pipeline.config.workspaceName}:${module.moduleName}",
-          transform.toString)
-        df.transform( transform)
+
+	/* 
+ 	 * reverting Spark UI Job Group labels for now
+   	 *
+	 * TODO: enumerate the regressions this would introduce
+	 *       when the labels set by then platform are replaced
+	 *       this way.
+	 * df.sparkSession.sparkContext.setJobGroup(
+         *    s"${module.pipeline.config.workspaceName}:${module.moduleName}",
+         *    transform.toString)
+	 */
+	
+	df.transform( transform)
     }
     write(transformedDF, module)
   }
