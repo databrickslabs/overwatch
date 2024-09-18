@@ -84,7 +84,7 @@ class TransformationDescriberTest
 
       And( "it applies the transformation correctly")
 
-      assertResult( "`foo` STRING") {
+      assertResult( "foo STRING") {
         out.schema.toDDL
       }
 
