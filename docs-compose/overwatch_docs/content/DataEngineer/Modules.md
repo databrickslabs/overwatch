@@ -28,6 +28,7 @@ Scopes are:
 * [DBSQL](#dbsql)
 * [sparkEvents](#sparkevents)
 * [notebookCommands](#notebookcommands)
+* [warehouseEvents](#warehouseevents)
 
 The default is to use all scopes so if none are specified in the configuration, all scopes will be enabled. Currently,
 under normal, daily operations, there no significant cost to any of these modules. It's likely best to leave them
