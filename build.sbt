@@ -2,9 +2,9 @@ name := "overwatch"
 
 organization := "com.databricks.labs"
 
-version := "0.8.2.0"
+version := "0.8.2.0-SNAPSHOT"
 
-scalaVersion := "2.12.14"
+scalaVersion := "2.12.15"
 scalacOptions ++= Seq("-Xmax-classfile-name", "78")
 
 Test / fork  := true
@@ -14,14 +14,14 @@ Test / envVars := Map("OVERWATCH_ENV" -> " ","OVERWATCH_TOKEN" -> " ","OVERWATCH
 logBuffered in Test := false
 // parallelExecution in Test := false
 
-val sparkVersion = "3.3.0"
+val sparkVersion = "3.4.1"
 
 libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-sql" % sparkVersion % Provided
 libraryDependencies += "org.apache.spark" %% "spark-hive" % sparkVersion % Provided
 libraryDependencies += "com.databricks" % "dbutils-api_2.12" % "0.0.5" % Provided
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.595" % Provided
-libraryDependencies += "io.delta" %% "delta-core" % "2.1.0" % Provided
+libraryDependencies += "io.delta" %% "delta-core" % "2.4.0" % Provided
 libraryDependencies += "org.eclipse.jetty" % "jetty-util" % "9.4.51.v20230217" % Provided
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "2.4.2"
 libraryDependencies += "com.lihaoyi" %% "sourcecode" % "0.4.1"
