@@ -14,10 +14,10 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
     val zoneArray = zones.split(",").distinct
     zoneArray.foreach(zone => {
       val layer = zone.toLowerCase()
-      if (layer == "bronze" || layer == "silver" || layer == "gold") {
+      if (layer == "bronze" || layer == "silver" || layer == "gold" || layer == "platinum") {
           //validated
       }else{
-        val errMsg = s"Unknown Zone found ${zones}, Zone should be either Bronze,Silver or Gold"
+        val errMsg = s"Unknown Zone found ${zones}, Zone should be either Bronze,Silver ,Gold or Platinum"
         throw new BadConfigException(errMsg)
       }
     })
@@ -32,13 +32,13 @@ object MultiWorkspaceRunner  extends SparkSessionWrapper{
   def main(args: Array[String]): Unit = {
     envInit()
     if (args.length == 1) { //Deploy Bronze,Silver and Gold with default parallelism.
-      logger.log(Level.INFO, "Deploying Bronze,Silver and Gold")
-      MultiWorkspaceDeployment(args(0)).deploy(4,"Bronze,Silver,Gold")
+      logger.log(Level.INFO, "Deploying Bronze,Silver and Gold,Platinum")
+      MultiWorkspaceDeployment(args(0)).deploy(4,"Bronze,Silver,Gold,Platinum")
 
     } else if (args.length == 2) {//Deploy Bronze,Silver and Gold with provided parallelism.
       val parallelism = args(1).toInt
-      logger.log(Level.INFO, s"Deploying Bronze,Silver and Gold with parallelism: ${parallelism}")
-      MultiWorkspaceDeployment(args(0)).deploy(parallelism,"Bronze,Silver,Gold")
+      logger.log(Level.INFO, s"Deploying Bronze,Silver,Gold and Platinum with parallelism: ${parallelism}")
+      MultiWorkspaceDeployment(args(0)).deploy(parallelism,"Bronze,Silver,Gold,Platinum")
     } else if(args.length == 3) {
       val parallelism = args(1).toInt
       validateInputZone(args(2))

@@ -740,6 +740,17 @@ abstract class PipelineTargets(config: Config) {
     )
 
   }
+  object PlatinumTargets {
+    lazy private[overwatch] val clusterPlatinumTarget: PipelineTable = PipelineTable(
+      name = "cluster_platinum",
+      _keys = Array("cluster_id", "cluster_category", "date"),
+      config,
+      _mode = WriteMode.merge,
+      partitionBy = Seq("organization_id", "date"),
+      incrementalColumns = Array("date"),
+      zOrderBy = Array("cluster_id", "date")
+    )
+  }
 
 
 }
