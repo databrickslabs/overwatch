@@ -262,3 +262,17 @@ It requires **verbose audit logging** to be enabled in the workspace.
 {{% notice note %}}
 NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
 {{% /notice %}}
+
+### WarehouseEvents
+*Requires:* Audit and system.compute.warehouse_events.
+
+*Enables:* WarehouseStateFact
+
+*Gold Entities:* WarehouseStateFact
+
+Warehouse Events represent state changes occurring within a warehouse. At present,
+these events are not accessible through the user interface.
+
+Data collection for these events is facilitated by querying the system table compute.warehouse_event,
+which maintains records for a configurable period, defaulting to 30 days.
+To enable the creation and use of a Warehouse Events table, Unity Catalog must be activated within the workspace.
