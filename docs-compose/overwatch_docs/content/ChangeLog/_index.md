@@ -3,6 +3,42 @@ title: "ChangeLog"
 date: 2021-05-05T17:00:13-04:00
 weight: 4
 ---
+
+## 0.8.2.0
+
+**To Upgrade**, simply swap the JAR
+
+### Enhancements
+
+* implemented new post-ETL validation
+  * check pipeline state in order to fail a workflow task and/or generate an alert
+  * check non-null expectations of key columns in Gold tables
+  * check cross-table referential integrity of key columns between pairs of Gold tables
+* implemented new Silver module to capture SQL Warehouse state details (2022)
+* implemented new Gold module to capture SQL Warehouse state facts (3020)
+* improve performance of Silver Job Runs module (2011)
+
+### Bug Fixes
+
+* modified view creation logic to use fully-qualified names of source
+  tables instead of storage locations to avoid failures caused by
+  storage access controls
+* added logic to avoid runtime schema mismatches in Silver jobs status
+  and Gold notebook commands modules (2010 & 3019)
+* added logic to Bronze cluster events module (1005) to also collect
+  cluster events prior to the primordial date on the first ETL run to
+  maximize data quality in downstream modules
+* corrected cases where `driver_node_type_id` was null in
+  `jobruncostpotential_gold` ("JRCP") to ensure correctness of queries
+  and aggregations by instance type
+* corrected cases where `node_type_id` and `driver_node_type_id` were
+  null in `clusterstatefact_gold` ("CLSF") to ensure correctness of
+  queries and aggregations by instance type
+
+Released September 24th, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/33?closed=1)
+
+------------------------------------------------------------------------------------------------
+
 ## 0.8.1.2 (PATCH)
 Patch for 0.8.1.0 and 0.8.1.1. Fixes a [regression introduced in 0.8.1.0](https://github.com/databrickslabs/overwatch/pull/1234)
 for clusterSnapshotBronze.
