@@ -67,9 +67,9 @@ Complete column descriptions are only provided for the consumption layer. The en
 * [sparkTask](#sparktask)
 * [sparkStream](#sparkstream)
 * [warehouse](#warehouse)
-* [notebookCommands](#notebookcommands)
 * [warehouseDbuDetails](#warehousedbudetails)
 * [warehouseStateFact](#warehousestatefact)
+* [notebookCommands](#notebookcommands)
 * [Common Meta Fields](#common-meta-fields)
 
   * There are several fields that are present in all tables. Instead of cluttering each table with them, this section
@@ -689,18 +689,18 @@ spark.table("overwatch.audit_log_bronze")
 
 **Write Mode** -- Append
 
-| Column                | Type   | Description                                           |
-|:----------------------|:-------|:------------------------------------------------------|
-| login_unixTimeMS      | string | Unix Timestamp when the user logged in              |
-| login_date            | string | Date when user logged in             |
-| login_type            | string | How did the user log in. One of *aadTokenLogin*, *login*, *aadBrowserLogin*, *tokenLogin*, *samlLogin*, *jwtLogin*, *ssh*            |
-| login_user            | string | Canonical user id (within the workspace)              |
-| user_email            | string | User's email                                          |
-| login_type            | string | Type of login such as web, ssh, token                 |
-| from_ip_address       | struct | Details about the source login and target logged into |
-| user_agent            | string | request origin such as browser, terraform, api, etc.  |
-| request_id            | string | GUID of the login request                                     |
-| response              | struct | HTTP Response to login attempt, including statusCode, error message, and result (if any)                                    |
+| Column                | Type   | Description                                                                                                               |
+|:----------------------|:-------|:--------------------------------------------------------------------------------------------------------------------------|
+| login_unixTimeMS      | string | Unix Timestamp when the user logged in                                                                                    |
+| login_date            | string | Date when user logged in                                                                                                  |
+| login_type            | string | How did the user log in. One of *aadTokenLogin*, *login*, *aadBrowserLogin*, *tokenLogin*, *samlLogin*, *jwtLogin*, *ssh* |
+| login_user            | string | Canonical user id (within the workspace)                                                                                  |
+| user_email            | string | User's email                                                                                                              |
+| login_type            | string | Type of login such as web, ssh, token                                                                                     |
+| from_ip_address       | struct | Details about the source login and target logged into                                                                     |
+| user_agent            | string | request origin such as browser, terraform, api, etc.                                                                      |
+| request_id            | string | GUID of the login request                                                                                                 |
+| response              | struct | HTTP Response to login attempt, including statusCode, error message, and result (if any)                                  |
 
 
 #### AccountMod
@@ -716,21 +716,21 @@ spark.table("overwatch.audit_log_bronze")
 
 This table tracks any admin changes made to user entities, such as group membership, user updates, etc.
 
-| Column                | Type   | Description                                           |
-|:----------------------|:-------|:------------------------------------------------------|
-| mod_unixTimeMS        | bigint | Unix timestamp when the modification happened         |
-| mod_date              | date | Date when the modification happened                     |
-| action                | string | Action performed, one of: *add*, *addPrincipalToGroup*, *removePrincipalFromGroup*, *setAdmin*, *updateUser*, *delete*     |
-| endpoint              | string | Mechanism for making the change, one of: *scim*, *adminConsole*, *autoUserCreation*, *roleAssignment*     |
-| modified_by           | string | Email of user making the change                       |
-| user_name             | string | Email or username of user profile being changed           |
-| user_id               | string | Canonical user id (within the workspace) of user profile      |
-| group_name            | string | In case the modification is to a group, the group name, otherwise this will ne NULL     |
-| group_id              | string | In case the modification is to a group, the group ID, otherwise this will ne NULL     |
-| from_ip_address       | string | IP Address where the change originated from     |
-| user_agent            | string | request origin such as browser, terraform, api, etc.    |
-| request_id            | string | GUID of the login request                                     |
-| response              | struct | HTTP Response to login attempt, including statusCode, error message, and result (if any)
+| Column                | Type   | Description                                                                                                            |
+|:----------------------|:-------|:-----------------------------------------------------------------------------------------------------------------------|
+| mod_unixTimeMS        | bigint | Unix timestamp when the modification happened                                                                          |
+| mod_date              | date   | Date when the modification happened                                                                                    |
+| action                | string | Action performed, one of: *add*, *addPrincipalToGroup*, *removePrincipalFromGroup*, *setAdmin*, *updateUser*, *delete* |
+| endpoint              | string | Mechanism for making the change, one of: *scim*, *adminConsole*, *autoUserCreation*, *roleAssignment*                  |
+| modified_by           | string | Email of user making the change                                                                                        |
+| user_name             | string | Email or username of user profile being changed                                                                        |
+| user_id               | string | Canonical user id (within the workspace) of user profile                                                               |
+| group_name            | string | In case the modification is to a group, the group name, otherwise this will ne NULL                                    |
+| group_id              | string | In case the modification is to a group, the group ID, otherwise this will ne NULL                                      |
+| from_ip_address       | string | IP Address where the change originated from                                                                            |
+| user_agent            | string | request origin such as browser, terraform, api, etc.                                                                   |
+| request_id            | string | GUID of the login request                                                                                              |
+| response              | struct | HTTP Response to login attempt, including statusCode, error message, and result (if any)                               |                 
 
 {{% notice note%}}
 The following sections are related to Spark. Everything that can be seend/found in the SparkUI is visibel in the 
@@ -799,7 +799,7 @@ make this section simpler. Please [**reference Spark Hierarchy For More Details*
 | spark_context_id | string        | Canonical context ID -- One Spark Context per Cluster                                                                               |
 | cluster_id       | string        | Canonical workspace cluster id                                                                                                      |
 | job_id           | string        | Spark Job ID                                                                                                                        |
-| job_group_id     | string        | Spark Job Group ID -- NOTE very powerful for many reasons. See [SparkEvents]({{%relref "DataEngineer/Modules.md"%}}/#sparkevents) |
+| job_group_id     | string        | Spark Job Group ID -- NOTE very powerful for many reasons. See [SparkEvents]({{%relref "DataEngineer/Modules.md"%}}/#sparkevents)   |
 | execution_id     | string        | Spark Execution ID                                                                                                                  |
 | stage_ids        | array\[long\] | Array of all Spark Stage IDs nested within this Spark Job                                                                           |
 | notebook_id      | string        | Canonical Databricks Workspace Notebook ID                                                                                          |
@@ -914,64 +914,25 @@ to improve performance.
 | service_name              | string  | Name of the service corresponding to DBSQL warehouse                                                                                                                                                          |                                                                                                                   
 | action_name               | string  | create, edit, or snapImpute – depicts the type of action for the warehouse – **snapImpute is used on first run to initialize the state of the cluster even if it wasn’t created/edited since audit logs began |              
 | user_email                | string  | Email of the user requesting the action                                                                                                                                                                       |                                                                                                                                                                                  
-| cluster_size              | string  | Size of the clusters allocated for this warehouse                                                                                                                                                          | 
-| min_num_clusters          | long    | Minimum number of available clusters that will be maintained for this SQL warehouse                                                                                                             | 
-| max_num_clusters          | long    | Maximum number of clusters that the autoscaler will create to handle concurrent queries                                                                                                                      | 
-| auto_stop_mins            | long    | The amount of time in minutes that a SQL warehouse must be idle (i.e., no RUNNING queries) before it is automatically stopped                                                                                | 
-| spot_instance_policy      | string  | Configurations whether the warehouse should use spot instances                                                                                                                                               | 
-| enable_photon             | boolean | Configures whether the warehouse should use Photon optimized clusters                                                                                                                                        | 
+| cluster_size              | string  | Size of the clusters allocated for this warehouse                                                                                                                                                             | 
+| min_num_clusters          | long    | Minimum number of available clusters that will be maintained for this SQL warehouse                                                                                                                           | 
+| max_num_clusters          | long    | Maximum number of clusters that the autoscaler will create to handle concurrent queries                                                                                                                       | 
+| auto_stop_mins            | long    | The amount of time in minutes that a SQL warehouse must be idle (i.e., no RUNNING queries) before it is automatically stopped                                                                                 | 
+| spot_instance_policy      | string  | Configurations whether the warehouse should use spot instances                                                                                                                                                | 
+| enable_photon             | boolean | Configures whether the warehouse should use Photon optimized clusters                                                                                                                                         | 
 | channel                   | struct  | This column contains channel details. Some examples - CHANNEL_NAME_UNSPECIFIED, CHANNEL_NAME_PREVIEW, CHANNEL_NAME_CURRENT, CHANNEL_NAME_PREVIOUS, CHANNEL_NAME_CUSTOM                                        |
-| enable_serverless_compute | boolean | Flag indicating whether the warehouse should use serverless compute                                                                                                                                          |                                                                                                                                                     
+| enable_serverless_compute | boolean | Flag indicating whether the warehouse should use serverless compute                                                                                                                                           |                                                                                                                                                     
 | warehouse_type            | string  | Warehouse type: PRO or CLASSIC                                                                                                                                                                                |                                                                                                                                                                                           
 | warehouse_state           | string  | State of the warehouse                                                                                                                                                                                        |                                                                                                                                                                                                   
-| size                      | string  | Size of the clusters allocated for this warehouse                                                                                                                                                            |                                                                                                                                                                       
+| size                      | string  | Size of the clusters allocated for this warehouse                                                                                                                                                             |                                                                                                                                                                       
 | creator_id                | long    | warehouse creator id                                                                                                                                                                                          |                                                                                                                                                                                                     
-| tags                      | map     | A set of key-value pairs that will be tagged on all resources (e.g., AWS instances and EBS volumes) associated with this SQL warehouse                                                                       |                                                                                  
+| tags                      | map     | A set of key-value pairs that will be tagged on all resources (e.g., AWS instances and EBS volumes) associated with this SQL warehouse                                                                        |                                                                                  
 | num_clusters              | long    | current number of clusters running for the service                                                                                                                                                            |                                                                                                                                                                       
 | num_active_sessions       | long    | current number of active sessions for the warehouse                                                                                                                                                           |                                                                                                                                                                      
 | jdbc_url                  | string  | the jdbc connection string for this warehouse                                                                                                                                                                 |                                                                                                                                                                            
 | created_by                | string  | warehouse creator name                                                                                                                                                                                        |
 
-#### NotebookCommands
-**KEY** -- notebook_id + unixTimeMS
-
-**Incremental Columns** -- unixTimeMS
-
-**Partition Columns** -- organization_id
-
-**Write Mode** -- Merge
-{{% notice note %}}
-NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
-{{% /notice %}}
-
-| Column               | Type   | Description                                                                                         |
-|:---------------------|:-------|:----------------------------------------------------------------------------------------------------|
-| organization_id      | string | Canonical workspace id                                                                              |
-| workspace_name       | string | Customizable human-legible name of the workspace, should be globally unique within the organization |
-| date                 | date   | unixTimeMS as a date type                                                                           |
-| timestamp            | long   | unixTimeMS as a timestamp type in milliseconds                                                      |
-| notebook_id          | string | id for the notebook in the workspace                                                                |
-| notebook_path        | string | Notebook path in the workspace                                                                      |
-| notebook_name        | string | Canonical notebook name for the workspace                                                           |
-| command_id           | string | id of the notebook command                                                                          |
-| command_text         | string | The actual text of the command                                                                      |
-| execution_time_s     | double | Notebook command execution time in second                                                           |
-| source_ip_address    | string | Origin IP of action requested                                                                       |
-| user_identity        | struct | User information as available. Will include userid and email address                                |
-| estimated_dbu_cost   | double | dbu cost per second for the command runtime                                                         |
-| status               | string | Status of the notebook command run                                                                  |
-| cluster_id           | string | Canonical workspace cluster id                                                                      |
-| cluster_name         | string | The name of the compute asset used to execute the task run                                          |
-| custom_tags          | string | JSON string of key/value pairs for all cluster associated custom tags give to the cluster           |
-| node_type_id         | string | Worker Node type for the compute asset (not supported for Warehouses yet)                           |
-| node_count           | long   | Cluster worker node count                                                                           |
-| response             | struct | HTTP response including errorMessage, result, and statusCode                                        |
-| user_agent           | string | Request origin such as browser, terraform, api, etc                                                 |
-| unixTimeMS           | long   | Unix time epoch as a long in milliseconds                                                           |
-| Pipeline_SnapTS      | string | Snapshot timestamp of Overwatch run that added the record                                           |
-| Overwatch_RunID      | string | Overwatch canonical ID that resulted in the record load                                             |
-
-#### warehouseDbuDetails
+#### WarehouseDbuDetails
 **KEY** -- Organization_ID + cloud + cluster_size
 
 **Incremental Columns** -- activeFrom
@@ -1057,6 +1018,45 @@ Cost may not appear for a warehouse until a state change is observed (i.e. start
 This means that Overwatch may not recognize costs for a warehouse until at least one state change has been observed by
 Overwatch since the primordial date (or first run date - 30d whichever is greater).
 {{% /notice %}}
+
+#### NotebookCommands
+**KEY** -- notebook_id + unixTimeMS
+
+**Incremental Columns** -- unixTimeMS
+
+**Partition Columns** -- organization_id
+
+**Write Mode** -- Merge
+{{% notice note %}}
+NotebookCommands are not available for notebooks run on a SQL Warehouse yet. This feature will be added in a future release
+{{% /notice %}}
+
+| Column               | Type   | Description                                                                                         |
+|:---------------------|:-------|:----------------------------------------------------------------------------------------------------|
+| organization_id      | string | Canonical workspace id                                                                              |
+| workspace_name       | string | Customizable human-legible name of the workspace, should be globally unique within the organization |
+| date                 | date   | unixTimeMS as a date type                                                                           |
+| timestamp            | long   | unixTimeMS as a timestamp type in milliseconds                                                      |
+| notebook_id          | string | id for the notebook in the workspace                                                                |
+| notebook_path        | string | Notebook path in the workspace                                                                      |
+| notebook_name        | string | Canonical notebook name for the workspace                                                           |
+| command_id           | string | id of the notebook command                                                                          |
+| command_text         | string | The actual text of the command                                                                      |
+| execution_time_s     | double | Notebook command execution time in second                                                           |
+| source_ip_address    | string | Origin IP of action requested                                                                       |
+| user_identity        | struct | User information as available. Will include userid and email address                                |
+| estimated_dbu_cost   | double | dbu cost per second for the command runtime                                                         |
+| status               | string | Status of the notebook command run                                                                  |
+| cluster_id           | string | Canonical workspace cluster id                                                                      |
+| cluster_name         | string | The name of the compute asset used to execute the task run                                          |
+| custom_tags          | string | JSON string of key/value pairs for all cluster associated custom tags give to the cluster           |
+| node_type_id         | string | Worker Node type for the compute asset (not supported for Warehouses yet)                           |
+| node_count           | long   | Cluster worker node count                                                                           |
+| response             | struct | HTTP response including errorMessage, result, and statusCode                                        |
+| user_agent           | string | Request origin such as browser, terraform, api, etc                                                 |
+| unixTimeMS           | long   | Unix time epoch as a long in milliseconds                                                           |
+| Pipeline_SnapTS      | string | Snapshot timestamp of Overwatch run that added the record                                           |
+| Overwatch_RunID      | string | Overwatch canonical ID that resulted in the record load                                             |
 
 #### Common Meta Fields
 | Column          | Type   | Description                                                       |
