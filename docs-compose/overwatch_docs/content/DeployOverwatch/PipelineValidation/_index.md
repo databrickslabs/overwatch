@@ -1,7 +1,6 @@
 ---
-title: "Pipeline Validation Framework"
-date: 2024-03-15T15:39:25+05:30
-draft: true
+title: "Pipeline Validation"
+weight: 7
 ---
 
 ## Overview

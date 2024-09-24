@@ -1,44 +1,67 @@
 ---
-title: "Deep Dive Validation Framework"
-date: 2024-03-16T18:06:39+05:30
+title: "Logical Flow and Reports"
 ---
 
-This pipeline validation module runs after each Overwatch deployment.  For now, this module will be used by the support team for checking the data quality of recent deployments.
+Overwatch provides a special pipeline validation module to perform a
+number of data quality checks on the output it produces in its target
+tables.  Pipeline validation may run as frequently as the regular
+Overwatch ETL pipeline/module runs, i.e. after each pipeline
+"deployment".  This page shows how to add this pipeline validation
+step to an Overwatch workflow and describes its functionality in
+detail.
 
 {{% notice note %}}
-Upon execution, the Validation Framework is designed to process only those records pending validation, thereby 
-ensuring that previously validated records are not subjected to redundant validation checks. For instance, 
-following a fresh deployment, executing the Validation Framework will initiate validation exclusively for 
-records associated with the recent deployment. Subsequently, if the framework is executed after the second and third 
-deployments, it will selectively validate records related to these deployments that have not yet been validated, 
-thus maintaining the efficiency and relevance of the validation process.
+
+The pipeline validation module is designed to perform its checks on
+records that it has not already validated in a previous run to avoid
+redundant validation checks. Given that validation has completed
+normally following a previous Overwatch pipeline deployment (i.e. ETL
+run), only new records produced in one or more subsequent deployments
+are subject to validation.
+
+
 {{% /notice %}}
 
-## High Level Design for Validation Framework
-Here is the high level design of the framework
- ![PipelineValidationFramework](/images/DeployOverwatch/Pipeline_Validation.png)
 
-1. Overwatch Deployment is finished as per the usual process.
-2. Trigger the Validation Framework and aS per the rules defined in Validation Framework the data in tables would be validated.
-3. This decision point checks the results of the pipeline validation.
-4. After validation framework is executed, a health check report for the pipeline is generated. This report likely
-   contains details on the validation checks and indicates that the pipeline is healthy and functioning as expected. 
-5. If any validation check fails, the snapshot of rows that got failed are moved to a quarantine zone. This would be used for 
-   debugging purpose.
+## Pipeline Validation Workflow Integration
 
-## Validation Framework Reports
+Here is the high-level logical flow of the Pipeline Validation module:
 
-Running the validation framework produces two types of records:
-
-1. HeathCheck_Report
-2. Quarantine_Report
+ ![PipelineValidationModule](/images/DeployOverwatch/Pipeline_Validation.png)
 
 
-### HeathCheck_Report
+1. All workflow tasks of an Overwatch pipeline deployment run to
+   completion.
 
-Each validation run produces one or more records in the pipeline healthcheck reportfor each healthcheck rule according to the number of Overwatch ETL tables associated with that rule.  Each record contains a reference to the corresponding Overwatch ETL run and its snapshot timestamp.
+2. An additional workflow task executes the Pipeline Validation
+   module.
 
-Structure for the HealthCheck Report is
+3. A health check report for the pipeline is generated with a record
+   for each check that was performed.
+
+4. Upon failure of any validation check, a snapshot of records that
+   caused the failure are moved to a quarantine zone for debugging
+   purpose.
+
+
+## Validation Module Reports
+
+Running the validation module produces two types of records:
+
+* Health Check Reports
+* Quarantine Reports
+
+
+### Heath Check Report
+
+Each validation run produces one or more records in the pipeline
+health check report for each health check rule according to the number
+of Overwatch ETL tables associated with that rule.  Each record
+contains a reference to the corresponding Overwatch ETL run and its
+snapshot timestamp.
+
+The schema of a Health Check Report is as follows:
+
 | Column Name             | Type   | Description                                                                                      | Example Value                                                              |
 |-------------------------|----------|--------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
 | healthcheck_id        | uuid   | Unique ID for this Healthcheck_Report record                 | 272b83eb-1362-456a-8dae-26c3083181ac |
@@ -51,8 +74,12 @@ Structure for the HealthCheck Report is
 | snap_ts               | long   | Snapshot timestamp in yyyy-mm-dd hh:mm:ss format             | 2023-09-27 07:43:39 |
 | quarantine_id         | uuid   | Unique ID for Quarantine Report                                | cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c |
 
+
 ### Quarantine_Report
-Rows which would fail as per the rules configured in validation framework would be updated to quarantine report
+
+Table rows that do not satisfy the rules configured in the pipeline validation module
+appear in the quarantine report using this schema:
+
 | Column Name             | Type         | Description                                                                                                         | Example Value                                                                                       |
 |-------------------------|--------------|---------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
 | quarantine_id         | uuid   | Unique ID for this Quarantine_Report record              | cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c |
@@ -64,28 +91,30 @@ Rows which would fail as per the rules configured in validation framework would 
 | keys                  | string | JSON of primary (possibly compound) key value              | {"cluster_id":"0831-200003-6bhv8y0u","state":"TERMINATING","unixTimeMS_state_start":1693514245329} |
 | snap_ts               | long   | Snapshot timestamp in yyyy-mm-dd hh:mm:ss format         | 2023-09-27 07:43:39 |
 
-After the execution of the validation framework would be completed both the above-mentioned report would be 
-created as delta file in dbfs location. You can get the information of the delta path in the stacktrace
-of the validation framework run like below
+
+These reports are persisted to cloud storage as Delta tables.  The
+output of the validation module reveals the location of these tables
+as shown withing the stack trace in the following screenshot:
+
 ![Report StackTrace](/images/DeployOverwatch/StackTrace.png)
 
-## Validation Framework Rule Types
 
-As mentioned above in HeathCheck_Report structure currently,there are 3 rule_type values available in validation framework. They are
+## Validation Module Rule Types
+
+The rule_type field mentioned in the Heath Check Report schema above currently has three possible values:
 
 1. Pipeline_Report_Validation
 2. Single_Table_Validation
 3. Cross_Table_Validation
 
-By default, execution of the validation framework applies healthcheckrules of all three rule types, but input arguments can configure a
-framework run.  More on this will be discussed in a later section.
+By default the validation module applies health check rules of all three rule types.  Rules may applied selectively by providing arguments to the module.  More on this will be discussed in a later section.
 
-Lets see how in detail how these rule types are different from each other.
+The following sections describe each of these rule types in detail.
 
 
 ### Pipeline_Report_Validation
 
-This rule type is validation of records in the Overwatch pipeline_report table.
+This rule type is validates records in the Overwatch pipeline_report table.
 
 This rule type has two healthcheck_rule values:
 
@@ -173,20 +202,20 @@ This rule type has the following healthcheck_rule values:
 * CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_cluster_gold
 
 
-## How to run the Validation Framework
+## How to run the Validation Module
 
-Currently we can execute the validation framework only running notebook.  Running through databricks workflow
+Currently we can execute the validation module only running notebook.  Running through databricks workflow
 would be added in the future.
 
 Execution would be started upon calling PipelineValidation() function. Below are the input arguments of this function:
 | Param                | Type    | Optional | Default Value | Description                                                                 |
 |----------------------|---------|----------|---------------|-----------------------------------------------------------------------------|
-| etlDB                | String  | No       | NA            | Overwatch etl database name on which Validation Framework need to be run    |
-| allRun               | Boolean | Yes      | Yes           | Boolean flag act on and off switch for validation of all overwatch_runID in pipeline_report. By Default all overwatchRun_IDs are validated.|
-| tableArray           | String  | Yes      | Array()       | Array of tables on which Single Table Validation need to be performed. If it is empty then all the tables mentioned in single table validation would be in scope.|
-| crossTableValidation | Boolean | Yes      | Yes           | Boolean flag act as on and off switch for cross table validation. By default, cross table validation is active.            |
+| etlDB                | String  | No       | NA            | Overwatch ETL database name to validate |
+| allRun               | Boolean | Yes      | true          | Validate all runs in pipeline_report?   |
+| tableArray           | Array[String]  | Yes      | <empty array> | Subset of tables subject to Single Table Validation. Default means to validate all tables mentioned above. |
+| crossTableValidation | Boolean | Yes      | true          | Perform Cross Table Validation? |
 
-Here are the screenshots of Validation Framework run with default setting and with custom configuration using input arguments:
+Here are the screenshots of Validation Module run with default setting and with custom configuration using input arguments:
 
 ### Default Run
 ![Default Run](/images/DeployOverwatch/Default_Validation_Run.png)
@@ -201,14 +230,14 @@ Here we can see from the above screenshot that:
 * Cross Table Validation would be performed
 * Single table validation would be perfor                                                                                                         +;;; vv;med for all the tables as mentioned above.
 
-### Validation Framework run with specific tables mentioned in tableArray
+### Validation Module run with specific tables mentioned in tableArray
 ![Table_Array](/images/DeployOverwatch/Table_Array.png)
 Here we can see from the above screenshot that:
 * By Default Pipeline_Report_Validation would be performed.
 * Cross Table Validation would be performed
 * Single table validation is performed on clusterstatefact_gold,jobruncostpotentialfact_gold as mentioned in tableArray param.
 
-### Validation Framework run with specific tables mentioned in tableArray and Disable Cross Validation
+### Validation Module run with specific tables mentioned in tableArray and Disable Cross Validation
 ![cross_validation](/images/DeployOverwatch/cross_validation.png)
 Here we can see from the above screenshot that:
 * By Default Pipeline_Report_Validation would be performed.
