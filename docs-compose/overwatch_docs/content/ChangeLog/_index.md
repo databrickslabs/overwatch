@@ -10,28 +10,28 @@ weight: 4
 
 ### Enhancements
 
-* implemented new post-ETL validation
-  * check pipeline state in order to fail a workflow task and/or generate an alert
-  * check non-null expectations of key columns in Gold tables
-  * check cross-table referential integrity of key columns between pairs of Gold tables
-* implemented new Silver module to capture SQL Warehouse state details (2022)
-* implemented new Gold module to capture SQL Warehouse state facts (3020)
-* improve performance of Silver Job Runs module (2011)
+* Implemented new post-ETL validation
+  * Check pipeline state in order to fail a workflow task and/or generate an alert
+  * Check non-null expectations of key columns in Gold tables
+  * Check cross-table referential integrity of key columns between pairs of Gold tables
+* Implemented new Silver module to capture SQL Warehouse state details (2022)
+* Implemented new Gold module to capture SQL Warehouse state facts (3020)
+* Improve performance of Silver Job Runs module (2011)
 
 ### Bug Fixes
 
-* modified view creation logic to use fully-qualified names of source
+* Modified view creation logic to use fully-qualified names of source
   tables instead of storage locations to avoid failures caused by
   storage access controls
-* added logic to avoid runtime schema mismatches in Silver jobs status
+* Added logic to avoid runtime schema mismatches in Silver jobs status
   and Gold notebook commands modules (2010 & 3019)
-* added logic to Bronze cluster events module (1005) to also collect
+* Added logic to Bronze cluster events module (1005) to also collect
   cluster events prior to the primordial date on the first ETL run to
   maximize data quality in downstream modules
-* corrected cases where `driver_node_type_id` was null in
+* Corrected cases where `driver_node_type_id` was null in
   `jobruncostpotential_gold` ("JRCP") to ensure correctness of queries
   and aggregations by instance type
-* corrected cases where `node_type_id` and `driver_node_type_id` were
+* Corrected cases where `node_type_id` and `driver_node_type_id` were
   null in `clusterstatefact_gold` ("CLSF") to ensure correctness of
   queries and aggregations by instance type
 
