@@ -23,7 +23,7 @@ class Platinum(_workspace: Workspace, _database: Database, _config: Config)
   def getAllModules: Seq[Module] = {
     config.overwatchScope.flatMap {
       case OverwatchScope.clusters => {
-        Array(clusterModule)
+        Array(clusterPlatinumModule)
       }
       case _ => Array[Module]()
     }
@@ -36,8 +36,8 @@ class Platinum(_workspace: Workspace, _database: Database, _config: Config)
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
 
-  lazy private[overwatch] val clusterModule = Module(4001, "Platinum_Cluster", this, Array(3005))
-  lazy private val appendClusterProccess: () => ETLDefinition = {
+  lazy private[overwatch] val clusterPlatinumModule = Module(4001, "Platinum_Cluster", this, Array(3005))
+  lazy private val appendClusterPlatinumProccess: () => ETLDefinition = {
     () =>
       ETLDefinition(
         GoldTargets.clusterStateFactTarget.asDF,
@@ -50,7 +50,7 @@ class Platinum(_workspace: Workspace, _database: Database, _config: Config)
 
   private def executeModules(): Unit = {
     config.overwatchScope.foreach {
-      case OverwatchScope.clusters =>  clusterModule.execute(appendClusterProccess)
+      case OverwatchScope.clusters =>  clusterPlatinumModule.execute(appendClusterPlatinumProccess)
       case _ =>
     }
   }
