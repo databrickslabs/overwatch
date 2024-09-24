@@ -57,10 +57,15 @@ configurations to system table integrations, minimizing downtime and ensuring a 
 Follow the below steps to migrate to System Table Integration: 
 [Configuration Details]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}})
 
-## Fetching data from Multi Account System Table  
+[//]: # (## Fetching data from Multi Account System Table  )
 
-With the integration of System Table in Overwatch, fetching system table data from multiple different accounts 
-becomes easy, enabling seamless multi-account deployments. This setup requires minimal adjustments in 
-configuration and additional infrastructure setup in the workspaces of other accounts.
-Follow the link to configure 
-[Multi Account System Table Integration]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}}/#ConfigurationChangesRequiredForMultiAccountSystemTableIntegration)
+[//]: # ()
+[//]: # (With the integration of System Table in Overwatch, fetching system table data from multiple different accounts )
+
+[//]: # (becomes easy, enabling seamless multi-account deployments. This setup requires minimal adjustments in )
+
+[//]: # (configuration and additional infrastructure setup in the workspaces of other accounts.)
+
+[//]: # (Follow the link to configure )
+
+[//]: # ([Multi Account System Table Integration]&#40;{{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}}/#ConfigurationChangesRequiredForMultiAccountSystemTableIntegration&#41;)
