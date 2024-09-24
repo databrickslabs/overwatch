@@ -27,7 +27,6 @@ trait PlatinumTransforms extends SparkSessionWrapper {
 
     try {
       val clsf = if (Helpers.pathExists(processed_runID_path)) {
-        println("Resume Run")
         val processed_ID = spark.read.format("delta").load(processed_runID_path).select("overwatch_runID").distinct().collect().map(x => x(0).toString).toList
 
         val clsf_raw_filtered = clsf_raw.filter(!'overwatch_runID.isin(processed_ID: _*))
@@ -69,7 +68,6 @@ trait PlatinumTransforms extends SparkSessionWrapper {
           .withColumn("compute_cost", col("total_compute_cost") / col("days_in_state"))
 
       } else {
-        println("First Time Run")
         clsf_raw
           .filter("custom_tags not like '%SqlEndpointId%' AND unixTimeMS_state_end > unixTimeMS_state_start")
           .select(
