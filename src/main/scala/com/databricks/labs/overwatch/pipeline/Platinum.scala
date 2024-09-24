@@ -36,7 +36,7 @@ class Platinum(_workspace: Workspace, _database: Database, _config: Config)
     "spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes" -> "67108864" // lower to 64MB due to high skew potential
   )
 
-  lazy private[overwatch] val clusterModule = Module(4001, "Gold_Cluster", this, Array(3005))
+  lazy private[overwatch] val clusterModule = Module(4001, "Platinum_Cluster", this, Array(3005))
   lazy private val appendClusterProccess: () => ETLDefinition = {
     () =>
       ETLDefinition(
