@@ -67,9 +67,9 @@ The schema of a Health Check Report is as follows:
 | healthcheck_id        | uuid   | Unique ID for this Healthcheck_Report record                 | 272b83eb-1362-456a-8dae-26c3083181ac |
 | etl_database          | string | Overwatch ETL database name                                    | ow_etl_azure_0721 |
 | table_name            | string | Overwatch ETL table name                                       | clusterstatefact_gold |
-| healthcheck_rule      | string | Description of healthcheck rule applied to the table data      | Driver_Node_Type_ID Should Not be NULL |
+| healthcheck_rule      | string | Description of health check rule applied to the table data      | Driver_Node_Type_ID Should Not be NULL |
 | rule_type             | string | Type of validation rule (See enumerated values below.)         | Pipeline_Report_Validation |
-| healthcheckMsg        | string | Healthcheck status of the table data for this healthcheck rule | HealthCheck Failed: got 63 driver_node_type_ids which are null |
+| healthcheckMsg        | string | health check status of the table data for this health check rule | health check Failed: got 63 driver_node_type_ids which are null |
 | overwatch_runID       | string | Overwatch run ID of the corresponding snapshot                 | b8985023d6ae40fa88bb6daef7f46725 |
 | snap_ts               | long   | Snapshot timestamp in yyyy-mm-dd hh:mm:ss format             | 2023-09-27 07:43:39 |
 | quarantine_id         | uuid   | Unique ID for Quarantine Report                                | cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c |
@@ -85,7 +85,7 @@ appear in the quarantine report using this schema:
 | quarantine_id         | uuid   | Unique ID for this Quarantine_Report record              | cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c |
 | etl_database          | string | Overwatch ETL database name                                | ow_etl_azure_0721 |
 | table_name            | string | Overwatch table name                                       | clusterstatefact_gold |
-| healthcheck_rule_failed | string | Description of healthcheck rule causing the row having keys to be quarantined | Driver_Node_Type_ID Should Not be NULL |
+| healthcheck_rule_failed | string | Description of health check rule causing the row having keys to be quarantined | Driver_Node_Type_ID Should Not be NULL |
 | rule_type             | string | Type of validation rule (See enumerated values below.)     | Pipeline_Report_Validation |
 | healthcheck_type      | string | Denote the failure type of the health check rule.          | Warning or Failure |
 | keys                  | string | JSON of primary (possibly compound) key value              | {"cluster_id":"0831-200003-6bhv8y0u","state":"TERMINATING","unixTimeMS_state_start":1693514245329} |
@@ -135,7 +135,7 @@ Currently, below tables are in scope of this rule type:
 * jobrun_gold
 * job_gold
 
-Different healthcheck rules are defined for the following tables:
+Different health check rules are defined for the following tables:
 
 
 #### clusterstatefact_gold
@@ -185,7 +185,7 @@ Different healthcheck rules are defined for the following tables:
 
 ### Cross_Table_Validation
 
-The healthcheck rules for this rule type are applied to two or more tables. This rule type is used to 
+The health check rules for this rule type are applied to two or more tables. This rule type is used to 
 validate data consistency across tables.
 
 This rule type has the following healthcheck_rule values:
