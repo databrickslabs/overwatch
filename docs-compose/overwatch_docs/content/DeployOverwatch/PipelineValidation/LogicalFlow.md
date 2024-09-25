@@ -140,47 +140,52 @@ Different health check rules are defined for the following tables:
 
 #### clusterstatefact_gold
 
-* Cluster_ID_Should_Not_be_NULL
-* Driver_Node_Type_ID_Should_Not_be_NULL
-* Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster
-* DBU_Rate_Should_Be_Greater_Than_Zero_for_Runtime_Engine_is_Standard_Or_Photon
-* Total_Cost_Should_Be_Greater_Than_Zero_for_Databricks_Billable
-* Check_Whether_Any_Single_Cluster_State_is_Running_For_Multiple_Days
+    •	cluster_id should not be null
+	•	driver_node_type_id should not be null
+	•	node_type_id should not be null for multi-node cluster
+	•	dbu_rate should be greater than zero for runtime engine is standard or photon
+	•	total_cost should be greater than zero for Databricks billable
+	•	check whether any single cluster state is running for multiple days
 
 
 #### jobruncostpotentialfact_gold
 
-* Job_ID_Should_Not_be_NULL
-* Driver_Node_Type_ID_Should_Not_be_NULL
-* Job_Run_Cluster_Util_value_Should_Not_Be_More_Than_One
-* Check_Whether_Any_Job_is_Running_For_Multiple_Days
+	•	job_id should not be null
+	•	driver_node_type_id should not be null
+	•	job_run_cluster_util_value should not be more than one
+	•	check whether any job is running for multiple days
 
 #### cluster_gold
-* Cluster_ID_Should_Not_be_NULL
-* Driver_Node_Type_ID_Should_Not_be_NULL
-* Node_Type_ID_Should_Not_be_NULL_for_Multi_Node_Cluster
-* Cluster_Type_Should_be_In_Between_Serverless_SQL-Analytics_Single-Node_Standard_High-Concurrency
-* 
+
+	•	cluster_id should not be null
+	•	driver_node_type_id should not be null
+	•	node_type_id should not be null for multi-node cluster
+	•	cluster_type should be between serverless, SQL analytics, single-node, standard, high-concurrency
 
 #### sparkjob_gold
-* Cluster_ID_Should_Not_be_NULL
-* Job_ID_Should_Not_be_NULL
-* db_id_in_job_Should_Not_be_NULL_When_db_Job_Id_is_Not_NULL
+
+	•	cluster_id should not be null
+	•	job_id should not be null
+	•	db_id_in_job should not be null when db_job_id is not null
 
 #### sql_query_history_gold
-* Warehouse_ID_Should_Not_be_NULL
-* Query_ID_Should_Not_be_NULL
+
+	•	warehouse_id should not be null
+	•	query_id should not be null
 
 #### jobrun_gold
-* Job_ID_Should_Not_be_NULL
-* Run_ID_Should_Not_be_NULL
-* Job_Run_ID_Should_Not_be_NULL
-* Task_Run_ID_Should_Not_be_NULL
-* Cluster_ID_Should_Not_be_NULL
+
+	•	job_id should not be null
+	•	run_id should not be null
+	•	job_run_id should not be null
+	•	task_run_id should not be null
+	•	cluster_id should not be null
+
 
 #### job_gold
-* Job_ID_Should_Not_be_NULL
-* Action_Should_be_In_Between_snapimpute_create_reset_update_delete_resetJobAcl_changeJobAcl
+
+	•	job_id should not be null
+	•	action should be between snapimpute, create, reset, update, delete, resetJobAcl, changeJobAcl
 
 
 ### Cross_Table_Validation
@@ -190,16 +195,16 @@ validate data consistency across tables.
 
 This rule type has the following healthcheck_rule values:
 
-* JOB_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold
-* JOB_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold
-* CLUSTER_ID_Present_In_jobRun_gold_But_Not_In_jobRunCostPotentialFact_gold
-* CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_jobRun_gold
-* NOTEBOOK_ID_Present_In_notebook_gold_But_Not_In_notebookCommands_gold
-* NOTEBOOK_ID_Present_In_notebookCommands_gold_But_Not_In_notebook_gold
-* CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_jobRunCostPotentialFact_gold
-* CLUSTER_ID_Present_In_jobRunCostPotentialFact_gold_But_Not_In_clusterStateFact_gold
-* CLUSTER_ID_Present_In_cluster_gold_But_Not_In_clusterStateFact_gold
-* CLUSTER_ID_Present_In_clusterStateFact_gold_But_Not_In_cluster_gold
+	•	job_id present in jobrun_gold but not in jobruncostpotentialfact_gold
+	•	job_id present in jobruncostpotentialfact_gold but not in jobrun_gold
+	•	cluster_id present in jobrun_gold but not in jobruncostpotentialfact_gold
+	•	cluster_id present in jobruncostpotentialfact_gold but not in jobrun_gold
+	•	notebook_id present in notebook_gold but not in notebookcommands_gold
+	•	notebook_id present in notebookcommands_gold but not in notebook_gold
+	•	cluster_id present in clusterstatefact_gold but not in jobruncostpotentialfact_gold
+	•	cluster_id present in jobruncostpotentialfact_gold but not in clusterstatefact_gold
+	•	cluster_id present in cluster_gold but not in clusterstatefact_gold
+	•	cluster_id present in clusterstatefact_gold but not in cluster_gold
 
 
 ## How to run the Validation Module
