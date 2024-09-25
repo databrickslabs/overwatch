@@ -634,7 +634,7 @@ trait BronzeTransforms extends SparkSessionWrapper {
 
     if (clusterIDs.isEmpty) throw new NoNewDataException(s"No clusters could be found with new events. Please " +
       s"validate your audit log input and clusters_snapshot_bronze tables to ensure data is flowing to them " +
-      s"properly. Skipping!", Level.ERROR)
+      s"properly. Skipping!", Level.WARN)
 
     val processingStartTime = System.currentTimeMillis();
     logger.log(Level.INFO, "Calling APIv2, Number of cluster id:" + clusterIDs.length + " run id :" + apiEnv.runID)

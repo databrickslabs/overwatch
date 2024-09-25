@@ -436,6 +436,8 @@ private[overwatch] class IncompleteFilterException(s: String) extends Exception(
 
 private[overwatch] class ApiCallEmptyResponse(val apiCallDetail: String, val allowModuleProgression: Boolean) extends Exception(apiCallDetail)
 
+
+
 private[overwatch] class ApiCallFailureV2(s: String) extends Exception(s) {}
 
 private[overwatch] class ModuleDisabled(moduleId: Int, s: String) extends Exception(s) {
