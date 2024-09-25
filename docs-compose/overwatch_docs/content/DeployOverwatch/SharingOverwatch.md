@@ -1,7 +1,7 @@
 ---
 title: "Sharing Overwatch Data"
 date: 2022-12-15T18:31:01-05:00
-weight: 4
+weight: 5
 ---
 
 ## Granting Access Via DBSQL
