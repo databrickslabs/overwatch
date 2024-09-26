@@ -990,28 +990,28 @@ end of the Overwatch run to the until-timestamp of the run. If the state was sti
 updated on the subsequent run.
 {{% /notice %}}
 
-| Column                  | Type        | Description                                                                                                                                                    |
-|:------------------------|:------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| warehouse_id            | string      | Canonical Databricks Warehouse ID (more info in [Common Meta Fields]())                                                                                        |
-| warehouse_name          | string      | Name of warehouse at beginning of state                                                                                                                        |
-| tags                    | string      | JSON string of key/value pairs for all cluster associated custom tags give to the cluster                                                                      |
-| unixTimeMS_state_start  | various     | timestamp reference column at the time the state began                                                                                                         |
-| unixTimeMS_state_end    | various     | timestamp reference column at the time the state ended                                                                                                         |
-| state_start_date        | date        | warehouse state start date                                                                                                                                     |
-| state                   | string      | state of the warehouse -- full list [HERE](https://docs.databricks.com/en/admin/system-tables/warehouse-events.html#logged-warehouse-event-types)              |
-| cluster_size            | string      | size of the warehouse cluster.                                                                                                                                 |
-| current_num_clusters    | long        | current number of clusters in use by the warehouse at the start of the state                                                                                   |
-| target_num_clusters     | long        | maximum number of clusters targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state        |
-| uptime_since_restart_S  | double      | Seconds since the cluster was last restarted / terminated                                                                                                      |
-| uptime_in_state_S       | double      | Seconds the cluster spent in current state                                                                                                                     |
-| uptime_in_state_H       | double      | Hours the cluster spent in current state                                                                                                                       |
-| cloud_billable          | boolean     | All current known states are cloud billable. This means that cloud provider charges are present during this state                                              |
-| databricks_billable     | boolean     | State incurs databricks DBU costs. All states incur DBU costs except: INIT_SCRIPTS_FINISHED, INIT_SCRIPTS_STARTED, STARTING, TERMINATING, CREATING, RESTARTING |
-| warehouse_type          | string      | Warehouse type (PRO, Serverless, Classic)                                                                                                                      |
-| state_dates             | array<date> | Array of all dates across which the state spanned                                                                                                              |
-| days_in_state           | int         | Number of days in state                                                                                                                                        |
-| worker_potential_core_H | double      | Worker core hours available to execute spark tasks                                                                                                             |
-| total_dbu_cost          | double      | All dbu costs for Driver and Workers                                                                                                                           |
+| Column                  | Type        | Description                                                                                                                                             |
+|:------------------------|:------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| warehouse_id            | string      | Canonical Databricks Warehouse ID (more info in [Common Meta Fields]())                                                                                 |
+| warehouse_name          | string      | Name of warehouse at beginning of state                                                                                                                 |
+| tags                    | string      | JSON string of key/value pairs for all cluster associated custom tags give to the cluster                                                               |
+| unixTimeMS_state_start  | various     | timestamp reference column at the time the state began                                                                                                  |
+| unixTimeMS_state_end    | various     | timestamp reference column at the time the state ended                                                                                                  |
+| state_start_date        | date        | warehouse state start date                                                                                                                              |
+| state                   | string      | state of the warehouse -- full list [HERE](https://docs.databricks.com/en/admin/system-tables/warehouse-events.html#logged-warehouse-event-types)       |
+| cluster_size            | string      | configured size of the warehouse clusters.                                                                                                              |
+| current_num_clusters    | long        | current number of clusters in use by the warehouse at the start of the state                                                                            |
+| target_num_clusters     | long        | maximum number of clusters targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state |
+| uptime_since_restart_S  | double      | Seconds since the cluster was last restarted / terminated                                                                                               |
+| uptime_in_state_S       | double      | Seconds the cluster spent in current state                                                                                                              |
+| uptime_in_state_H       | double      | Hours the cluster spent in current state                                                                                                                |
+| cloud_billable          | boolean     | All current known states are cloud billable. This means that cloud provider charges are present during this state                                       |
+| databricks_billable     | boolean     | State incurs databricks DBU costs.                                                                                                                      |
+| warehouse_type          | string      | Warehouse type (PRO, Serverless, Classic)                                                                                                               |
+| state_dates             | array<date> | Array of all dates across which the state spanned                                                                                                       |
+| days_in_state           | int         | Number of days in state                                                                                                                                 |
+| worker_potential_core_H | double      | Worker core hours available to execute spark tasks                                                                                                      |
+| total_dbu_cost          | double      | All dbu costs for Driver and Workers                                                                                                                    |
 
 {{% notice note %}}
 Cost may not appear for a warehouse until a state change is observed (i.e. starting/terminating/expanded_disk/resizing/etc).
