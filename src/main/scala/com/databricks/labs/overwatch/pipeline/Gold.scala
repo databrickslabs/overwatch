@@ -33,7 +33,8 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       GoldTargets.sparkExecutorTarget,
       GoldTargets.sqlQueryHistoryTarget,
       GoldTargets.warehouseTarget,
-      GoldTargets.notebookCommandsTarget
+      GoldTargets.notebookCommandsTarget,
+      GoldTargets.warehouseStateFactTarget
     )
   }
 
@@ -76,6 +77,11 @@ class Gold(_workspace: Workspace, _database: Database, _config: Config)
       case OverwatchScope.notebookCommands => {
         Array(
           notebookCommandsFactModule
+        )
+      }
+      case OverwatchScope.warehouseEvents => {
+        Array(
+          warehouseStateFactModule
         )
       }
       case _ => Array[Module]()
