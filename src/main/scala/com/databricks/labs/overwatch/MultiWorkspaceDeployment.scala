@@ -308,6 +308,31 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
     }
   }
 
+  private def startPlatinumDeployment(workspace: Workspace, deploymentId: String): MultiWSDeploymentReport = {
+    val workspaceId = workspace.getConfig.organizationId
+    val args = JsonUtils.objToJson(workspace.getConfig.inputConfig)
+    try {
+      println(s"""************Platinum Deployment Started workspaceID:$workspaceId args:${args.prettyString} ************"""")
+
+      Platinum(workspace).run()
+      println(s"""************Platinum Deployment Completed workspaceID:$workspaceId************""")
+      MultiWSDeploymentReport(workspaceId, "Platinum", Some(args.compactString),
+        "SUCCESS",
+        Some(deploymentId)
+      )
+    } catch {
+      case exception: Exception =>
+        val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
+        logger.log(Level.ERROR, fullMsg)
+        MultiWSDeploymentReport(workspaceId, "Platinum", Some(args.compactString),
+          fullMsg,
+          Some(deploymentId)
+        )
+    } finally {
+      clearThreadFromSessionsMap()
+    }
+  }
+
   /**
    * Takes a snapshot of the config and saves it to /report/configTable
    *
@@ -468,7 +493,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   /**
    * crate pipeline executions as futures and return the deployment reports
    * @param deploymentParams deployment params for a specific workspace
-   * @param medallions medallions to execute (bronze, silver, gold)
+   * @param medallions medallions to execute (bronze, silver, gold,platinum)
    * @param ec futures executionContext
    * @return future deployment report
    */
@@ -489,6 +514,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       if (zonesLower.contains("bronze")) threadDeploymentReport.append(startBronzeDeployment(workspace, deploymentId))
       if (zonesLower.contains("silver")) threadDeploymentReport.append(startSilverDeployment(workspace, deploymentId))
       if (zonesLower.contains("gold")) threadDeploymentReport.append(startGoldDeployment(workspace, deploymentId))
+      if (zonesLower.contains("platinum")) threadDeploymentReport.append(startPlatinumDeployment(workspace, deploymentId))
       threadDeploymentReport.toArray
     }(ec)
 
@@ -499,9 +525,9 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
    * Performs the multi workspace deployment
    *
    * @param parallelism the number of threads which will run in parallel to perform the deployment
-   * @param zones       the zone can be Bronze,Silver or Gold by default it will be Bronze
+   * @param zones       the zone can be Bronze,Silver,Gold or Platinum by default it will be Bronze
    */
-  def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold"): Unit = {
+  def deploy(parallelism: Int = 4, zones: String = "Bronze,Silver,Gold,Platinum"): Unit = {
     val processingStartTime = System.currentTimeMillis();
     try {
       // initialize spark overrides for global spark conf
