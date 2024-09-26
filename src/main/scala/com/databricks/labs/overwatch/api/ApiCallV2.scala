@@ -817,14 +817,14 @@ class ApiCallV2(apiEnv: ApiEnv) extends SparkSessionWrapper {
       }
     }
     if (apiResponseCounter.size() != finalResponseCount) { // Checking whether all the api responses has been received or not.
-      logger.log(Level.ERROR,
-        s"""Unable to receive all the ${endpoint} api responses; Api response
+      val msg = s"""Unable to receive all the ${endpoint} api responses; Api response
            |received ${apiResponseCounter.size()};Api response not
-           |received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
-      throw new Exception(
-        s"""Unable to receive all the ${endpoint} api responses; Api response received
-           |${apiResponseCounter.size()};
-           |Api response not received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
+           |received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin
+      logger.log(Level.WARN, msg)
+//      throw new Exception(
+//        s"""Unable to receive all the ${endpoint} api responses; Api response received
+//           |${apiResponseCounter.size()};
+//           |Api response not received ${finalResponseCount - apiResponseCounter.size()}""".stripMargin)
     }
     if (apiResponseArray.size() > 0) { //In case of response array didn't hit the batch-size as a
       // final step we will write it to the persistent storage.
