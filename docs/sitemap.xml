@@ -65,9 +65,6 @@
     <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/migratingtouc/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
   </url><url>
-    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</loc>
-    <lastmod>2022-12-15T18:31:01-05:00</lastmod>
-  </url><url>
     <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</loc>
     <lastmod>2022-12-12T11:36:53-05:00</lastmod>
   </url><url>
@@ -77,8 +74,13 @@
     <loc>https://databrickslabs.github.io/overwatch/changelog/</loc>
     <lastmod>2021-05-05T17:00:13-04:00</lastmod>
   </url><url>
+    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/pipelinevalidation/</loc>
+  </url><url>
     <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/</loc>
     <lastmod>2023-04-18T11:28:39-05:00</lastmod>
+  </url><url>
+    <loc>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</loc>
+    <lastmod>2022-12-15T18:31:01-05:00</lastmod>
   </url><url>
     <loc>https://databrickslabs.github.io/overwatch/dataengineer/productionizing/</loc>
     <lastmod>2022-07-20T15:03:23-04:00</lastmod>

@@ -20,7 +20,7 @@
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</link>
       <pubDate>Tue, 18 Apr 2023 11:28:39 -0500</pubDate>
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/ucedeployment/uceconfiguration/</guid>
-      <description>Configuration changes required for UC Enablement There is no unique configuration process for UC; however, the format for the THREE CONFIGURATIONS below are specific for UC Enablement. For all other configurations, please follow the Configuration&#xA;etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;gt; consumer_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;consumer_database_name&amp;gt; storage_prefix - &amp;lt;UC External Location&amp;gt;/&amp;lt;storage_prefix&amp;gt; </description>
+      <description>Configuration changes required for UC Enablement There is no unique configuration process for UC; however, the format for the THREE CONFIGURATIONS below are specific for UC Enablement. For all other configurations, please follow the Configuration&#xA;etl_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;etl_database_name&amp;gt; consumer_database_name - &amp;lt;catalog_name&amp;gt;.&amp;lt;consumer_database_name&amp;gt; storage_prefix - &amp;lt;UC External Location&amp;gt;/&amp;lt;storage_prefix&amp;gt; With the release of Overwatch 0.8.2.0, we have added support for Multi Catalog Overwatch Deployment. Now user can provide different catalogs for ETL Database and Consumer Database.</description>
     </item>
     <item>
       <title>Migrating To UC</title>

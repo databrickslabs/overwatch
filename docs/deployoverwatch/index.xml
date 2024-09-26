@@ -9,6 +9,13 @@
     <lastBuildDate>Thu, 15 Dec 2022 18:31:01 -0500</lastBuildDate>
     <atom:link href="https://databrickslabs.github.io/overwatch/deployoverwatch/index.xml" rel="self" type="application/rss+xml" />
     <item>
+      <title>Pipeline Validation</title>
+      <link>https://databrickslabs.github.io/overwatch/deployoverwatch/pipelinevalidation/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/pipelinevalidation/</guid>
+      <description>Overview Overwatch provides a special pipeline validation module to perform a number of data quality, data completeness, and referential integrity checks on its output. Pipeline validation may run as frequently as the regularly scheduled, automated Overwatch ETL pipeline runs/deployments or manually as a notebook command. It is used by the Overwatch maintainers to guard against data quality regressions when extending and enhancing Overwatch&amp;rsquo;s internal logic. Similarly, we are encouraging users to apply this tool to their deployments to provide data quality readouts and to assist with customer issue resolution.</description>
+    </item>
+    <item>
       <title>Sharing Overwatch Data</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/</link>
       <pubDate>Thu, 15 Dec 2022 18:31:01 -0500</pubDate>
