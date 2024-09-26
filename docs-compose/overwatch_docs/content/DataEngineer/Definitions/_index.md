@@ -998,7 +998,7 @@ updated on the subsequent run.
 | unixTimeMS_state_start  | various     | timestamp reference column at the time the state began                                                                                                         |
 | unixTimeMS_state_end    | various     | timestamp reference column at the time the state ended                                                                                                         |
 | state_start_date        | date        | warehouse state start date                                                                                                                                     |
-| state                   | string      | state of the cluster -- full list [HERE](https://docs.databricks.com/dev-tools/api/latest/clusters.html#clustereventtype)                                      |
+| state                   | string      | state of the warehouse -- full list [HERE](https://docs.databricks.com/en/admin/system-tables/warehouse-events.html#logged-warehouse-event-types)              |
 | cluster_size            | string      | size of the warehouse cluster.                                                                                                                                 |
 | current_num_clusters    | long        | current number of clusters in use by the warehouse at the start of the state                                                                                   |
 | target_num_clusters     | long        | maximum number of clusters targeted to be present by the completion of the state. Should be equal to *current_num_workers* except during RESIZING state        |
