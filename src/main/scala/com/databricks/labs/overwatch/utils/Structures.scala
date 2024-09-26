@@ -160,6 +160,8 @@ case class ReconReport(
                         deviationPercentage: Option[Double] = None,
                         sourceQuery: Option[String] = None,
                         targetQuery: Option[String] = None,
+                        sourceOnlyColumns: Option[String] = None,
+                        targetOnlyColumns: Option[String] = None,
                         errorMsg: Option[String] = None
                       )
 
@@ -340,6 +342,24 @@ case class MultiWSDeploymentReport(
                                     deploymentId: Option[String]
                                   )
 
+case class HealthCheckReport(
+                              etl_database: String,
+                              table_name:  String,
+                              healthCheck_rule: String,
+                              rule_type : String,
+                              healthCheckMsg: Option[String] = None,
+                              Overwatch_RunID: String
+                            )
+
+case class QuarantineReport(
+                             etl_database: String,
+                             table_name : String,
+                             healthcheck_rule_failed : String,
+                             rule_type : String,
+                             healthcheck_type : String,
+                             keys : String
+                           )
+
 case class WorkspaceMetastoreRegistrationReport(workspaceDataset: WorkspaceDataset, registerStatement: String, status: String)
 
 
@@ -382,8 +402,10 @@ case class SanitizeFieldException(field: StructField, rules: List[SanitizeRule],
 
 object OverwatchScope extends Enumeration {
   type OverwatchScope = Value
-  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts, dbsql, pools, notebookCommands = Value
+  val jobs, clusters, clusterEvents, sparkEvents, audit, notebooks, accounts,
+  dbsql, pools, notebookCommands, warehouseEvents = Value
   // Todo Issue_77
+  def toArray: Array[String] = values.map(_.toString).toArray
 }
 
 object WriteMode extends Enumeration {
