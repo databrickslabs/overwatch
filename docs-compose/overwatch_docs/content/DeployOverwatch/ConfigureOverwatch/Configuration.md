@@ -29,9 +29,12 @@ to you just leave it blank to avoid any strange issues when parsing the CSV.
 
 Please use the template for your version. If you are upgrading from 071x to 072x the upgrade script in the change log
 will upgrade the script for you.
-* 0.8.0.x+ ([.XLSX](/assets/DeployOverwatch/080x_overwatch_deployment_config_template.xlsx) |
-  [.CSV](/assets/DeployOverwatch/080x_overwatch_deployment_config_template.csv))
-  * Added sql_endpoint column for multi account deployment
+
+[//]: # (* 0.8.0.x+ &#40;[.XLSX]&#40;/assets/DeployOverwatch/080x_overwatch_deployment_config_template.xlsx&#41; |)
+
+[//]: # (  [.CSV]&#40;/assets/DeployOverwatch/080x_overwatch_deployment_config_template.csv&#41;&#41;)
+
+[//]: # (  * Added sql_endpoint column for multi account deployment)
 * 0.7.2.x+ ([.XLSX](/assets/DeployOverwatch/072x_overwatch_deployment_config_template.xlsx) |
   [.CSV](/assets/DeployOverwatch/072x_overwatch_deployment_config_template.csv))
   * Two column names were changed in 072x to make the scope a little broader
@@ -79,7 +82,8 @@ version please see [Configuration Details By Version]({{%relref "DeployOverwatch
 | api_waiting_time	          | Long    | False      | API Tunable - Overwatch makes async api calls in parallel, api_waiting_time signifies the max wait time in case of no response received from the api call. Default = 300000(5 minutes)                                                                                                                                                                                                                                                        |
 | mount_mapping_path         | String  | False      | Path to local CSV holding details of all mounts on remote workspaces (only necessary for remote workspaces with >50 mounts) **[click here for more details]({{%relref "DataEngineer/AdvancedTopics"%}}/#exception---remote-workspaces-with-50-mounts)**                                                                                                                                                                                       |
 | temp_dir_path              | String  | False      | Custom temporary working directory, directory gets cleaned up after each run.                                                                                                                                                                                                                                                                                                                                                                 |
-| sql_endpoint               | String  | False      | Use http path from warehouse connection details. **IMPORTANT NOTE: ** This column only needs to be added for multi account deployment, see [Multi Account System Table Integration]({{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}}/#ConfigurationChangesRequiredForMultiAccountSystemTableIntegration) for more details                                                                                       |
+
+[//]: # (| sql_endpoint               | String  | False      | Use http path from warehouse connection details. **IMPORTANT NOTE: ** This column only needs to be added for multi account deployment, see [Multi Account System Table Integration]&#40;{{%relref "DeployOverwatch/SystemTableIntegration/SystemTableConfiguration"%}}/#ConfigurationChangesRequiredForMultiAccountSystemTableIntegration&#41; for more details                                                                                       |)
 
 #### Azure Event Hub Specific Configurations
 When configuring the Azure EH configurations users can use EITHER a **shared access key** OR **AAD SP as of 072x** 

@@ -30,11 +30,11 @@
       <description>API Access Overwatch utilizes several APIs to normalize the platform data. Overwatch leverages secret scopes and keys to acquire a token that is authorized to access the platform. The account that owns the token (i.e. dapi token) must have read access to the assets you wish to manage. If the token owner is a non-admin account the account must be granted read level access to the assets to be monitored.</description>
     </item>
     <item>
-      <title>Validation</title>
+      <title>Configuration Validation</title>
       <link>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</link>
       <pubDate>Mon, 12 Dec 2022 11:36:53 -0500</pubDate>
       <guid>https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/</guid>
-      <description>Deployment Validations Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below&#xA;Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key.</description>
+      <description>Many validations are performed to minimize mistakes. The following section offers details on all validations done. Not all validation steps are done on all runs. All validations should be performed before a first run on any given workspace. For more information on executing a full validation, see below&#xA;Validation rules Name Validation Rule Impacted columns Api Url Validation API URL should give some response with provided scope and key. api_url Primordial data validation Primordial Date must be in yyyy-MM-dd format (i.</description>
     </item>
     <item>
       <title>Configuration Details By Version</title>

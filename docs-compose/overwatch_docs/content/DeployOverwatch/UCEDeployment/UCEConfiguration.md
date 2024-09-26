@@ -13,3 +13,9 @@ are specific for UC Enablement. For all other configurations, please follow the
 * **etl_database_name** - <catalog_name>.<etl_database_name>
 * **consumer_database_name** - <catalog_name>.<consumer_database_name>
 * **storage_prefix** -  <UC External Location\>/<storage_prefix>
+
+
+{{% notice note %}}
+With the release of Overwatch 0.8.2.0, we have added support for Multi Catalog Overwatch Deployment.
+Now user can provide different catalogs for ETL Database and Consumer Database.
+{{% /notice %}}

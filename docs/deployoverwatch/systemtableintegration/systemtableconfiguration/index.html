@@ -12,21 +12,21 @@
     <title>System Table Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1718998190" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1718998190" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1718998190" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1718998190"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1718998190"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1718998190"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1718998190"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
 
     
   </div>
@@ -309,9 +309,9 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/configureoverwatch/validation/" title="Validation" class="dd-item ">
+      <li data-nav-id="/deployoverwatch/configureoverwatch/validation/" title="Configuration Validation" class="dd-item ">
         <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/validation/">
-        Validation
+        Configuration Validation
         
         </a>
     </li>
@@ -441,9 +441,9 @@
  
   
     
-      <li data-nav-id="/deployoverwatch/sharingoverwatch/" title="Sharing Overwatch Data" class="dd-item ">
-        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/">
-        Sharing Overwatch Data
+      <li data-nav-id="/deployoverwatch/pipelinevalidation/" title="Pipeline Validation" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/pipelinevalidation/">
+        Pipeline Validation
         
         </a>
     </li>
@@ -648,6 +648,27 @@
         </ul>
       
     </li>
+  
+ 
+
+            
+          
+            
+            
+
+
+
+
+ 
+  
+    
+      <li data-nav-id="/deployoverwatch/sharingoverwatch/" title="Sharing Overwatch Data" class="dd-item ">
+        <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/sharingoverwatch/">
+        Sharing Overwatch Data
+        
+        </a>
+    </li>
+     
   
  
 
@@ -1127,7 +1148,6 @@
 <nav id="TableOfContents">
   <ul>
     <li><a href="#configuration-changes-required-for-system-table-integration">Configuration changes required for System Table Integration</a></li>
-    <li><a href="#configuration-changes-required-for-multi-account-system-table-integration">Configuration changes required for Multi Account System Table Integration</a></li>
   </ul>
 </nav>
     </div>
@@ -1165,29 +1185,11 @@ add keyword <strong>system</strong> in this column. This will enable the system 
 </div>
 
 
-<div class="notices note" ><p>For Azure deployments since Eventhub is not required for System Table Integration, we can leave these
-fields blank - eh_name, Event hub name, eh_name, eh_conn_string, aad_tenant_id, aad_client_id, aad_client_secret_key,
+<div class="notices note" ><p>For Azure deployments since Eventhub is not required for System Table Integration, the following fields can be left blank
+in the configuration - eh_name, Event hub name, eh_name, eh_conn_string, aad_tenant_id, aad_client_id, aad_client_secret_key,
 aad_authority_endpoint</p>
 </div>
 
-<h2 id="configuration-changes-required-for-multi-account-system-table-integration">Configuration changes required for Multi Account System Table Integration</h2>
-<p>The process for achieving multi-account deployment is straightforward. In the configuration table, for each workspace
-in a different account from the one where Overwatch is run from, you&rsquo;ll need to enter a value for the sql_endpoint column.
-In order to get this value, you can create a new warehouse or use an existing one on a workspace in the remote account.
-We encourage you to use a serverless warehouse for this purpose.
-You would then pass the warehouse endpoint details to Overwatch through the configuration in the sql_endpoint
-column. <strong>sql_endpoint column needs to be populated only for workspaces in a different account</strong>
-You can use the same warehouse sql_endpoint to collect the data for all the workspaces in the remote account.</p>
-<p>Below are the details:</p>
-<ul>
-<li><strong>sql_endpoint</strong> - this will be the http path from the sql warehouse. This can be found
-in the connection details table of the warehouse. See the below screenshot on how to find it
-<img src="https://databrickslabs.github.io/overwatch/images/DeployOverwatch/warehouse_http_path.png" alt="WarehouseHTTPPath"></li>
-<li><strong>auditlogprefix_source_path</strong> - Instead of adding a fully qualified path (s3 or GC) for auditlog,
-add keyword <strong>system</strong> in this column. This will enable the system table integration.</li>
-</ul>
-<p>For all other configurations, please follow the
-<a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configuration/">Configuration</a></p>
 
 
 <footer class="footline">
@@ -1603,6 +1605,22 @@ add keyword <strong>system</strong> in this column. This will enable the system 
             
                 
                     
+                
+                
+
+                    
+                    
+                    
+
+                    
+            
+        
+                    
+                        
+            
+            
+                
+                    
                     
                 
                 
@@ -1880,19 +1898,19 @@ add keyword <strong>system</strong> in this column. This will enable the system 
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1718998190"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1718998190"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1718998190"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1718998190" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1718998190"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

@@ -27,5 +27,5 @@ Data Ingestion Process and also contains the data dictionary for all columns del
 
 
 ## Overwatch ERD
-![OverwatchERD](/images/_index/Overwatch_Gold_072x.png)
+![OverwatchERD](/images/_index/Overwatch_Gold_0.8.2.0.png)
 For full fidelity image, right click and save the image.

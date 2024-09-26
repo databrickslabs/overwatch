@@ -1,9 +1,9 @@
 ---
-title: "Validation"
+title: "Configuration Validation"
 date: 2022-12-12T11:36:53-05:00
 weight: 4
 ---
-## Deployment Validations
+
 Many validations are performed to minimize mistakes. The following section offers details on all validations
 done. Not all validation steps are done on all runs. All validations should be performed before a first run on any
 given workspace. For more information on executing a full validation, see [below]()
