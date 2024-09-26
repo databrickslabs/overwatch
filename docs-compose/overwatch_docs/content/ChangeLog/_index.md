@@ -10,13 +10,15 @@ weight: 4
 
 ### Enhancements
 
-* Implemented new post-ETL validation
-  * Check pipeline state in order to fail a workflow task and/or generate an alert
-  * Check non-null expectations of key columns in Gold tables
-  * Check cross-table referential integrity of key columns between pairs of Gold tables
-* Implemented new Silver module to capture SQL Warehouse state details (2022)
-* Implemented new Gold module to capture SQL Warehouse state facts (3020)
-* Improve performance of Silver Job Runs module (2011)
+* **New SQL Warehouse tables!**
+  * A new [WarehouseEvents]({{%relref "DataEngineer/Modules/#warehouseevents"%}}) scope is enabled by default.
+  * New Silver [module]({{%relref "DataEngineer/Pipeline_Management/#module-dependencies"%}}) 2022 populates a new Warehouse Details table similar to the existing Cluster Details table.  Because Warehouse state events are not currently available through the Databricks REST API, these facts must be derived from system table `compute.warehouse_events` ( [AWS](https://docs.databricks.com/en/admin/system-tables/warehouse-events.html) | [Azure](https://learn.microsoft.com/en-us/azure/databricks/admin/system-tables/warehouse-events) | [GCP](https://docs.gcp.databricks.com/en/admin/system-tables/warehouse-events.html)) (requires Unity Catalog).
+  * New Gold [module]({{%relref "DataEngineer/Pipeline_Management/#module-dependencies"%}}) 3020 then populates a new Warehouse State Facts table  with estimates of SQL Warehouse DBU consumption similar to the existing Cluster State Facts table for classic compute resources.
+* **New post-ETL [pipeline validation]({{%relref "DeployOverwatch/PipelineValidation"%}}) functionality!**
+  * Checks pipeline state in order to fail a workflow task and/or generate an alert upon completion of an Overwatch pipeline deployment/run
+  * Applies several data quality rules to Gold tables to ensure data completeness and correctness 
+  * Checks cross-table referential integrity of key columns between pairs of Gold tables
+
 
 ### Bug Fixes
 
@@ -35,7 +37,7 @@ weight: 4
   null in `clusterstatefact_gold` ("CLSF") to ensure correctness of
   queries and aggregations by instance type
 
-Released September 24th, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/33?closed=1)
+Released September 26th, 2024 - [Full Change Inventory](https://github.com/databrickslabs/overwatch/milestone/33?closed=1)
 
 ------------------------------------------------------------------------------------------------
 
