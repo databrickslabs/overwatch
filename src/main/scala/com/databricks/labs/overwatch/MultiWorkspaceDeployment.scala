@@ -237,11 +237,12 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private def startBronzeDeployment(workspace: Workspace, deploymentId: String): MultiWSDeploymentReport = {
     val workspaceId = workspace.getConfig.organizationId
     val args = JsonUtils.objToJson(workspace.getConfig.inputConfig)
-    println(s"""************Bronze Deployment Started workspaceID:$workspaceId\nargs:${args.prettyString}**********  """)
+    val redactedArgs = args.replace("\"azureClientSecret\":\"[^\"]+\"".r, "\"azureClientSecret\":\"REDACTED\"")
+    println(s"""************Bronze Deployment Started workspaceID:$workspaceId\nargs:${redactedArgs.prettyString}**********  """)
     try {
       Bronze(workspace).run()
       println(s"""************Bronze Deployment Completed workspaceID:$workspaceId************ """)
-      MultiWSDeploymentReport(workspaceId, "Bronze", Some(args.compactString),
+      MultiWSDeploymentReport(workspaceId, "Bronze", Some(redactedArgs.compactString),
         "SUCCESS",
         Some(deploymentId)
       )
@@ -249,7 +250,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        MultiWSDeploymentReport(workspaceId, "Bronze", Some(args.compactString),
+        MultiWSDeploymentReport(workspaceId, "Bronze", Some(redactedArgs.compactString),
           fullMsg,
           Some(deploymentId)
         )
@@ -261,12 +262,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private def startSilverDeployment(workspace: Workspace, deploymentId: String): MultiWSDeploymentReport = {
     val workspaceId = workspace.getConfig.organizationId
     val args = JsonUtils.objToJson(workspace.getConfig.inputConfig)
+    val redactedArgs = args.replace("\"azureClientSecret\":\"[^\"]+\"".r, "\"azureClientSecret\":\"REDACTED\"")
     try {
-      println(s"""************Silver Deployment Started workspaceID:$workspaceId\nargs:${args.prettyString} ************""")
+      println(s"""************Silver Deployment Started workspaceID:$workspaceId\nargs:${redactedArgs.prettyString} ************""")
 
       Silver(workspace).run()
       println(s"""************Silver Deployment Completed workspaceID:$workspaceId************""")
-      MultiWSDeploymentReport(workspaceId, "Silver", Some(args.compactString),
+      MultiWSDeploymentReport(workspaceId, "Silver", Some(redactedArgs.compactString),
         "SUCCESS",
         Some(deploymentId)
       )
@@ -274,7 +276,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        MultiWSDeploymentReport(workspaceId, "Silver", Some(args.compactString),
+        MultiWSDeploymentReport(workspaceId, "Silver", Some(redactedArgs.compactString),
           fullMsg,
           Some(deploymentId)
         )
@@ -286,12 +288,13 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
   private def startGoldDeployment(workspace: Workspace, deploymentId: String): MultiWSDeploymentReport = {
     val workspaceId = workspace.getConfig.organizationId
     val args = JsonUtils.objToJson(workspace.getConfig.inputConfig)
+    val redactedArgs = args.replace("\"azureClientSecret\":\"[^\"]+\"".r, "\"azureClientSecret\":\"REDACTED\"")
     try {
-      println(s"""************Gold Deployment Started workspaceID:$workspaceId args:${args.prettyString} ************"""")
+      println(s"""************Gold Deployment Started workspaceID:$workspaceId\nargs:${redactedArgs.prettyString} ************"""")
 
       Gold(workspace).run()
       println(s"""************Gold Deployment Completed workspaceID:$workspaceId************""")
-      MultiWSDeploymentReport(workspaceId, "Gold", Some(args.compactString),
+      MultiWSDeploymentReport(workspaceId, "Gold", Some(redactedArgs.compactString),
         "SUCCESS",
         Some(deploymentId)
       )
@@ -299,7 +302,7 @@ class MultiWorkspaceDeployment extends SparkSessionWrapper {
       case exception: Exception =>
         val fullMsg = PipelineFunctions.appendStackStrace(exception, "Got Exception while Deploying,")
         logger.log(Level.ERROR, fullMsg)
-        MultiWSDeploymentReport(workspaceId, "Gold", Some(args.compactString),
+        MultiWSDeploymentReport(workspaceId, "Gold", Some(redactedArgs.compactString),
           fullMsg,
           Some(deploymentId)
         )
