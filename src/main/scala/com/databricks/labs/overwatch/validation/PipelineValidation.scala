@@ -15,27 +15,27 @@ import org.apache.spark.sql.DataFrame
  */
 object PipelineValidation extends SparkSessionWrapper {
 
-  def apply(etlDB : String , allRun: Boolean) :Unit = {
-    new PipelineValidation(etlDB,allRun)
+  def apply(etlDB : String , allRun: Boolean,_dateWindow: Array[String]) :Unit = {
+    new PipelineValidation(etlDB,allRun,_dateWindow)
       .setPipelineSnapTime()
       .process()
   }
 
-  def apply(etlDB : String, allRun: Boolean, table : Array[String]) :Unit = {
-    new PipelineValidation(etlDB,allRun)
+  def apply(etlDB : String, allRun: Boolean,_dateWindow: Array[String], table : Array[String]) :Unit = {
+    new PipelineValidation(etlDB,allRun,_dateWindow)
       .setPipelineSnapTime()
       .process(table)
   }
 
-  def apply(etlDB : String, allRun: Boolean, table : Array[String],crossTableValidation : Boolean) :Unit = {
-    new PipelineValidation(etlDB,allRun)
+  def apply(etlDB : String, allRun: Boolean,_dateWindow: Array[String], table : Array[String],crossTableValidation : Boolean) :Unit = {
+    new PipelineValidation(etlDB,allRun,_dateWindow)
       .setPipelineSnapTime()
       .process(table,crossTableValidation)
   }
 
 }
 
-class PipelineValidation (_etlDB: String, _allRun: Boolean) extends PipelineValidationHelper(_etlDB,_allRun) with SparkSessionWrapper {
+class PipelineValidation (_etlDB: String, _allRun: Boolean,_dateWindow: Array[String]) extends PipelineValidationHelper(_etlDB,_allRun,_dateWindow) with SparkSessionWrapper {
 
   import spark.implicits._
 
