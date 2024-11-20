@@ -16,7 +16,7 @@ import scala.collection.mutable.ArrayBuffer
  * This class contains the utility functions for PipelineValidation.scala.
  */
 
-class PipelineValidationHelper(_etlDB: String ,_allRun: Boolean = true)  extends SparkSessionWrapper {
+class PipelineValidationHelper(_etlDB: String ,_allRun: Boolean = true,_dateWindow: Array[String] = Array())  extends SparkSessionWrapper {
 
   import spark.implicits._
 
@@ -32,6 +32,7 @@ class PipelineValidationHelper(_etlDB: String ,_allRun: Boolean = true)  extends
   def quarantineID: String = _quarantine_id
 
   def etlDB: String = _etlDB
+  def dateWindow: Array[String] = _dateWindow
   val allRun: Boolean = _allRun
 
   private var _validations: ArrayBuffer[HealthCheckReport] = new ArrayBuffer[HealthCheckReport]()
@@ -76,9 +77,20 @@ class PipelineValidationHelper(_etlDB: String ,_allRun: Boolean = true)  extends
       All_Overwatch_RunID
   }else {
     if (Helpers.pathExists(healthCheckReportPath)) {
-      val healthCheckDF = spark.read.load(healthCheckReportPath)
-      val Validated_Overwatch_RunIDs = healthCheckDF.select("Overwatch_RunID").distinct().collect().map(_.getString(0))
-      All_Overwatch_RunID.diff(Validated_Overwatch_RunIDs)
+      if (dateWindow.isEmpty) {
+        val Msg = s"Date Window is not provided. Validation will run for all overwatch_runID which is yet to be validated"
+        logger.log(Level.INFO, Msg)
+        val healthCheckDF = spark.read.load(healthCheckReportPath)
+        val Validated_Overwatch_RunIDs = healthCheckDF.select("Overwatch_RunID").distinct().collect().map(_.getString(0))
+        All_Overwatch_RunID.diff(Validated_Overwatch_RunIDs)
+      }else{
+        val start_date = dateWindow(0)
+        val end_date = dateWindow(1)
+        val filtered_overwatch_RunID = spark.read.table(s"$etlDB.pipeline_report").filter(
+          col("Pipeline_SnapTS") > start_date && col("Pipeline_SnapTS") <= end_date)
+          .select("Overwatch_RunID").distinct().collect().map(_.getString(0))
+        filtered_overwatch_RunID
+      }
     } else {
       All_Overwatch_RunID
     }
