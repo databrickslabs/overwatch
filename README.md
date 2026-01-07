@@ -1,3 +1,5 @@
+## DEPRECATION NOTICE: This project is now deprecated and will no longer be maintained. The codebase will remain available in case you wish to fork/extend it.
+
 # Overwatch
 Calibrated Precision for your Databricks Unified Analytics Platform enabling governance and actionable intelligence.
 
