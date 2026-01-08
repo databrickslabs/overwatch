@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Hugo 0.125.5">
+    <meta name="generator" content="Hugo 0.147.6">
     <meta name="description" content="Overwatch Documentation">
 <meta name="author" content="Daniel Tomes -- DatabricksLabs">
 
@@ -12,21 +12,21 @@
     <title>Productionizing :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1767883980" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1767883980" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1767883980"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1767883980"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1767883980"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1767883980"></script>
 
     
   </div>
@@ -1126,7 +1126,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > Productionizing
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > Productionizing
           
         
           
@@ -1247,59 +1247,59 @@ Here we can do Deep Cloning of existing ETL database tables to target Snapshot R
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">Snapshot</span><span style="color:#f92672">.</span>process<span style="color:#f92672">(</span>sourceETLDB<span style="color:#f92672">,</span>targetPrefix<span style="color:#f92672">,</span>snapshotType<span style="color:#f92672">,</span>pipeline<span style="color:#f92672">,</span>tablesToExclude<span style="color:#f92672">)</span>
 </span></span></code></pre></div><p>We need below parameters to run the snapshot process through Databricks Notebook:</p>
 <table>
-<thead>
-<tr>
-<th>Param</th>
-<th>Type</th>
-<th>Optional</th>
-<th>Default Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sourceETLDB</td>
-<td>String</td>
-<td>No</td>
-<td>NA</td>
-<td>Source Database Name for which Snapshot need to be done(note you should only snapshot your Overwatch etl database).</td>
-</tr>
-<tr>
-<td>targetPrefix</td>
-<td>String</td>
-<td>No</td>
-<td>NA</td>
-<td>Target path where Snapshot data will be saved to.</td>
-</tr>
-<tr>
-<td>snapshotType</td>
-<td>String</td>
-<td>No</td>
-<td>NA</td>
-<td>Type of Snapshot to be performed. &ldquo;Full&rdquo; for Full Snapshot, &ldquo;Incremental&rdquo; for Incremental Snapshot</td>
-</tr>
-<tr>
-<td>pipeline</td>
-<td>String</td>
-<td>Yes</td>
-<td>&ldquo;Bronze,Silver,Gold&rdquo;</td>
-<td>Define the Medallion Layers. Argument should be in form of &ldquo;Bronze, Silver, Gold&rdquo;(All 3 or any combination of them)</td>
-</tr>
-<tr>
-<td>cloneLevel</td>
-<td>String</td>
-<td>Yes</td>
-<td>&ldquo;DEEP&rdquo;</td>
-<td>Clone Level for Snapshot. By Default it is &ldquo;DEEP&rdquo;. You can also specify &ldquo;SHALLOW&rdquo; Clone. You can get more details on cloning <a href="https://learn.microsoft.com/en-us/azure/databricks/delta/clone">here</a></td>
-</tr>
-<tr>
-<td>tablesToExclude</td>
-<td>String</td>
-<td>Yes</td>
-<td>&quot;&quot;</td>
-<td>Array of table names to exclude from the snapshot. Tables should be separated with &ldquo;,&rdquo;. This is the table name only - without the database prefix.</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Param</th>
+          <th>Type</th>
+          <th>Optional</th>
+          <th>Default Value</th>
+          <th>Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>sourceETLDB</td>
+          <td>String</td>
+          <td>No</td>
+          <td>NA</td>
+          <td>Source Database Name for which Snapshot need to be done(note you should only snapshot your Overwatch etl database).</td>
+      </tr>
+      <tr>
+          <td>targetPrefix</td>
+          <td>String</td>
+          <td>No</td>
+          <td>NA</td>
+          <td>Target path where Snapshot data will be saved to.</td>
+      </tr>
+      <tr>
+          <td>snapshotType</td>
+          <td>String</td>
+          <td>No</td>
+          <td>NA</td>
+          <td>Type of Snapshot to be performed. &ldquo;Full&rdquo; for Full Snapshot, &ldquo;Incremental&rdquo; for Incremental Snapshot</td>
+      </tr>
+      <tr>
+          <td>pipeline</td>
+          <td>String</td>
+          <td>Yes</td>
+          <td>&ldquo;Bronze,Silver,Gold&rdquo;</td>
+          <td>Define the Medallion Layers. Argument should be in form of &ldquo;Bronze, Silver, Gold&rdquo;(All 3 or any combination of them)</td>
+      </tr>
+      <tr>
+          <td>cloneLevel</td>
+          <td>String</td>
+          <td>Yes</td>
+          <td>&ldquo;DEEP&rdquo;</td>
+          <td>Clone Level for Snapshot. By Default it is &ldquo;DEEP&rdquo;. You can also specify &ldquo;SHALLOW&rdquo; Clone. You can get more details on cloning <a href="https://learn.microsoft.com/en-us/azure/databricks/delta/clone">here</a></td>
+      </tr>
+      <tr>
+          <td>tablesToExclude</td>
+          <td>String</td>
+          <td>Yes</td>
+          <td>&quot;&quot;</td>
+          <td>Array of table names to exclude from the snapshot. Tables should be separated with &ldquo;,&rdquo;. This is the table name only - without the database prefix.</td>
+      </tr>
+  </tbody>
 </table>
 <p>The snapshot data will be in the &ldquo;targetPrefix/data&rdquo; path as shown below:</p>
 <p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/snapshotTarget_Data.png" alt="Snapshot_Target_Data"></p>
@@ -1340,28 +1340,28 @@ Similar to Snapshot, Restore can be run by both Databricks Job and Databricks No
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">Restore</span><span style="color:#f92672">.</span>process<span style="color:#f92672">(</span>sourcePrefix<span style="color:#f92672">,</span>targetPrefix<span style="color:#f92672">)</span>
 </span></span></code></pre></div><p>We need below parameters to run the Restore process through Databricks Notebook:</p>
 <table>
-<thead>
-<tr>
-<th>Param</th>
-<th>Type</th>
-<th>Optional</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sourcePrefix</td>
-<td>String</td>
-<td>No</td>
-<td>Source ETL Path Prefix from where restore need to be performed.</td>
-</tr>
-<tr>
-<td>targetPrefix</td>
-<td>String</td>
-<td>No</td>
-<td>Target ETL Path Prefix where restore data will be loaded to.</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Param</th>
+          <th>Type</th>
+          <th>Optional</th>
+          <th>Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>sourcePrefix</td>
+          <td>String</td>
+          <td>No</td>
+          <td>Source ETL Path Prefix from where restore need to be performed.</td>
+      </tr>
+      <tr>
+          <td>targetPrefix</td>
+          <td>String</td>
+          <td>No</td>
+          <td>Target ETL Path Prefix where restore data will be loaded to.</td>
+      </tr>
+  </tbody>
 </table>
 <p>After Restore process is done the tables from sourcePrefix will be restored in the <code>targetPrefix/globalshare</code> location
 <img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/restore_path.png" alt="Restore"></p>
@@ -1405,40 +1405,40 @@ These the steps required to Migrate your Overwatch data:</p>
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">Migration</span><span style="color:#f92672">.</span>process<span style="color:#f92672">(</span>sourceETLDB<span style="color:#f92672">,</span>migrateRootPath<span style="color:#f92672">,</span>configPath<span style="color:#f92672">,</span>tablesToExclude<span style="color:#f92672">)</span>
 </span></span></code></pre></div><p>We need below parameters to run the Migration process through Databricks Notebook:</p>
 <table>
-<thead>
-<tr>
-<th>Param</th>
-<th>Type</th>
-<th>Optional</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sourceETLDB</td>
-<td>String</td>
-<td>No</td>
-<td>Source Database Name to migrate. Note that you can only use the Overwatch ETL database.</td>
-</tr>
-<tr>
-<td>migrateRootPath</td>
-<td>String</td>
-<td>No</td>
-<td>Target path to where migration need to be performed.</td>
-</tr>
-<tr>
-<td>configPath</td>
-<td>String</td>
-<td>No</td>
-<td>Configuration Path where the config file for the source is present. <!-- raw HTML omitted -->Path can be to a CSV file or path to a delta table, or simple a delta table name that contains your configuration.</td>
-</tr>
-<tr>
-<td>tablesToExclude</td>
-<td>String</td>
-<td>Yes</td>
-<td>Array of table names to exclude from the migration. This is the table name only - <!-- raw HTML omitted -->without the database prefix. By Default it is empty.</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Param</th>
+          <th>Type</th>
+          <th>Optional</th>
+          <th>Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>sourceETLDB</td>
+          <td>String</td>
+          <td>No</td>
+          <td>Source Database Name to migrate. Note that you can only use the Overwatch ETL database.</td>
+      </tr>
+      <tr>
+          <td>migrateRootPath</td>
+          <td>String</td>
+          <td>No</td>
+          <td>Target path to where migration need to be performed.</td>
+      </tr>
+      <tr>
+          <td>configPath</td>
+          <td>String</td>
+          <td>No</td>
+          <td>Configuration Path where the config file for the source is present. <!-- raw HTML omitted -->Path can be to a CSV file or path to a delta table, or simple a delta table name that contains your configuration.</td>
+      </tr>
+      <tr>
+          <td>tablesToExclude</td>
+          <td>String</td>
+          <td>Yes</td>
+          <td>Array of table names to exclude from the migration. This is the table name only - <!-- raw HTML omitted -->without the database prefix. By Default it is empty.</td>
+      </tr>
+  </tbody>
 </table>
 <p>After Migration process is done the tables from sourcePrefix will be restored in the <code>migrateRootPath/globalshare</code> location
 <img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Migration_path.png" alt="Migration"></p>
@@ -2185,19 +2185,19 @@ To do this, follow the instructions for
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1767883980"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1767883980"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1767883980" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1767883980"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

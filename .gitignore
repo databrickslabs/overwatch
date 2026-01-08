@@ -1,4 +1,5 @@
 /.idea/
+/.bsp/
 *.iml
 #local spark context data from unit tests
 spark-warehouse/

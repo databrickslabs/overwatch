@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Hugo 0.125.5">
+    <meta name="generator" content="Hugo 0.147.6">
     <meta name="description" content="Overwatch Documentation">
 <meta name="author" content="Daniel Tomes -- DatabricksLabs">
 
@@ -12,21 +12,21 @@
     <title>Configuration Validation :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1767883980" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1767883980" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1767883980"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1767883980"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1767883980"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1767883980"></script>
 
     
   </div>
@@ -1130,7 +1130,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/'>Configure Overwatch</a> > Configuration Validation
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/'>Configure Overwatch</a> > Configuration Validation
           
         
           
@@ -1183,90 +1183,90 @@ done. Not all validation steps are done on all runs. All validations should be p
 given workspace. For more information on executing a full validation, see <a href="">below</a></p>
 <h3 id="validation-rules">Validation rules</h3>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Name</th>
-<th style="text-align:left">Validation Rule</th>
-<th style="text-align:left">Impacted columns</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">Api Url Validation</td>
-<td style="text-align:left">API URL should give some response with provided scope and key.</td>
-<td style="text-align:left">api_url</td>
-</tr>
-<tr>
-<td style="text-align:left">Primordial data validation</td>
-<td style="text-align:left">Primordial Date must be in <strong>yyyy-MM-dd format</strong> (i.e. 2022-01-30 == Jan 30, 2022) and must be less than current date.</td>
-<td style="text-align:left">primordial_date</td>
-</tr>
-<tr>
-<td style="text-align:left">Excluded scope validation</td>
-<td style="text-align:left">Excluded scope must be null or in colon-delimited format and include only the following audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts:dbsql</td>
-<td style="text-align:left">excluded_scopes</td>
-</tr>
-<tr>
-<td style="text-align:left">Event Hub <strong>Shared Access Key</strong> (Azure Only)</td>
-<td style="text-align:left">Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.</td>
-<td style="text-align:left">eh_name, eh_scope_key, secret_scope</td>
-</tr>
-<tr>
-<td style="text-align:left">Event Hub <strong>AAD Auth</strong> (Azure Only)</td>
-<td style="text-align:left">Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.</td>
-<td style="text-align:left">eh_name, eh_conn_string, aad_tenant_id, aad_client_id, aad_client_secret_key, aad_authority_endpoint</td>
-</tr>
-<tr>
-<td style="text-align:left">Common consumer database name</td>
-<td style="text-align:left">All workspaces must have a common consumer database name.</td>
-<td style="text-align:left">consumer_database_name</td>
-</tr>
-<tr>
-<td style="text-align:left">Common ETL database name</td>
-<td style="text-align:left">All workspaces must have a common ETL database name.</td>
-<td style="text-align:left">etl_database_name</td>
-</tr>
-<tr>
-<td style="text-align:left">Storage prefix validation</td>
-<td style="text-align:left">All workspaces must share a single storage prefix and the Overwatch cluster must have appropriate access to read/write.</td>
-<td style="text-align:left">storage_prefix</td>
-</tr>
-<tr>
-<td style="text-align:left">Cloud provider validation</td>
-<td style="text-align:left">Either Azure or AWS.</td>
-<td style="text-align:left">cloud</td>
-</tr>
-<tr>
-<td style="text-align:left">Max days validation</td>
-<td style="text-align:left">Must Be a Number</td>
-<td style="text-align:left">max_days</td>
-</tr>
-<tr>
-<td style="text-align:left">Secrete scope validation</td>
-<td style="text-align:left">Secret scope must not be empty.</td>
-<td style="text-align:left">secret_scope</td>
-</tr>
-<tr>
-<td style="text-align:left">PAT key validation</td>
-<td style="text-align:left">DBPAT must not be empty and must be able to authenticate to the workspace.</td>
-<td style="text-align:left">secret_key_dbpat</td>
-</tr>
-<tr>
-<td style="text-align:left">Audit log location validation <strong>(AWS/GCP ONLY)</strong></td>
-<td style="text-align:left">Audit logs must present immediately within the provided path and must be read accessible</td>
-<td style="text-align:left">auditlogprefix_source_path</td>
-</tr>
-<tr>
-<td style="text-align:left">Mount point validation</td>
-<td style="text-align:left">Workspaces with more than 50 mount points need to provide a csv file which will contain the mount point to source mapping. <strong><a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics//#exception---remote-workspaces-with-50-mounts">click here for more details</a></strong></td>
-<td style="text-align:left">mount_mapping_path</td>
-</tr>
-<tr>
-<td style="text-align:left">System Table Validation</td>
-<td style="text-align:left">System table should enabled and must have data for the workspace.</td>
-<td style="text-align:left">auditlogprefix_source_path</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Name</th>
+          <th style="text-align: left">Validation Rule</th>
+          <th style="text-align: left">Impacted columns</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">Api Url Validation</td>
+          <td style="text-align: left">API URL should give some response with provided scope and key.</td>
+          <td style="text-align: left">api_url</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Primordial data validation</td>
+          <td style="text-align: left">Primordial Date must be in <strong>yyyy-MM-dd format</strong> (i.e. 2022-01-30 == Jan 30, 2022) and must be less than current date.</td>
+          <td style="text-align: left">primordial_date</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Excluded scope validation</td>
+          <td style="text-align: left">Excluded scope must be null or in colon-delimited format and include only the following audit:sparkEvents:jobs:clusters:clusterEvents:notebooks:pools:accounts:dbsql</td>
+          <td style="text-align: left">excluded_scopes</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Event Hub <strong>Shared Access Key</strong> (Azure Only)</td>
+          <td style="text-align: left">Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.</td>
+          <td style="text-align: left">eh_name, eh_scope_key, secret_scope</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Event Hub <strong>AAD Auth</strong> (Azure Only)</td>
+          <td style="text-align: left">Audit Log data must be recognized as present and readable from the provided Event Hub Configuration fields.</td>
+          <td style="text-align: left">eh_name, eh_conn_string, aad_tenant_id, aad_client_id, aad_client_secret_key, aad_authority_endpoint</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Common consumer database name</td>
+          <td style="text-align: left">All workspaces must have a common consumer database name.</td>
+          <td style="text-align: left">consumer_database_name</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Common ETL database name</td>
+          <td style="text-align: left">All workspaces must have a common ETL database name.</td>
+          <td style="text-align: left">etl_database_name</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Storage prefix validation</td>
+          <td style="text-align: left">All workspaces must share a single storage prefix and the Overwatch cluster must have appropriate access to read/write.</td>
+          <td style="text-align: left">storage_prefix</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Cloud provider validation</td>
+          <td style="text-align: left">Either Azure or AWS.</td>
+          <td style="text-align: left">cloud</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Max days validation</td>
+          <td style="text-align: left">Must Be a Number</td>
+          <td style="text-align: left">max_days</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Secrete scope validation</td>
+          <td style="text-align: left">Secret scope must not be empty.</td>
+          <td style="text-align: left">secret_scope</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">PAT key validation</td>
+          <td style="text-align: left">DBPAT must not be empty and must be able to authenticate to the workspace.</td>
+          <td style="text-align: left">secret_key_dbpat</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Audit log location validation <strong>(AWS/GCP ONLY)</strong></td>
+          <td style="text-align: left">Audit logs must present immediately within the provided path and must be read accessible</td>
+          <td style="text-align: left">auditlogprefix_source_path</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Mount point validation</td>
+          <td style="text-align: left">Workspaces with more than 50 mount points need to provide a csv file which will contain the mount point to source mapping. <strong><a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics//#exception---remote-workspaces-with-50-mounts">click here for more details</a></strong></td>
+          <td style="text-align: left">mount_mapping_path</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">System Table Validation</td>
+          <td style="text-align: left">System table should enabled and must have data for the workspace.</td>
+          <td style="text-align: left">auditlogprefix_source_path</td>
+      </tr>
+  </tbody>
 </table>
 <h3 id="run-the-validation">Run the validation</h3>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span><span style="color:#66d9ef">import</span> com.databricks.labs.overwatch.MultiWorkspaceDeployment
@@ -2009,19 +2009,19 @@ to look at the snapTS and only review the validations relevant for the latest va
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1767883980"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1767883980"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1767883980" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1767883980"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

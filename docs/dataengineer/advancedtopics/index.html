@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Hugo 0.125.5">
+    <meta name="generator" content="Hugo 0.147.6">
     <meta name="description" content="Overwatch Documentation">
 <meta name="author" content="Daniel Tomes -- DatabricksLabs">
 
@@ -12,21 +12,21 @@
     <title>AdvancedTopics :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1767883980" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1767883980" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1767883980"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1767883980"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1767883980"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1767883980"></script>
 
     
   </div>
@@ -1126,7 +1126,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > AdvancedTopics
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > AdvancedTopics
           
         
           
@@ -1145,7 +1145,7 @@
     <li><a href="#optimizing-overwatch">Optimizing Overwatch</a>
       <ul>
         <li><a href="#optimization-limitations-bronze">Optimization Limitations (Bronze)</a></li>
-        <li><a href="#utilize-external-optimizeexternalize-optimize--z-order-as-of-060">Utilize <a href="#externalize-optimize--z-order-as-of-060">External Optimize</a></a></li>
+        <li><a href="#utilize-external-optimize">Utilize <a href="#externalize-optimize--z-order-as-of-060">External Optimize</a></a></li>
         <li><a href="#additional-optimization-considerations">Additional Optimization Considerations</a></li>
       </ul>
     </li>
@@ -1249,7 +1249,7 @@ scalability in silver/gold.</li>
 </ul>
 <p>Below is a screenshot illustrating the job definition when broken apart into a multi-task job.
 <img src="https://databrickslabs.github.io/overwatch/images/GettingStarted/AdvancedTopics/Overwatch_multitaskJob.png" alt="Multi-TaskJob"></p>
-<h3 id="utilize-external-optimizeexternalize-optimize--z-order-as-of-060">Utilize <a href="#externalize-optimize--z-order-as-of-060">External Optimize</a></h3>
+<h3 id="utilize-external-optimize">Utilize <a href="#externalize-optimize--z-order-as-of-060">External Optimize</a></h3>
 <p>Externalizing the optimize and z-order functions is critical for reducing daily Overwatch runtimes and increasing
 efficiency of the optimize and z-order functions. Optimize &amp; z-order are more efficient the larger the dataset and
 the larger the number of partitions to be optimized. Furthermore, optimize functions are very parallelizable and
@@ -1481,91 +1481,91 @@ for local and remote workspaces.
 &ldquo;Overwatch Reads Logs From&rdquo; field which demonstrates from which path Overwatch will load the logs in the given
 scenario; the Overwatch cluster must have access to read from that location.</p>
 <table>
-<thead>
-<tr>
-<th>Workspace</th>
-<th>Cluster Logging Path</th>
-<th>Is Mounted</th>
-<th>Fully Qualified Storage Location</th>
-<th>Accessible From Deployment Workspace</th>
-<th>Overwatch Reads Logs From</th>
-<th>Comments</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>123</td>
-<td>dbfs:/mnt/cluster_logs (AWS)</td>
-<td>True</td>
-<td>s3://myCompany/logsBucket/123</td>
-<td>True</td>
-<td>dbfs:/mnt/cluster_logs</td>
-<td>Locally mounted locations are directly accessed on deployment workspace</td>
-</tr>
-<tr>
-<td>123</td>
-<td>dbfs:/mnt/cluster_logs (Azure)</td>
-<td>True</td>
-<td>abfss://mylogsContainer123@myComany&hellip;</td>
-<td>True</td>
-<td>dbfs:/mnt/cluster_logs</td>
-<td>Locally mounted locations are directly accessed on deployment workspace</td>
-</tr>
-<tr>
-<td>123</td>
-<td>dbfs:/unmounted_local_path</td>
-<td>False</td>
-<td>dbfs:/unmounted_local_path</td>
-<td>True</td>
-<td>dbfs:/unmounted_local_path</td>
-<td>Locally mounted locations are directly accessed on deployment workspace</td>
-</tr>
-<tr>
-<td>123</td>
-<td>s3://myCompany/logsBucket/123 (AWS)</td>
-<td>False</td>
-<td>s3://myCompany/logsBucket/123</td>
-<td>True*</td>
-<td>s3://myCompany/logsBucket/123</td>
-<td>AWS - Direct s3 path access as configured in cluster logs</td>
-</tr>
-<tr>
-<td>456</td>
-<td>dbfs:/mnt/cluster_logs (AWS)</td>
-<td>True</td>
-<td>s3://myCompany/logsBucket/456</td>
-<td>True*</td>
-<td>s3://myCompany/logsBucket/456</td>
-<td>Remote mount point is translated to fully-qualified path and remote storage is access directly</td>
-</tr>
-<tr>
-<td>456</td>
-<td>dbfs:/mnt/cluster_logs (Azure)</td>
-<td>True</td>
-<td>abfss://mylogsContainer456@myComany&hellip;</td>
-<td>True*</td>
-<td>abfss://mylogsContainer456@myComany&hellip;</td>
-<td>Remote mount point is translated to fully-qualified path and remote storage is access directly</td>
-</tr>
-<tr>
-<td>456</td>
-<td>dbfs:/unmounted_local_path</td>
-<td>False</td>
-<td>dbfs:/unmounted_local_path</td>
-<td>False</td>
-<td>Inaccessible</td>
-<td>Root dbfs storage locations are never accessible from outside the workspace</td>
-</tr>
-<tr>
-<td>456</td>
-<td>s3://myCompany/logsBucket/456 (AWS)</td>
-<td>False</td>
-<td>s3://myCompany/logsBucket/456</td>
-<td>True*</td>
-<td>s3://myCompany/logsBucket/456</td>
-<td>AWS - Direct s3 path access as configured in cluster logs</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Workspace</th>
+          <th>Cluster Logging Path</th>
+          <th>Is Mounted</th>
+          <th>Fully Qualified Storage Location</th>
+          <th>Accessible From Deployment Workspace</th>
+          <th>Overwatch Reads Logs From</th>
+          <th>Comments</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>123</td>
+          <td>dbfs:/mnt/cluster_logs (AWS)</td>
+          <td>True</td>
+          <td>s3://myCompany/logsBucket/123</td>
+          <td>True</td>
+          <td>dbfs:/mnt/cluster_logs</td>
+          <td>Locally mounted locations are directly accessed on deployment workspace</td>
+      </tr>
+      <tr>
+          <td>123</td>
+          <td>dbfs:/mnt/cluster_logs (Azure)</td>
+          <td>True</td>
+          <td>abfss://mylogsContainer123@myComany&hellip;</td>
+          <td>True</td>
+          <td>dbfs:/mnt/cluster_logs</td>
+          <td>Locally mounted locations are directly accessed on deployment workspace</td>
+      </tr>
+      <tr>
+          <td>123</td>
+          <td>dbfs:/unmounted_local_path</td>
+          <td>False</td>
+          <td>dbfs:/unmounted_local_path</td>
+          <td>True</td>
+          <td>dbfs:/unmounted_local_path</td>
+          <td>Locally mounted locations are directly accessed on deployment workspace</td>
+      </tr>
+      <tr>
+          <td>123</td>
+          <td>s3://myCompany/logsBucket/123 (AWS)</td>
+          <td>False</td>
+          <td>s3://myCompany/logsBucket/123</td>
+          <td>True*</td>
+          <td>s3://myCompany/logsBucket/123</td>
+          <td>AWS - Direct s3 path access as configured in cluster logs</td>
+      </tr>
+      <tr>
+          <td>456</td>
+          <td>dbfs:/mnt/cluster_logs (AWS)</td>
+          <td>True</td>
+          <td>s3://myCompany/logsBucket/456</td>
+          <td>True*</td>
+          <td>s3://myCompany/logsBucket/456</td>
+          <td>Remote mount point is translated to fully-qualified path and remote storage is access directly</td>
+      </tr>
+      <tr>
+          <td>456</td>
+          <td>dbfs:/mnt/cluster_logs (Azure)</td>
+          <td>True</td>
+          <td>abfss://mylogsContainer456@myComany&hellip;</td>
+          <td>True*</td>
+          <td>abfss://mylogsContainer456@myComany&hellip;</td>
+          <td>Remote mount point is translated to fully-qualified path and remote storage is access directly</td>
+      </tr>
+      <tr>
+          <td>456</td>
+          <td>dbfs:/unmounted_local_path</td>
+          <td>False</td>
+          <td>dbfs:/unmounted_local_path</td>
+          <td>False</td>
+          <td>Inaccessible</td>
+          <td>Root dbfs storage locations are never accessible from outside the workspace</td>
+      </tr>
+      <tr>
+          <td>456</td>
+          <td>s3://myCompany/logsBucket/456 (AWS)</td>
+          <td>False</td>
+          <td>s3://myCompany/logsBucket/456</td>
+          <td>True*</td>
+          <td>s3://myCompany/logsBucket/456</td>
+          <td>AWS - Direct s3 path access as configured in cluster logs</td>
+      </tr>
+  </tbody>
 </table>
 <p>* (AWS) Assuming Instance Profile authroized to the fully qualified path location and configured</p>
 <p>* (AZURE) Assuming SPN authroized to the fully qualified path location and configured on the Overwatch cluster</p>
@@ -1652,75 +1652,75 @@ All data captured as part of traceability will be stored in the apiEventDetails 
 advanced Spark settings: <code>overwatch.traceapi true</code>.</p>
 <h3 id="column-descriptions-of-apieventdetails">Column Descriptions of ApiEventDetails</h3>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Column</th>
-<th style="text-align:left">Type</th>
-<th style="text-align:left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">end_point</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">Api call end point.</td>
-</tr>
-<tr>
-<td style="text-align:left">type</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">Type of api call.</td>
-</tr>
-<tr>
-<td style="text-align:left">apiVersion</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">Api call version.</td>
-</tr>
-<tr>
-<td style="text-align:left">batch_key_filter</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">Parameters that has been specified in the api call.It will be String of Json.</td>
-</tr>
-<tr>
-<td style="text-align:left">response_code</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Response code for the api call.</td>
-</tr>
-<tr>
-<td style="text-align:left">data</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">Response which is stored in binary format.</td>
-</tr>
-<tr>
-<td style="text-align:left">moduleID</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Id of the module from which Api call was initiated.</td>
-</tr>
-<tr>
-<td style="text-align:left">moduleName</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">Name of the module from which api call was initiated.</td>
-</tr>
-<tr>
-<td style="text-align:left">organization_id</td>
-<td style="text-align:left">Long</td>
-<td style="text-align:left">Id of the workspace.</td>
-</tr>
-<tr>
-<td style="text-align:left">snap_ts</td>
-<td style="text-align:left">timestamp</td>
-<td style="text-align:left">Time in which this row was inserted into the table.</td>
-</tr>
-<tr>
-<td style="text-align:left">timestamp</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Timestamp in which this row was inserted into the table.</td>
-</tr>
-<tr>
-<td style="text-align:left">Overwatch_RunID</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">GUID for the overwatch run.</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Column</th>
+          <th style="text-align: left">Type</th>
+          <th style="text-align: left">Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">end_point</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">Api call end point.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">type</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">Type of api call.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">apiVersion</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">Api call version.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">batch_key_filter</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">Parameters that has been specified in the api call.It will be String of Json.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">response_code</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">Response code for the api call.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">data</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">Response which is stored in binary format.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">moduleID</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">Id of the module from which Api call was initiated.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">moduleName</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">Name of the module from which api call was initiated.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">organization_id</td>
+          <td style="text-align: left">Long</td>
+          <td style="text-align: left">Id of the workspace.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">snap_ts</td>
+          <td style="text-align: left">timestamp</td>
+          <td style="text-align: left">Time in which this row was inserted into the table.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">timestamp</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">Timestamp in which this row was inserted into the table.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Overwatch_RunID</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">GUID for the overwatch run.</td>
+      </tr>
+  </tbody>
 </table>
 <h3 id="how-to-read-the-binary-data-which-has-been-stored-in-apieventdetails">How to read the binary data which has been stored in ApiEventDetails</h3>
 <p>The following function was introduced in version 0.8.1.0 to decode the binary data received into a readable format, which
@@ -1773,20 +1773,20 @@ standing up / configuring the real-time infrastructure itself.</p>
 <p><img src="https://databrickslabs.github.io/overwatch/images/_index/Realtime_example_architecture.png" alt="RealTime Diagram"></p>
 <h4 id="example-realtime-dashboards">Example Realtime Dashboards</h4>
 <table>
-<thead>
-<tr>
-<th style="text-align:center">Simple Spark Dashboard</th>
-<th style="text-align:center">IO Dashboard</th>
-<th style="text-align:center">Advanced Dashboard</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center"><img src="https://databrickslabs.github.io/overwatch/images/_index/spark_dashboard1.png" alt="RealTime Dasboard1"></td>
-<td style="text-align:center"><img src="https://databrickslabs.github.io/overwatch/images/_index/spark_dashboard2.png" alt="RealTime Dasboard2"></td>
-<td style="text-align:center"><img src="https://databrickslabs.github.io/overwatch/images/_index/spark_dashboard3.png" alt="RealTime Dasboard3"></td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: center">Simple Spark Dashboard</th>
+          <th style="text-align: center">IO Dashboard</th>
+          <th style="text-align: center">Advanced Dashboard</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: center"><img src="https://databrickslabs.github.io/overwatch/images/_index/spark_dashboard1.png" alt="RealTime Dasboard1"></td>
+          <td style="text-align: center"><img src="https://databrickslabs.github.io/overwatch/images/_index/spark_dashboard2.png" alt="RealTime Dasboard2"></td>
+          <td style="text-align: center"><img src="https://databrickslabs.github.io/overwatch/images/_index/spark_dashboard3.png" alt="RealTime Dasboard3"></td>
+      </tr>
+  </tbody>
 </table>
 
 
@@ -2498,19 +2498,19 @@ standing up / configuring the real-time infrastructure itself.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1767883980"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1767883980"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1767883980" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1767883980"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
