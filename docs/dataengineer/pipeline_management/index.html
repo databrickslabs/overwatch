@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Hugo 0.125.5">
+    <meta name="generator" content="Hugo 0.147.6">
     <meta name="description" content="Overwatch Documentation">
 <meta name="author" content="Daniel Tomes -- DatabricksLabs">
 
@@ -12,21 +12,21 @@
     <title>Pipeline_Management :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1767883980" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1767883980" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1767883980"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1767883980"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1767883980"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1767883980"></script>
 
     
   </div>
@@ -1126,7 +1126,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > Pipeline_Management
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/dataengineer/'>Data Engineering</a> > Pipeline_Management
           
         
           
@@ -1146,7 +1146,7 @@
       <ul>
         <li><a href="#snapshot">Snapshot</a></li>
         <li><a href="#job">Job</a></li>
-        <li><a href="#spark-context-composition--hierarchydataengineermodules"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">Spark Context Composition &amp; Hierarchy</a></a></li>
+        <li><a href="#spark-context-composition--hierarchy"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">Spark Context Composition &amp; Hierarchy</a></a></li>
       </ul>
     </li>
     <li><a href="#data-ingestion-and-resume-process">Data Ingestion and Resume Process</a>
@@ -1234,7 +1234,7 @@ a very different entity than a Spark Job. The documentation attempts to be very 
 find a section in which the difference is not made clear.</p>
 </div>
 
-<h3 id="spark-context-composition--hierarchydataengineermodules"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">Spark Context Composition &amp; Hierarchy</a></h3>
+<h3 id="spark-context-composition--hierarchy"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules/">Spark Context Composition &amp; Hierarchy</a></h3>
 <h2 id="data-ingestion-and-resume-process">Data Ingestion and Resume Process</h2>
 <p>The specificities can vary slightly between cloud provider but the general methodology is the exact same.</p>
 <p>Each module is responsible for building certain entities at each layer, bronze, silver, gold, and presentation.
@@ -1267,100 +1267,100 @@ The structure of the table is outlined <a href="#pipeline_report-structure">belo
 <p>For the developers &ndash; This output is created as a DataSet via the Case Class
 <em>com.databricks.labs.overwatch.utils.ModuleStatusReport</em></p>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Column</th>
-<th style="text-align:left">Type</th>
-<th style="text-align:left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">organization_id</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Canonical workspace id</td>
-</tr>
-<tr>
-<td style="text-align:left">workspace_name</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
-</tr>
-<tr>
-<td style="text-align:left">moduleId</td>
-<td style="text-align:left">int</td>
-<td style="text-align:left">Module ID &ndash; Unique identifier for the module</td>
-</tr>
-<tr>
-<td style="text-align:left">moduleName</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Name of the module</td>
-</tr>
-<tr>
-<td style="text-align:left">primordialDateString</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022</td>
-</tr>
-<tr>
-<td style="text-align:left">runStartTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Snapshot time of when the Overwatch run begins</td>
-</tr>
-<tr>
-<td style="text-align:left">runEndTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Snapshot time of when the Overwatch run ends</td>
-</tr>
-<tr>
-<td style="text-align:left">fromTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">The snapshot start time from which data will be loaded for the module</td>
-</tr>
-<tr>
-<td style="text-align:left">untilTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS</td>
-</tr>
-<tr>
-<td style="text-align:left">status</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues</td>
-</tr>
-<tr>
-<td style="text-align:left">writeOpsMetrics</td>
-<td style="text-align:left">map</td>
-<td style="text-align:left">Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written</td>
-</tr>
-<tr>
-<td style="text-align:left">lastOptimizedTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">Epoch millis of the last delta optimize run. Used by Overwatch internals to maintain healthy and optimized tables.</td>
-</tr>
-<tr>
-<td style="text-align:left">vacuumRetentionHours</td>
-<td style="text-align:left">int</td>
-<td style="text-align:left">Retention hours for delta &ndash; How long to retain deleted data</td>
-</tr>
-<tr>
-<td style="text-align:left">inputConfig</td>
-<td style="text-align:left">struct</td>
-<td style="text-align:left">Captured input of OverwatchParams config at time of module run</td>
-</tr>
-<tr>
-<td style="text-align:left">parsedConfig</td>
-<td style="text-align:left">struct</td>
-<td style="text-align:left">The config that was parsed into OverwatchParams through the json deserializer</td>
-</tr>
-<tr>
-<td style="text-align:left">Pipeline_SnapTS</td>
-<td style="text-align:left">timestamp</td>
-<td style="text-align:left">Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.</td>
-</tr>
-<tr>
-<td style="text-align:left">Overwatch_RunID</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">GUID for the overwatch run</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Column</th>
+          <th style="text-align: left">Type</th>
+          <th style="text-align: left">Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">organization_id</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Canonical workspace id</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">workspace_name</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">moduleId</td>
+          <td style="text-align: left">int</td>
+          <td style="text-align: left">Module ID &ndash; Unique identifier for the module</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">moduleName</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Name of the module</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">primordialDateString</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">runStartTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">Snapshot time of when the Overwatch run begins</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">runEndTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">Snapshot time of when the Overwatch run ends</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">fromTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">The snapshot start time from which data will be loaded for the module</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">untilTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">status</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">writeOpsMetrics</td>
+          <td style="text-align: left">map</td>
+          <td style="text-align: left">Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">lastOptimizedTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">Epoch millis of the last delta optimize run. Used by Overwatch internals to maintain healthy and optimized tables.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">vacuumRetentionHours</td>
+          <td style="text-align: left">int</td>
+          <td style="text-align: left">Retention hours for delta &ndash; How long to retain deleted data</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">inputConfig</td>
+          <td style="text-align: left">struct</td>
+          <td style="text-align: left">Captured input of OverwatchParams config at time of module run</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">parsedConfig</td>
+          <td style="text-align: left">struct</td>
+          <td style="text-align: left">The config that was parsed into OverwatchParams through the json deserializer</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Pipeline_SnapTS</td>
+          <td style="text-align: left">timestamp</td>
+          <td style="text-align: left">Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Overwatch_RunID</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">GUID for the overwatch run</td>
+      </tr>
+  </tbody>
 </table>
 <h2 id="the-pipreport-view">The PipReport View</h2>
 <p>A <em>pipReport</em> view has been created atop the pipeline_report table to simplify reviewing the historical runs. The
@@ -1379,70 +1379,70 @@ query most commonly used is below. If you are asked for the pipReport, please pr
 <p><strong>KEY</strong> &ndash; organization_id + moduleID + Overwatch_RunID</p>
 <p><strong>Write Mode</strong> &ndash; Append</p>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Column</th>
-<th style="text-align:left">Type</th>
-<th style="text-align:left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">organization_id</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Canonical workspace id</td>
-</tr>
-<tr>
-<td style="text-align:left">workspace_name</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
-</tr>
-<tr>
-<td style="text-align:left">module_id</td>
-<td style="text-align:left">int</td>
-<td style="text-align:left">Module ID &ndash; Unique identifier for the module</td>
-</tr>
-<tr>
-<td style="text-align:left">module_name</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Name of the module</td>
-</tr>
-<tr>
-<td style="text-align:left">primodialDate</td>
-<td style="text-align:left">date</td>
-<td style="text-align:left">The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022</td>
-</tr>
-<tr>
-<td style="text-align:left">fromTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">The snapshot start time from which data will be loaded for the module</td>
-</tr>
-<tr>
-<td style="text-align:left">untilTS</td>
-<td style="text-align:left">long</td>
-<td style="text-align:left">The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS</td>
-</tr>
-<tr>
-<td style="text-align:left">status</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues</td>
-</tr>
-<tr>
-<td style="text-align:left">write_metrics</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written.</td>
-</tr>
-<tr>
-<td style="text-align:left">Pipeline_SnapTS</td>
-<td style="text-align:left">timestamp</td>
-<td style="text-align:left">Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.</td>
-</tr>
-<tr>
-<td style="text-align:left">Overwatch_RunID</td>
-<td style="text-align:left">string</td>
-<td style="text-align:left">GUID for the overwatch run</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Column</th>
+          <th style="text-align: left">Type</th>
+          <th style="text-align: left">Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">organization_id</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Canonical workspace id</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">workspace_name</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Customizable human-legible name of the workspace, should be globally unique within the organization</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">module_id</td>
+          <td style="text-align: left">int</td>
+          <td style="text-align: left">Module ID &ndash; Unique identifier for the module</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">module_name</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Name of the module</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">primodialDate</td>
+          <td style="text-align: left">date</td>
+          <td style="text-align: left">The date from which Overwatch will capture the details. The format should be yyyy-MM-dd ex: 2022-05-20 == May 20 2022</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">fromTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">The snapshot start time from which data will be loaded for the module</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">untilTS</td>
+          <td style="text-align: left">long</td>
+          <td style="text-align: left">The snapshot final time from which data will be loaded for the module. This is also the epoch millis of Pipeline_SnapTS</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">status</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Terminal Status for the module run (SUCCEEDED, FAILED, ROLLED_BACK, EMPTY, etc). When status is failed, the error message and stack trace that can be obtained is also placed in this field to assist in finding issues</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">write_metrics</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">Contains write metric for a particular chunk of data written to a table. It has information like number of files, Output Rows and Output bytes being written.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Pipeline_SnapTS</td>
+          <td style="text-align: left">timestamp</td>
+          <td style="text-align: left">Timestamp when the module was completed as part of the pipeline. This timestamp is reported in server time.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">Overwatch_RunID</td>
+          <td style="text-align: left">string</td>
+          <td style="text-align: left">GUID for the overwatch run</td>
+      </tr>
+  </tbody>
 </table>
 <h2 id="overwatch-time">Overwatch Time</h2>
 <p>Overwatch will default timezone to that of the server / cluster on which it runs. This is a critical point to
@@ -1457,353 +1457,353 @@ progression of the &ldquo;until&rdquo; time as no data is not considered an erro
 <h3 id="module-dependencies-diagram">Module Dependencies Diagram</h3>
 <p><img src="https://databrickslabs.github.io/overwatch/images/DataEngineer/Overwatch_Entity_Dependencies_0820.png" alt="ModuleDepDiagram"></p>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Module ID</th>
-<th style="text-align:left">Module Name</th>
-<th style="text-align:left">Target Table Name</th>
-<th style="text-align:left">Module ID Dependencies</th>
-<th>As Of</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">1001</td>
-<td style="text-align:left">Bronze_Jobs_Snapshot</td>
-<td style="text-align:left">jobs_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">1002</td>
-<td style="text-align:left">Bronze_Clusters_Snapshot</td>
-<td style="text-align:left">clusters_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">1003</td>
-<td style="text-align:left">Bronze_Pools</td>
-<td style="text-align:left">pools_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">1004</td>
-<td style="text-align:left">Bronze_AuditLogs</td>
-<td style="text-align:left">audit_log_bronze</td>
-<td style="text-align:left"></td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">1005</td>
-<td style="text-align:left">Bronze_ClusterEventLogs</td>
-<td style="text-align:left">cluster_events_bronze</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">1006</td>
-<td style="text-align:left">Bronze_SparkEventLogs</td>
-<td style="text-align:left">spark_events_bronze</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">1007</td>
-<td style="text-align:left">Bronze_Libraries_Snapshot</td>
-<td style="text-align:left">libs_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.1.1</td>
-</tr>
-<tr>
-<td style="text-align:left">1008</td>
-<td style="text-align:left">Bronze_Policies_Snapshot</td>
-<td style="text-align:left">policies_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.1.1</td>
-</tr>
-<tr>
-<td style="text-align:left">1009</td>
-<td style="text-align:left">Bronze_Instance_Profile_Snapshot</td>
-<td style="text-align:left">instance_profiles_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.1.1</td>
-</tr>
-<tr>
-<td style="text-align:left">1010</td>
-<td style="text-align:left">Bronze_Token_Snapshot</td>
-<td style="text-align:left">tokens_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.1.1</td>
-</tr>
-<tr>
-<td style="text-align:left">1011</td>
-<td style="text-align:left">Bronze_Global_Init_Scripts_Snapshot</td>
-<td style="text-align:left">global_inits_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.1.1</td>
-</tr>
-<tr>
-<td style="text-align:left">1012</td>
-<td style="text-align:left">Bronze_Job_Runs_Snapshot*</td>
-<td style="text-align:left">job_runs_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.1.1</td>
-</tr>
-<tr>
-<td style="text-align:left">1013</td>
-<td style="text-align:left">Bronze_Warehouses_Snapshot</td>
-<td style="text-align:left">warehouses_snapshot_bronze</td>
-<td style="text-align:left"></td>
-<td>0.7.2</td>
-</tr>
-<tr>
-<td style="text-align:left">2003</td>
-<td style="text-align:left">Silver_SPARK_Executors</td>
-<td style="text-align:left">spark_executors_silver</td>
-<td style="text-align:left">1006</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2005</td>
-<td style="text-align:left">Silver_SPARK_Executions</td>
-<td style="text-align:left">spark_executions_silver</td>
-<td style="text-align:left">1006</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2006</td>
-<td style="text-align:left">Silver_SPARK_Jobs</td>
-<td style="text-align:left">spark_jobs_silver</td>
-<td style="text-align:left">1006</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2007</td>
-<td style="text-align:left">Silver_SPARK_Stages</td>
-<td style="text-align:left">spark_stages_silver</td>
-<td style="text-align:left">1006</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2008</td>
-<td style="text-align:left">Silver_SPARK_Tasks</td>
-<td style="text-align:left">spark_tasks_silver</td>
-<td style="text-align:left">1006</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2009</td>
-<td style="text-align:left">Silver_PoolsSpec</td>
-<td style="text-align:left">pools_silver</td>
-<td style="text-align:left">1003,1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2010</td>
-<td style="text-align:left">Silver_JobsStatus</td>
-<td style="text-align:left">job_status_silver</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2011</td>
-<td style="text-align:left">Silver_JobsRuns</td>
-<td style="text-align:left">jobrun_silver</td>
-<td style="text-align:left">1004,2010,2014</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2014</td>
-<td style="text-align:left">Silver_ClusterSpec</td>
-<td style="text-align:left">cluster_spec_silver</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2016</td>
-<td style="text-align:left">Silver_AccountLogins</td>
-<td style="text-align:left">accountlogin</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2017</td>
-<td style="text-align:left">Silver_ModifiedAccounts</td>
-<td style="text-align:left">account_mods_silver</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2018</td>
-<td style="text-align:left">Silver_Notebooks</td>
-<td style="text-align:left">notebook_silver</td>
-<td style="text-align:left">1004</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2019</td>
-<td style="text-align:left">Silver_ClusterStateDetail</td>
-<td style="text-align:left">cluster_state_detail_silver</td>
-<td style="text-align:left">1005</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2020</td>
-<td style="text-align:left">Silver_SQLQueryHistory</td>
-<td style="text-align:left">sql_query_history_silver</td>
-<td style="text-align:left">1004</td>
-<td>0.7.0</td>
-</tr>
-<tr>
-<td style="text-align:left">2021</td>
-<td style="text-align:left">Silver_WarehouseSpec</td>
-<td style="text-align:left">warehouse_spec_silver</td>
-<td style="text-align:left">1004,1013</td>
-<td>0.7.2</td>
-</tr>
-<tr>
-<td style="text-align:left">2022</td>
-<td style="text-align:left">Silver_WarehouseStateDetail</td>
-<td style="text-align:left">warehouse_state_detail_silver</td>
-<td style="text-align:left">1004,1013</td>
-<td>0.8.2</td>
-</tr>
-<tr>
-<td style="text-align:left">3001</td>
-<td style="text-align:left">Gold_Cluster</td>
-<td style="text-align:left">cluster_gold</td>
-<td style="text-align:left">2014</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3002</td>
-<td style="text-align:left">Gold_Job</td>
-<td style="text-align:left">job_gold</td>
-<td style="text-align:left">2010</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3003</td>
-<td style="text-align:left">Gold_JobRun</td>
-<td style="text-align:left">jobrun_gold</td>
-<td style="text-align:left">2011</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3004</td>
-<td style="text-align:left">Gold_Notebook</td>
-<td style="text-align:left">notebook_gold</td>
-<td style="text-align:left">2018</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3005</td>
-<td style="text-align:left">Gold_ClusterStateFact</td>
-<td style="text-align:left">clusterstatefact_gold</td>
-<td style="text-align:left">1005,2014</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3007</td>
-<td style="text-align:left">Gold_AccountMod</td>
-<td style="text-align:left">account_mods_gold</td>
-<td style="text-align:left">2017</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3008</td>
-<td style="text-align:left">Gold_AccountLogin</td>
-<td style="text-align:left">account_login_gold</td>
-<td style="text-align:left">2016</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3009</td>
-<td style="text-align:left">Gold_Pools</td>
-<td style="text-align:left">instancepool_gold</td>
-<td style="text-align:left">2009</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3010</td>
-<td style="text-align:left">Gold_SparkJob</td>
-<td style="text-align:left">sparkjob_gold</td>
-<td style="text-align:left">2006</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3011</td>
-<td style="text-align:left">Gold_SparkStage</td>
-<td style="text-align:left">sparkstage_gold</td>
-<td style="text-align:left">2007</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3012</td>
-<td style="text-align:left">Gold_SparkTask</td>
-<td style="text-align:left">sparktask_gold</td>
-<td style="text-align:left">2008</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3013</td>
-<td style="text-align:left">Gold_SparkExecution</td>
-<td style="text-align:left">sparkexecution_gold</td>
-<td style="text-align:left">2005</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3014</td>
-<td style="text-align:left">Gold_SparkExecutor</td>
-<td style="text-align:left">sparkexecutor_gold</td>
-<td style="text-align:left">2003</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3016</td>
-<td style="text-align:left">Gold_SparkStream</td>
-<td style="text-align:left">sparkstream_gold</td>
-<td style="text-align:left">1006,2005</td>
-<td>0.7.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3015</td>
-<td style="text-align:left">Gold_jobRunCostPotentialFact</td>
-<td style="text-align:left">jobruncostpotentialfact_gold</td>
-<td style="text-align:left">3001,3003,3005,3010,3012</td>
-<td>0.6.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3017</td>
-<td style="text-align:left">Gold_Sql_QueryHistory</td>
-<td style="text-align:left">sql_query_history_gold</td>
-<td style="text-align:left">2020</td>
-<td>0.7.0</td>
-</tr>
-<tr>
-<td style="text-align:left">3018</td>
-<td style="text-align:left">Gold_Warehouse</td>
-<td style="text-align:left">warehouse_gold</td>
-<td style="text-align:left">2021</td>
-<td>0.7.2.1</td>
-</tr>
-<tr>
-<td style="text-align:left">3019</td>
-<td style="text-align:left">Gold_NotebookCommands</td>
-<td style="text-align:left">notebookCommands_gold</td>
-<td style="text-align:left">1004,3004,3005</td>
-<td>0.7.2.1</td>
-</tr>
-<tr>
-<td style="text-align:left">3020</td>
-<td style="text-align:left">Gold_WarehouseStateFact</td>
-<td style="text-align:left">warehousestatefact_gold</td>
-<td style="text-align:left">2021, 2022</td>
-<td>0.8.2</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Module ID</th>
+          <th style="text-align: left">Module Name</th>
+          <th style="text-align: left">Target Table Name</th>
+          <th style="text-align: left">Module ID Dependencies</th>
+          <th>As Of</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">1001</td>
+          <td style="text-align: left">Bronze_Jobs_Snapshot</td>
+          <td style="text-align: left">jobs_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1002</td>
+          <td style="text-align: left">Bronze_Clusters_Snapshot</td>
+          <td style="text-align: left">clusters_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1003</td>
+          <td style="text-align: left">Bronze_Pools</td>
+          <td style="text-align: left">pools_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1004</td>
+          <td style="text-align: left">Bronze_AuditLogs</td>
+          <td style="text-align: left">audit_log_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1005</td>
+          <td style="text-align: left">Bronze_ClusterEventLogs</td>
+          <td style="text-align: left">cluster_events_bronze</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1006</td>
+          <td style="text-align: left">Bronze_SparkEventLogs</td>
+          <td style="text-align: left">spark_events_bronze</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1007</td>
+          <td style="text-align: left">Bronze_Libraries_Snapshot</td>
+          <td style="text-align: left">libs_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.1.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1008</td>
+          <td style="text-align: left">Bronze_Policies_Snapshot</td>
+          <td style="text-align: left">policies_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.1.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1009</td>
+          <td style="text-align: left">Bronze_Instance_Profile_Snapshot</td>
+          <td style="text-align: left">instance_profiles_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.1.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1010</td>
+          <td style="text-align: left">Bronze_Token_Snapshot</td>
+          <td style="text-align: left">tokens_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.1.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1011</td>
+          <td style="text-align: left">Bronze_Global_Init_Scripts_Snapshot</td>
+          <td style="text-align: left">global_inits_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.1.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1012</td>
+          <td style="text-align: left">Bronze_Job_Runs_Snapshot*</td>
+          <td style="text-align: left">job_runs_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.1.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">1013</td>
+          <td style="text-align: left">Bronze_Warehouses_Snapshot</td>
+          <td style="text-align: left">warehouses_snapshot_bronze</td>
+          <td style="text-align: left"></td>
+          <td>0.7.2</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2003</td>
+          <td style="text-align: left">Silver_SPARK_Executors</td>
+          <td style="text-align: left">spark_executors_silver</td>
+          <td style="text-align: left">1006</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2005</td>
+          <td style="text-align: left">Silver_SPARK_Executions</td>
+          <td style="text-align: left">spark_executions_silver</td>
+          <td style="text-align: left">1006</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2006</td>
+          <td style="text-align: left">Silver_SPARK_Jobs</td>
+          <td style="text-align: left">spark_jobs_silver</td>
+          <td style="text-align: left">1006</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2007</td>
+          <td style="text-align: left">Silver_SPARK_Stages</td>
+          <td style="text-align: left">spark_stages_silver</td>
+          <td style="text-align: left">1006</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2008</td>
+          <td style="text-align: left">Silver_SPARK_Tasks</td>
+          <td style="text-align: left">spark_tasks_silver</td>
+          <td style="text-align: left">1006</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2009</td>
+          <td style="text-align: left">Silver_PoolsSpec</td>
+          <td style="text-align: left">pools_silver</td>
+          <td style="text-align: left">1003,1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2010</td>
+          <td style="text-align: left">Silver_JobsStatus</td>
+          <td style="text-align: left">job_status_silver</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2011</td>
+          <td style="text-align: left">Silver_JobsRuns</td>
+          <td style="text-align: left">jobrun_silver</td>
+          <td style="text-align: left">1004,2010,2014</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2014</td>
+          <td style="text-align: left">Silver_ClusterSpec</td>
+          <td style="text-align: left">cluster_spec_silver</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2016</td>
+          <td style="text-align: left">Silver_AccountLogins</td>
+          <td style="text-align: left">accountlogin</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2017</td>
+          <td style="text-align: left">Silver_ModifiedAccounts</td>
+          <td style="text-align: left">account_mods_silver</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2018</td>
+          <td style="text-align: left">Silver_Notebooks</td>
+          <td style="text-align: left">notebook_silver</td>
+          <td style="text-align: left">1004</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2019</td>
+          <td style="text-align: left">Silver_ClusterStateDetail</td>
+          <td style="text-align: left">cluster_state_detail_silver</td>
+          <td style="text-align: left">1005</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2020</td>
+          <td style="text-align: left">Silver_SQLQueryHistory</td>
+          <td style="text-align: left">sql_query_history_silver</td>
+          <td style="text-align: left">1004</td>
+          <td>0.7.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2021</td>
+          <td style="text-align: left">Silver_WarehouseSpec</td>
+          <td style="text-align: left">warehouse_spec_silver</td>
+          <td style="text-align: left">1004,1013</td>
+          <td>0.7.2</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">2022</td>
+          <td style="text-align: left">Silver_WarehouseStateDetail</td>
+          <td style="text-align: left">warehouse_state_detail_silver</td>
+          <td style="text-align: left">1004,1013</td>
+          <td>0.8.2</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3001</td>
+          <td style="text-align: left">Gold_Cluster</td>
+          <td style="text-align: left">cluster_gold</td>
+          <td style="text-align: left">2014</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3002</td>
+          <td style="text-align: left">Gold_Job</td>
+          <td style="text-align: left">job_gold</td>
+          <td style="text-align: left">2010</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3003</td>
+          <td style="text-align: left">Gold_JobRun</td>
+          <td style="text-align: left">jobrun_gold</td>
+          <td style="text-align: left">2011</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3004</td>
+          <td style="text-align: left">Gold_Notebook</td>
+          <td style="text-align: left">notebook_gold</td>
+          <td style="text-align: left">2018</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3005</td>
+          <td style="text-align: left">Gold_ClusterStateFact</td>
+          <td style="text-align: left">clusterstatefact_gold</td>
+          <td style="text-align: left">1005,2014</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3007</td>
+          <td style="text-align: left">Gold_AccountMod</td>
+          <td style="text-align: left">account_mods_gold</td>
+          <td style="text-align: left">2017</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3008</td>
+          <td style="text-align: left">Gold_AccountLogin</td>
+          <td style="text-align: left">account_login_gold</td>
+          <td style="text-align: left">2016</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3009</td>
+          <td style="text-align: left">Gold_Pools</td>
+          <td style="text-align: left">instancepool_gold</td>
+          <td style="text-align: left">2009</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3010</td>
+          <td style="text-align: left">Gold_SparkJob</td>
+          <td style="text-align: left">sparkjob_gold</td>
+          <td style="text-align: left">2006</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3011</td>
+          <td style="text-align: left">Gold_SparkStage</td>
+          <td style="text-align: left">sparkstage_gold</td>
+          <td style="text-align: left">2007</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3012</td>
+          <td style="text-align: left">Gold_SparkTask</td>
+          <td style="text-align: left">sparktask_gold</td>
+          <td style="text-align: left">2008</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3013</td>
+          <td style="text-align: left">Gold_SparkExecution</td>
+          <td style="text-align: left">sparkexecution_gold</td>
+          <td style="text-align: left">2005</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3014</td>
+          <td style="text-align: left">Gold_SparkExecutor</td>
+          <td style="text-align: left">sparkexecutor_gold</td>
+          <td style="text-align: left">2003</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3016</td>
+          <td style="text-align: left">Gold_SparkStream</td>
+          <td style="text-align: left">sparkstream_gold</td>
+          <td style="text-align: left">1006,2005</td>
+          <td>0.7.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3015</td>
+          <td style="text-align: left">Gold_jobRunCostPotentialFact</td>
+          <td style="text-align: left">jobruncostpotentialfact_gold</td>
+          <td style="text-align: left">3001,3003,3005,3010,3012</td>
+          <td>0.6.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3017</td>
+          <td style="text-align: left">Gold_Sql_QueryHistory</td>
+          <td style="text-align: left">sql_query_history_gold</td>
+          <td style="text-align: left">2020</td>
+          <td>0.7.0</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3018</td>
+          <td style="text-align: left">Gold_Warehouse</td>
+          <td style="text-align: left">warehouse_gold</td>
+          <td style="text-align: left">2021</td>
+          <td>0.7.2.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3019</td>
+          <td style="text-align: left">Gold_NotebookCommands</td>
+          <td style="text-align: left">notebookCommands_gold</td>
+          <td style="text-align: left">1004,3004,3005</td>
+          <td>0.7.2.1</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">3020</td>
+          <td style="text-align: left">Gold_WarehouseStateFact</td>
+          <td style="text-align: left">warehousestatefact_gold</td>
+          <td style="text-align: left">2021, 2022</td>
+          <td>0.8.2</td>
+      </tr>
+  </tbody>
 </table>
 <p>* <strong>Bronze_Job_Runs_Snapshot</strong> is experimental as of 0711. The module works as expected but the API can only pull
 25 runs per API call; therefore, for some customers with many runs per day (i.e. thousands) this module can take
@@ -2604,19 +2604,19 @@ information on how to run a single pipeline from main class. The same can also b
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1767883980"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1767883980"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1767883980" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1767883980"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

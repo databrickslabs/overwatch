@@ -1,6 +1,11 @@
 ---
-title: "Welcome To OverWatch"
+title: "Welcome To Overwatch"
 ---
+
+# {{% notice warning %}}
+**This project is now deprecated. You can continue using the latest published version, but no further updates will be 
+released. For all your observability needs, please use [ Databricks System Tables](https://docs.databricks.com/aws/en/admin/system-tables/)**
+{{% /notice %}}
 
 ## Project Overview
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Hugo 0.125.5">
+    <meta name="generator" content="Hugo 0.147.6">
     <meta name="description" content="Overwatch Documentation">
 <meta name="author" content="Daniel Tomes -- DatabricksLabs">
 
@@ -12,21 +12,21 @@
     <title>Configuration :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1767883980" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1767883980" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1767883980"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1767883980"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1767883980"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1767883980"></script>
 
     
   </div>
@@ -1130,7 +1130,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/'>Configure Overwatch</a> > Configuration
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/'>Configure Overwatch</a> > Configuration
           
         
           
@@ -1219,202 +1219,202 @@ will upgrade the script for you.</p>
 <p>Below are the full details of each column in the latest config. For exact/complete configuration options by
 version please see <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/configdetailsbyversion/">Configuration Details By Version</a></p>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Column</th>
-<th style="text-align:left">Type</th>
-<th style="text-align:left">IsRequired</th>
-<th style="text-align:left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">workspace_name</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Name of the workspace.</td>
-</tr>
-<tr>
-<td style="text-align:left">workspace_id</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Id of the workspace. <strong>MUST BE VALUE AFTER THE o=</strong> in the URL bar. To ensure you get the right value, run the following on the target workspace. <code>Initializer.getOrgId</code></td>
-</tr>
-<tr>
-<td style="text-align:left">workspace_url</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">URL of the workspace. Should be in format of <em>https://*.com</em> or <em>https://*.net</em>. Don&rsquo;t include anything after the .com or .net suffix</td>
-</tr>
-<tr>
-<td style="text-align:left">api_url</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">API URL for the Workspace (execute in scala <code>dbutils.notebook.getContext().apiUrl.get</code> <strong>ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE</strong> to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces). You can also use the workspace_url here.</td>
-</tr>
-<tr>
-<td style="text-align:left">cloud</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Cloud provider (Azure/AWS/GCP).</td>
-</tr>
-<tr>
-<td style="text-align:left">primordial_date</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">The date from which Overwatch will capture the details. The <strong>format</strong> should be <strong>yyyy-MM-dd</strong> ex: 2022-05-20 == May 20 2022. **IMPORTANT NOTE: ** You should only set the primordial date in the initial run of Overwatch, and never change it again, as Overwatch will progress the dates using it&rsquo;s own calculations and checkpoints.</td>
-</tr>
-<tr>
-<td style="text-align:left">storage_prefix</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left"><strong>CASE SENSITIVE - Lower Case</strong> The location in which Overwatch will store the data. You can think of this as the Overwatch working directory. dbfs:/mnt/path/&hellip; or abfss://container@myStorageAccount.dfs.core.windows.net/&hellip; or s3://myBucket/&hellip;   or gs://myBucket/&hellip;</td>
-</tr>
-<tr>
-<td style="text-align:left">etl_database_name</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">The name of the ETL data base for Overwatch (i.e. overwatch_etl or custom)</td>
-</tr>
-<tr>
-<td style="text-align:left">consumer_database_name</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">The name of the Consumer database for Overwatch. (i.e. overwatch or custom)</td>
-</tr>
-<tr>
-<td style="text-align:left">secret_scope</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Name of the secret scope. This must be created on the workspace which the Overwatch job will execute.</td>
-</tr>
-<tr>
-<td style="text-align:left">secret_key_dbpat</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">This will contain the PAT token of the workspace. The key should be present in the secret_scope and should start with the letters <em>dapi</em>.</td>
-</tr>
-<tr>
-<td style="text-align:left">auditlogprefix_source_path</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">For all clouds use keyword <strong>system</strong> to fetch data from System Tables (system.access.audit) See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/">System Table Configuration Details</a> for details. If you are not using System Tables, you can enter the location of the auditlogs (<strong>AWS/GCP</strong> Only). The contents under this directory must have the folders with the date partitions like date=2022-12-0 .</td>
-</tr>
-<tr>
-<td style="text-align:left">interactive_dbu_price</td>
-<td style="text-align:left">Double</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Contract (or list) Price for interactive DBUs. The provided template has the list prices by default.</td>
-</tr>
-<tr>
-<td style="text-align:left">automated_dbu_price</td>
-<td style="text-align:left">Double</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Contract (or list) Price for automated DBUs. The provided template has the list prices by default.</td>
-</tr>
-<tr>
-<td style="text-align:left">sql_compute_dbu_price</td>
-<td style="text-align:left">Double</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Contract (or list) Price for DBSQL DBUs. This should be the closest average price across your DBSQL Skus (classic / Pro / Serverless) for now. See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/">Custom Costs</a> for more details. The provided template has the DBSQL Classic list prices by default.</td>
-</tr>
-<tr>
-<td style="text-align:left">jobs_light_dbu_price</td>
-<td style="text-align:left">Double</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Contract (or list) Price for interactive DBUs. The provided template has the list prices by default.</td>
-</tr>
-<tr>
-<td style="text-align:left">max_days</td>
-<td style="text-align:left">Integer</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">This is the max incrementals days that will be loaded. Usually only relevant for historical loading and rebuilds. Recommendation == 30</td>
-</tr>
-<tr>
-<td style="text-align:left">excluded_scopes</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules//#scopes">Scopes</a> that should not be excluded from the pipelines. Since this is a CSV, it&rsquo;s critical that these are <strong>colon delimited</strong>. Leave blank if you&rsquo;d like to load all overwatch scopes.</td>
-</tr>
-<tr>
-<td style="text-align:left">active</td>
-<td style="text-align:left">Boolean</td>
-<td style="text-align:left">True</td>
-<td style="text-align:left">Whether or not the workspace should be validated / deployed.</td>
-</tr>
-<tr>
-<td style="text-align:left">proxy_host</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Proxy url for the workspace.</td>
-</tr>
-<tr>
-<td style="text-align:left">proxy_port</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Proxy port for the workspace</td>
-</tr>
-<tr>
-<td style="text-align:left">proxy_user_name</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Proxy user name for the workspace.</td>
-</tr>
-<tr>
-<td style="text-align:left">proxy_password_scope</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Scope which contains the proxy password key.</td>
-</tr>
-<tr>
-<td style="text-align:left">proxy_password_key</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Key which contains proxy password.</td>
-</tr>
-<tr>
-<td style="text-align:left">success_batch_size</td>
-<td style="text-align:left">Integer</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">API Tunable - Indicates the size of the buffer on filling of which the result will be written to a temp location. This is used to tune performance in certain circumstances. Leave default except for special circumstances. Default == 200</td>
-</tr>
-<tr>
-<td style="text-align:left">error_batch_size</td>
-<td style="text-align:left">Integer</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">API Tunable - Indicates the size of the error writer buffer containing API call errors. This is used to tune performance in certain circumstances. Leave default except for special circumstances. Default == 500</td>
-</tr>
-<tr>
-<td style="text-align:left">enable_unsafe_SSL</td>
-<td style="text-align:left">Boolean</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">API Tunable - Enables unsafe SSL. Default == False</td>
-</tr>
-<tr>
-<td style="text-align:left">thread_pool_size</td>
-<td style="text-align:left">Integer</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">API Tunable - Max number of API calls Overwatch is allowed to make in parallel. Default == 4. Increase for faster bronze but if workspace is busy, risks API endpoint saturation. Overwatch will detect saturation and back-off when detected but for safety never go over 8 without testing.</td>
-</tr>
-<tr>
-<td style="text-align:left">api_waiting_time</td>
-<td style="text-align:left">Long</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">API Tunable - Overwatch makes async api calls in parallel, api_waiting_time signifies the max wait time in case of no response received from the api call. Default = 300000(5 minutes)</td>
-</tr>
-<tr>
-<td style="text-align:left">mount_mapping_path</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Path to local CSV holding details of all mounts on remote workspaces (only necessary for remote workspaces with &gt;50 mounts) <strong><a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics//#exception---remote-workspaces-with-50-mounts">click here for more details</a></strong></td>
-</tr>
-<tr>
-<td style="text-align:left">temp_dir_path</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">False</td>
-<td style="text-align:left">Custom temporary working directory, directory gets cleaned up after each run.</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Column</th>
+          <th style="text-align: left">Type</th>
+          <th style="text-align: left">IsRequired</th>
+          <th style="text-align: left">Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">workspace_name</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Name of the workspace.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">workspace_id</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Id of the workspace. <strong>MUST BE VALUE AFTER THE o=</strong> in the URL bar. To ensure you get the right value, run the following on the target workspace. <code>Initializer.getOrgId</code></td>
+      </tr>
+      <tr>
+          <td style="text-align: left">workspace_url</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">URL of the workspace. Should be in format of <em>https://*.com</em> or <em>https://*.net</em>. Don&rsquo;t include anything after the .com or .net suffix</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">api_url</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">API URL for the Workspace (execute in scala <code>dbutils.notebook.getContext().apiUrl.get</code> <strong>ON THE TARGET WORKSPACE NOT DEPLOYMENT WORKSPACE</strong> to get the API URL for the workspace. NOTE: Workspace_URL and API_URL can be different for a workspace but may be the same even for multiple workspaces). You can also use the workspace_url here.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">cloud</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Cloud provider (Azure/AWS/GCP).</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">primordial_date</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">The date from which Overwatch will capture the details. The <strong>format</strong> should be <strong>yyyy-MM-dd</strong> ex: 2022-05-20 == May 20 2022. **IMPORTANT NOTE: ** You should only set the primordial date in the initial run of Overwatch, and never change it again, as Overwatch will progress the dates using it&rsquo;s own calculations and checkpoints.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">storage_prefix</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left"><strong>CASE SENSITIVE - Lower Case</strong> The location in which Overwatch will store the data. You can think of this as the Overwatch working directory. dbfs:/mnt/path/&hellip; or abfss://container@myStorageAccount.dfs.core.windows.net/&hellip; or s3://myBucket/&hellip;   or gs://myBucket/&hellip;</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">etl_database_name</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">The name of the ETL data base for Overwatch (i.e. overwatch_etl or custom)</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">consumer_database_name</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">The name of the Consumer database for Overwatch. (i.e. overwatch or custom)</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">secret_scope</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Name of the secret scope. This must be created on the workspace which the Overwatch job will execute.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">secret_key_dbpat</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">This will contain the PAT token of the workspace. The key should be present in the secret_scope and should start with the letters <em>dapi</em>.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">auditlogprefix_source_path</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">For all clouds use keyword <strong>system</strong> to fetch data from System Tables (system.access.audit) See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/systemtableintegration/systemtableconfiguration/">System Table Configuration Details</a> for details. If you are not using System Tables, you can enter the location of the auditlogs (<strong>AWS/GCP</strong> Only). The contents under this directory must have the folders with the date partitions like date=2022-12-0 .</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">interactive_dbu_price</td>
+          <td style="text-align: left">Double</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Contract (or list) Price for interactive DBUs. The provided template has the list prices by default.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">automated_dbu_price</td>
+          <td style="text-align: left">Double</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Contract (or list) Price for automated DBUs. The provided template has the list prices by default.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">sql_compute_dbu_price</td>
+          <td style="text-align: left">Double</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Contract (or list) Price for DBSQL DBUs. This should be the closest average price across your DBSQL Skus (classic / Pro / Serverless) for now. See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/configureoverwatch/customcosts/">Custom Costs</a> for more details. The provided template has the DBSQL Classic list prices by default.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">jobs_light_dbu_price</td>
+          <td style="text-align: left">Double</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Contract (or list) Price for interactive DBUs. The provided template has the list prices by default.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">max_days</td>
+          <td style="text-align: left">Integer</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">This is the max incrementals days that will be loaded. Usually only relevant for historical loading and rebuilds. Recommendation == 30</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">excluded_scopes</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left"><a href="https://databrickslabs.github.io/overwatch/dataengineer/modules//#scopes">Scopes</a> that should not be excluded from the pipelines. Since this is a CSV, it&rsquo;s critical that these are <strong>colon delimited</strong>. Leave blank if you&rsquo;d like to load all overwatch scopes.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">active</td>
+          <td style="text-align: left">Boolean</td>
+          <td style="text-align: left">True</td>
+          <td style="text-align: left">Whether or not the workspace should be validated / deployed.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">proxy_host</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Proxy url for the workspace.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">proxy_port</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Proxy port for the workspace</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">proxy_user_name</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Proxy user name for the workspace.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">proxy_password_scope</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Scope which contains the proxy password key.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">proxy_password_key</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Key which contains proxy password.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">success_batch_size</td>
+          <td style="text-align: left">Integer</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">API Tunable - Indicates the size of the buffer on filling of which the result will be written to a temp location. This is used to tune performance in certain circumstances. Leave default except for special circumstances. Default == 200</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">error_batch_size</td>
+          <td style="text-align: left">Integer</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">API Tunable - Indicates the size of the error writer buffer containing API call errors. This is used to tune performance in certain circumstances. Leave default except for special circumstances. Default == 500</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">enable_unsafe_SSL</td>
+          <td style="text-align: left">Boolean</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">API Tunable - Enables unsafe SSL. Default == False</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">thread_pool_size</td>
+          <td style="text-align: left">Integer</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">API Tunable - Max number of API calls Overwatch is allowed to make in parallel. Default == 4. Increase for faster bronze but if workspace is busy, risks API endpoint saturation. Overwatch will detect saturation and back-off when detected but for safety never go over 8 without testing.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">api_waiting_time</td>
+          <td style="text-align: left">Long</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">API Tunable - Overwatch makes async api calls in parallel, api_waiting_time signifies the max wait time in case of no response received from the api call. Default = 300000(5 minutes)</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">mount_mapping_path</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Path to local CSV holding details of all mounts on remote workspaces (only necessary for remote workspaces with &gt;50 mounts) <strong><a href="https://databrickslabs.github.io/overwatch/dataengineer/advancedtopics//#exception---remote-workspaces-with-50-mounts">click here for more details</a></strong></td>
+      </tr>
+      <tr>
+          <td style="text-align: left">temp_dir_path</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">False</td>
+          <td style="text-align: left">Custom temporary working directory, directory gets cleaned up after each run.</td>
+      </tr>
+  </tbody>
 </table>
 <h4 id="azure-event-hub-specific-configurations">Azure Event Hub Specific Configurations</h4>
 <p>When configuring the Azure EH configurations users can use EITHER a <strong>shared access key</strong> OR <strong>AAD SP as of 072x</strong>
@@ -1424,80 +1424,80 @@ deployments must be used as EH is required for Azure.</p>
 Review <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure//#step-21-authorizing-access-via-sas-policy">Authorizing Access Via SAS Policy</a>
 for more details.</p>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Column</th>
-<th style="text-align:left">Type</th>
-<th style="text-align:left">IsRequired</th>
-<th style="text-align:left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">eh_name</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Event hub name (<strong>Azure Only</strong>) The event hub will contain the audit logs of the workspace</td>
-</tr>
-<tr>
-<td style="text-align:left">eh_scope_key</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Name of the key in the &lt;secret_scope&gt; that holds the connection string to the Event Hub WITH THE SHARED ACCESS KEY IN IT &ndash; See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure//#step-21-authorizing-access-via-sas-policy">EH Configuration</a> for details</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Column</th>
+          <th style="text-align: left">Type</th>
+          <th style="text-align: left">IsRequired</th>
+          <th style="text-align: left">Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">eh_name</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Event hub name (<strong>Azure Only</strong>) The event hub will contain the audit logs of the workspace</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">eh_scope_key</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Name of the key in the &lt;secret_scope&gt; that holds the connection string to the Event Hub WITH THE SHARED ACCESS KEY IN IT &ndash; See <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure//#step-21-authorizing-access-via-sas-policy">EH Configuration</a> for details</td>
+      </tr>
+  </tbody>
 </table>
 <p><strong>AAD Requirements</strong></p>
 <p>Review <a href="https://databrickslabs.github.io/overwatch/deployoverwatch/cloudinfra/azure//#step-22-authorizing-access-via-aad-spn">Authorizing Access Via AAD SPN</a>
 for more details.</p>
 <p>Ensure the dependent library for AAD Auth is attached <code>com.microsoft.azure:msal4j:1.10.1</code></p>
 <table>
-<thead>
-<tr>
-<th style="text-align:left">Column</th>
-<th style="text-align:left">Type</th>
-<th style="text-align:left">IsRequired</th>
-<th style="text-align:left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:left">eh_name</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Event hub name The event hub will contain the audit logs of the workspace</td>
-</tr>
-<tr>
-<td style="text-align:left">eh_conn_string</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Event hub connection string without shared access key. ex: &ldquo;Endpoint=sb://evhub-ns.servicebus.windows.net&rdquo;</td>
-</tr>
-<tr>
-<td style="text-align:left">aad_tenant_id</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Tenant ID for Service principle.</td>
-</tr>
-<tr>
-<td style="text-align:left">aad_client_id</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Client ID for Service principle.</td>
-</tr>
-<tr>
-<td style="text-align:left">aad_client_secret_key</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Name of the key in the &lt;secret_scope&gt; that holds the SPN secret for the Service principle.</td>
-</tr>
-<tr>
-<td style="text-align:left">aad_authority_endpoint</td>
-<td style="text-align:left">String</td>
-<td style="text-align:left">True (<strong>AZURE</strong>)</td>
-<td style="text-align:left">Endpoint of the authority. Default value is &ldquo;<a href="https://login.microsoftonline.com/%22">https://login.microsoftonline.com/&quot;</a></td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th style="text-align: left">Column</th>
+          <th style="text-align: left">Type</th>
+          <th style="text-align: left">IsRequired</th>
+          <th style="text-align: left">Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td style="text-align: left">eh_name</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Event hub name The event hub will contain the audit logs of the workspace</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">eh_conn_string</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Event hub connection string without shared access key. ex: &ldquo;Endpoint=sb://evhub-ns.servicebus.windows.net&rdquo;</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">aad_tenant_id</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Tenant ID for Service principle.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">aad_client_id</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Client ID for Service principle.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">aad_client_secret_key</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Name of the key in the &lt;secret_scope&gt; that holds the SPN secret for the Service principle.</td>
+      </tr>
+      <tr>
+          <td style="text-align: left">aad_authority_endpoint</td>
+          <td style="text-align: left">String</td>
+          <td style="text-align: left">True (<strong>AZURE</strong>)</td>
+          <td style="text-align: left">Endpoint of the authority. Default value is &ldquo;<a href="https://login.microsoftonline.com/%22">https://login.microsoftonline.com/&quot;</a></td>
+      </tr>
+  </tbody>
 </table>
 <h3 id="converting-your-config-from-csv-to-delta-strongly-recommended">Converting Your Config From CSV To Delta (STRONGLY RECOMMENDED)</h3>
 <p><strong>AS OF version 0.7.1.1</strong> you may now use a <strong>CSV</strong> OR a <strong>Delta Table</strong> OR <strong>Delta Path</strong> for your config</p>
@@ -1509,26 +1509,26 @@ quickly disable scopes, etc. Below are the details of how to reference the relev
 safely convert your CSV to a delta source. To do so just upgrade to 0.7.1.1+ and everywhere the docs reference the
 config.csv switch it to reference the appropriate path.</p>
 <table>
-<thead>
-<tr>
-<th>Source Config Format</th>
-<th>Path Reference</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>CSV</td>
-<td>dbfs:/myPath/overwatch/configs/prod_config.csv</td>
-</tr>
-<tr>
-<td>Delta Table</td>
-<td>database.overwatch_prod_config</td>
-</tr>
-<tr>
-<td>Delta Path</td>
-<td>dbfs:/myPath/overwatch/configs/prod_config</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Source Config Format</th>
+          <th>Path Reference</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>CSV</td>
+          <td>dbfs:/myPath/overwatch/configs/prod_config.csv</td>
+      </tr>
+      <tr>
+          <td>Delta Table</td>
+          <td>database.overwatch_prod_config</td>
+      </tr>
+      <tr>
+          <td>Delta Path</td>
+          <td>dbfs:/myPath/overwatch/configs/prod_config</td>
+      </tr>
+  </tbody>
 </table>
 <p><strong>Convert To Delta Table</strong> (Example)</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-scala" data-lang="scala"><span style="display:flex;"><span>spark<span style="color:#f92672">.</span>read
@@ -2256,19 +2256,19 @@ config.csv switch it to reference the appropriate path.</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1767883980"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1767883980"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1767883980" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1767883980"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>

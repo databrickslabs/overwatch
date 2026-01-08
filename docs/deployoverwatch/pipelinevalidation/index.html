@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="generator" content="Hugo 0.125.5">
+    <meta name="generator" content="Hugo 0.147.6">
     <meta name="description" content="Overwatch Documentation">
 <meta name="author" content="Daniel Tomes -- DatabricksLabs">
 
@@ -12,21 +12,21 @@
     <title>Pipeline Validation :: Overwatch</title>
 
     
-    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1727378842" rel="stylesheet">
-    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/nucleus.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/fontawesome-all.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hybrid.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/featherlight.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/perfect-scrollbar.min.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/auto-complete.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/atom-one-dark-reasonable.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme.css?1767883980" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/hugo-theme.css?1767883980" rel="stylesheet">
     
-    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1727378842" rel="stylesheet">
+    <link href="https://databrickslabs.github.io/overwatch/css/theme-blue.css?1767883980" rel="stylesheet">
     
     
 
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery-3.3.1.min.js?1767883980"></script>
 
     <style>
       :root #header + #content > #left > #rlblock_left{
@@ -57,14 +57,14 @@
     <span data-search-clear=""><i class="fas fa-times"></i></span>
 </div>
 
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1727378842"></script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/lunr.min.js?1767883980"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/auto-complete.js?1767883980"></script>
 <script type="text/javascript">
     
         var baseurl = "https:\/\/databrickslabs.github.io\/overwatch\/";
     
 </script>
-<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1727378842"></script>
+<script type="text/javascript" src="https://databrickslabs.github.io/overwatch/js/search.js?1767883980"></script>
 
     
   </div>
@@ -1126,7 +1126,7 @@
             
           
           
-            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To OverWatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > Pipeline Validation
+            <a href='https://databrickslabs.github.io/overwatch/'>Welcome To Overwatch</a> > <a href='https://databrickslabs.github.io/overwatch/deployoverwatch/'>Deploy Overwatch</a> > Pipeline Validation
           
         
           
@@ -1238,133 +1238,133 @@ contains a reference to the corresponding Overwatch ETL run and its
 snapshot timestamp.</p>
 <p>The schema of a health check report is as follows:</p>
 <table>
-<thead>
-<tr>
-<th>Column Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Example Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>healthcheck_id</td>
-<td>uuid</td>
-<td>Unique ID for this Healthcheck_Report record</td>
-<td>272b83eb-1362-456a-8dae-26c3083181ac</td>
-</tr>
-<tr>
-<td>etl_database</td>
-<td>string</td>
-<td>Overwatch ETL database name</td>
-<td>ow_etl_azure_0721</td>
-</tr>
-<tr>
-<td>table_name</td>
-<td>string</td>
-<td>Overwatch ETL table name</td>
-<td>clusterstatefact_gold</td>
-</tr>
-<tr>
-<td>healthcheck_rule</td>
-<td>string</td>
-<td>Description of health check rule applied to the table data</td>
-<td>Driver_Node_Type_ID Should Not be NULL</td>
-</tr>
-<tr>
-<td>rule_type</td>
-<td>string</td>
-<td>Type of validation rule (See enumerated values below.)</td>
-<td>Pipeline_Report_Validation</td>
-</tr>
-<tr>
-<td>healthcheckMsg</td>
-<td>string</td>
-<td>health check status of the table data for this health check rule</td>
-<td>health check Failed: got 63 driver_node_type_ids which are null</td>
-</tr>
-<tr>
-<td>overwatch_runID</td>
-<td>string</td>
-<td>Overwatch run ID of the corresponding snapshot</td>
-<td>b8985023d6ae40fa88bb6daef7f46725</td>
-</tr>
-<tr>
-<td>snap_ts</td>
-<td>long</td>
-<td>Snapshot timestamp in yyyy-mm-dd hh:mm:ss format</td>
-<td>2023-09-27 07:43:39</td>
-</tr>
-<tr>
-<td>quarantine_id</td>
-<td>uuid</td>
-<td>Unique ID for Quarantine Report</td>
-<td>cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Column Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Example Value</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>healthcheck_id</td>
+          <td>uuid</td>
+          <td>Unique ID for this Healthcheck_Report record</td>
+          <td>272b83eb-1362-456a-8dae-26c3083181ac</td>
+      </tr>
+      <tr>
+          <td>etl_database</td>
+          <td>string</td>
+          <td>Overwatch ETL database name</td>
+          <td>ow_etl_azure_0721</td>
+      </tr>
+      <tr>
+          <td>table_name</td>
+          <td>string</td>
+          <td>Overwatch ETL table name</td>
+          <td>clusterstatefact_gold</td>
+      </tr>
+      <tr>
+          <td>healthcheck_rule</td>
+          <td>string</td>
+          <td>Description of health check rule applied to the table data</td>
+          <td>Driver_Node_Type_ID Should Not be NULL</td>
+      </tr>
+      <tr>
+          <td>rule_type</td>
+          <td>string</td>
+          <td>Type of validation rule (See enumerated values below.)</td>
+          <td>Pipeline_Report_Validation</td>
+      </tr>
+      <tr>
+          <td>healthcheckMsg</td>
+          <td>string</td>
+          <td>health check status of the table data for this health check rule</td>
+          <td>health check Failed: got 63 driver_node_type_ids which are null</td>
+      </tr>
+      <tr>
+          <td>overwatch_runID</td>
+          <td>string</td>
+          <td>Overwatch run ID of the corresponding snapshot</td>
+          <td>b8985023d6ae40fa88bb6daef7f46725</td>
+      </tr>
+      <tr>
+          <td>snap_ts</td>
+          <td>long</td>
+          <td>Snapshot timestamp in yyyy-mm-dd hh:mm:ss format</td>
+          <td>2023-09-27 07:43:39</td>
+      </tr>
+      <tr>
+          <td>quarantine_id</td>
+          <td>uuid</td>
+          <td>Unique ID for Quarantine Report</td>
+          <td>cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c</td>
+      </tr>
+  </tbody>
 </table>
 <h4 id="quarantine-reports">Quarantine reports</h4>
 <p>Table rows that do not satisfy the rules configured in the pipeline validation module
 appear in the quarantine report using this schema:</p>
 <table>
-<thead>
-<tr>
-<th>Column Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Example Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>quarantine_id</td>
-<td>uuid</td>
-<td>Unique ID for this Quarantine_Report record</td>
-<td>cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c</td>
-</tr>
-<tr>
-<td>etl_database</td>
-<td>string</td>
-<td>Overwatch ETL database name</td>
-<td>ow_etl_azure_0721</td>
-</tr>
-<tr>
-<td>table_name</td>
-<td>string</td>
-<td>Overwatch table name</td>
-<td>clusterstatefact_gold</td>
-</tr>
-<tr>
-<td>healthcheck_rule_failed</td>
-<td>string</td>
-<td>Description of health check rule causing the row having keys to be quarantined</td>
-<td>Driver_Node_Type_ID Should Not be NULL</td>
-</tr>
-<tr>
-<td>rule_type</td>
-<td>string</td>
-<td>Type of validation rule (See enumerated values below.)</td>
-<td>Pipeline_Report_Validation</td>
-</tr>
-<tr>
-<td>healthcheck_type</td>
-<td>string</td>
-<td>Denote the failure type of the health check rule.</td>
-<td>Warning or Failure</td>
-</tr>
-<tr>
-<td>keys</td>
-<td>string</td>
-<td>JSON of primary (possibly compound) key value</td>
-<td>{&ldquo;cluster_id&rdquo;:&ldquo;0831-200003-6bhv8y0u&rdquo;,&ldquo;state&rdquo;:&ldquo;TERMINATING&rdquo;,&ldquo;unixTimeMS_state_start&rdquo;:1693514245329}</td>
-</tr>
-<tr>
-<td>snap_ts</td>
-<td>long</td>
-<td>Snapshot timestamp in yyyy-mm-dd hh:mm:ss format</td>
-<td>2023-09-27 07:43:39</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Column Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Example Value</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>quarantine_id</td>
+          <td>uuid</td>
+          <td>Unique ID for this Quarantine_Report record</td>
+          <td>cd6d7ecc-b72d-4c16-b8ca-01a6df4fba9c</td>
+      </tr>
+      <tr>
+          <td>etl_database</td>
+          <td>string</td>
+          <td>Overwatch ETL database name</td>
+          <td>ow_etl_azure_0721</td>
+      </tr>
+      <tr>
+          <td>table_name</td>
+          <td>string</td>
+          <td>Overwatch table name</td>
+          <td>clusterstatefact_gold</td>
+      </tr>
+      <tr>
+          <td>healthcheck_rule_failed</td>
+          <td>string</td>
+          <td>Description of health check rule causing the row having keys to be quarantined</td>
+          <td>Driver_Node_Type_ID Should Not be NULL</td>
+      </tr>
+      <tr>
+          <td>rule_type</td>
+          <td>string</td>
+          <td>Type of validation rule (See enumerated values below.)</td>
+          <td>Pipeline_Report_Validation</td>
+      </tr>
+      <tr>
+          <td>healthcheck_type</td>
+          <td>string</td>
+          <td>Denote the failure type of the health check rule.</td>
+          <td>Warning or Failure</td>
+      </tr>
+      <tr>
+          <td>keys</td>
+          <td>string</td>
+          <td>JSON of primary (possibly compound) key value</td>
+          <td>{&ldquo;cluster_id&rdquo;:&ldquo;0831-200003-6bhv8y0u&rdquo;,&ldquo;state&rdquo;:&ldquo;TERMINATING&rdquo;,&ldquo;unixTimeMS_state_start&rdquo;:1693514245329}</td>
+      </tr>
+      <tr>
+          <td>snap_ts</td>
+          <td>long</td>
+          <td>Snapshot timestamp in yyyy-mm-dd hh:mm:ss format</td>
+          <td>2023-09-27 07:43:39</td>
+      </tr>
+  </tbody>
 </table>
 <p>These reports are persisted to cloud storage as Delta tables.  The
 output of the validation module reveals the location of these tables
@@ -1480,45 +1480,45 @@ target ETL database as its sole mandatory parameter:</p>
 </span></span></code></pre></div><p>The module&rsquo;s behavior can be altered by providing one or more of the
 following optional parameters:</p>
 <table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Type</th>
-<th>Optional</th>
-<th>Default Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>etlDB</td>
-<td>string</td>
-<td>No</td>
-<td>NA</td>
-<td>Overwatch ETL database name to validate</td>
-</tr>
-<tr>
-<td>allRun</td>
-<td>boolean</td>
-<td>Yes</td>
-<td>true</td>
-<td>Validate all runs in pipeline_report?</td>
-</tr>
-<tr>
-<td>table</td>
-<td>array<!-- raw HTML omitted --></td>
-<td>Yes</td>
-<td>[]</td>
-<td>Subset of default tables to validate.</td>
-</tr>
-<tr>
-<td>crossTableValidation</td>
-<td>Boolean</td>
-<td>Yes</td>
-<td>true</td>
-<td>Perform Cross Table Validation?</td>
-</tr>
-</tbody>
+  <thead>
+      <tr>
+          <th>Parameter</th>
+          <th>Type</th>
+          <th>Optional</th>
+          <th>Default Value</th>
+          <th>Description</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>etlDB</td>
+          <td>string</td>
+          <td>No</td>
+          <td>NA</td>
+          <td>Overwatch ETL database name to validate</td>
+      </tr>
+      <tr>
+          <td>allRun</td>
+          <td>boolean</td>
+          <td>Yes</td>
+          <td>true</td>
+          <td>Validate all runs in pipeline_report?</td>
+      </tr>
+      <tr>
+          <td>table</td>
+          <td>array<!-- raw HTML omitted --></td>
+          <td>Yes</td>
+          <td>[]</td>
+          <td>Subset of default tables to validate.</td>
+      </tr>
+      <tr>
+          <td>crossTableValidation</td>
+          <td>Boolean</td>
+          <td>Yes</td>
+          <td>true</td>
+          <td>Perform Cross Table Validation?</td>
+      </tr>
+  </tbody>
 </table>
 <p>Below are example pipeline validation runs, first with default behavior
 followed by demonstrations of the optional paramaters.</p>
@@ -2297,19 +2297,19 @@ Here we can see from the above screenshot that:</p>
     <div style="left: -1000px; overflow: scroll; position: absolute; top: -1000px; border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;">
       <div style="border: none; box-sizing: content-box; height: 200px; margin: 0px; padding: 0px; width: 200px;"></div>
     </div>
-    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/clipboard.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/perfect-scrollbar.jquery.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/jquery.sticky.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/featherlight.min.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/highlight.pack.js?1767883980"></script>
     <script>hljs.initHighlightingOnLoad();</script>
-    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1727378842"></script>
-    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1727378842"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/modernizr.custom-3.6.0.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/learn.js?1767883980"></script>
+    <script src="https://databrickslabs.github.io/overwatch/js/hugo-learn.js?1767883980"></script>
 
-    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1727378842" rel="stylesheet" />
-    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1727378842"></script>
+    <link href="https://databrickslabs.github.io/overwatch/mermaid/mermaid.css?1767883980" rel="stylesheet" />
+    <script src="https://databrickslabs.github.io/overwatch/mermaid/mermaid.js?1767883980"></script>
     <script>
         mermaid.initialize({ startOnLoad: true });
     </script>
